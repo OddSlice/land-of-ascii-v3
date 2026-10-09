@@ -10,7 +10,7 @@
 // It reads nothing but its own cell, so stripes never touch each other.
 import { LOOK } from './look.js';
 import { MAT, MAT_NAMES, MAT_COUNT, HIT_STRIDE, CELL_STRIDE } from './contract.js';
-import { FAMILY } from './glyphs.js';
+import { FAMILY, SHADE_STEPS } from './glyphs.js';
 import { sunDir, moonDir } from './world/sky.js';
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -117,7 +117,7 @@ const sky3 = [0, 0, 0];
 // Resolve a stripe. `hits` and `cells` cover columns c0..c0+sw-1, all rows.
 export function resolveStripe(pal, hits, cells, sw, rows, c0) {
   const { lit, shade, k } = pal;
-  const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade;
+  const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade, curve = LOOK.curve, toneRung = LOOK.toneRung;
   const haze = k.haze, torch = k.torch;
   const [ifr, ifg, ifb] = pal.inkFloor;
   for (let cy = 0; cy < rows; cy++) {
@@ -141,6 +141,17 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0) {
         h = haze.max * (1 - Math.exp(-dist / (haze.dist * 9)));
         r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
         bright = light;
+        const cover = toneB / 255;
+        if (cover < 0.92) {
+          // the edge: sky behind, the cloud in a shade block over it
+          skyColour(pal, sh, (1 - cl) * Math.PI, sky3);
+          const step = cover < 0.42 ? 0 : cover < 0.7 ? 1 : 2;
+          const bc = clampColour(sky3[0], sky3[1], sky3[2]);
+          cells[oc] = bc[0]; cells[oc + 1] = bc[1]; cells[oc + 2] = bc[2]; cells[oc + 3] = SHADE_STEPS[step];
+          const fc = clampColour(r, g, b);
+          cells[oc + 4] = fc[0]; cells[oc + 5] = fc[1]; cells[oc + 6] = fc[2]; cells[oc + 7] = 0;
+          continue;
+        }
       } else if (m === MAT.SUN || m === MAT.MOON || m === MAT.FLAME) {
         const c = m === MAT.SUN ? k.sun : m === MAT.MOON ? k.moon : k.flame;
         const f = m === MAT.FLAME ? 0.75 + 0.25 * light : 1;
@@ -149,13 +160,14 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0) {
       } else {
         // a lit surface
         const L = pal.ambient + pal.direct * light * (1 - pal.castK * sh) * (1 - pal.cloudK * cl);
-        const t = L < 0 ? 0 : L > 1 ? 1 : L;
+        const t0 = L < 0 ? 0 : L > 1 ? 1 : L;
+        const t = Math.pow(t0, curve);
         const j = m * 3;
         r = shade[j] + (lit[j] - shade[j]) * t;
         g = shade[j + 1] + (lit[j + 1] - shade[j + 1]) * t;
         b = shade[j + 2] + (lit[j + 2] - shade[j + 2]) * t;
         if (m === MAT.WATER) {
-          const fr = toneB / 255;
+          const fr = 0.85 * toneB / 255;
           const ws = k.water.sky;
           r += (ws[0] - r) * fr; g += (ws[1] - g) * fr; b += (ws[2] - b) * fr;
         } else {
@@ -166,8 +178,8 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0) {
         r += torch.colour[0] * tg; g += torch.colour[1] * tg; b += torch.colour[2] * tg;
         h = haze.max * (1 - Math.exp(-dist / haze.dist));
         r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
-        bright = t + tg * 2.5;
-        if (bright > 1) bright = 1;
+        bright = t0 + tg * 2.5 + toneRung * ((toneB - 128) / 127);
+        if (bright > 1) bright = 1; else if (bright < 0) bright = 0;
       }
       // glyph: the rung of the family's ladder
       const fam = FAMILY[m];

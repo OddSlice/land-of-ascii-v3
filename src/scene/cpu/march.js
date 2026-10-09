@@ -37,8 +37,9 @@ export class Marcher {
     this.v = v; this.rays = rays; this.hits = hits; this.torch = torch;
     this.dEnd = [];
     for (let L = 0; L < LEVELS; L++) this.dEnd.push((1 << L) / (LOD_Q * v.colAngle));
-    // merlons fade to the walkway before they get thinner than two columns
-    this.merlonFar = 1 / (2.2 * v.colAngle);
+    // merlons sink into the walkway before they get thinner than about two
+    // cells across or tall
+    this.merlonFar = Math.min(WALL.merlonW / (1.6 * v.colAngle), WALL.merlon / (1.6 * v.rowAngle));
     for (let p = 0; p < rays.np; p++) {
       const start = rays.pstart[p], n = rays.pstart[p + 1] - start;
       if (n) this.plane(p, start, n);
@@ -304,7 +305,7 @@ export class Marcher {
       lam = nx * Ld[0] + ny * Ld[1] + nz * Ld[2];
       if (lam < 0) lam = 0;
       const patch = bil1(T.tone, x, z);
-      if (mat === MAT.ROCK) tone = 0.7 * Math.sin(y * 1.4 + patch * 3) * fade(2) + 0.4 * patch;
+      if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fade(3) + 0.6 * patch + 0.3 * fine * fade(2);
       else tone = 0.75 * patch * fade(5) + 0.45 * fine * fade(1.8);
     }
     const shadow = bil2(lv[L], this.light.S[L], x, z) * (1 - beta) + (beta > 0 ? bil2(lv[L + 1], this.light.S[L + 1], x, z) * beta : 0);

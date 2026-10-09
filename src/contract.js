@@ -33,12 +33,16 @@ export const MAT_COUNT = MAT_NAMES.length;
 //             Sun, moon, flame: brightness of the light source.
 //             Star: elevation, as for the sky.
 // [2] shadow  cast shadow from terrain, walls and trees, 0 = lit .. 255 = fully shadowed
+//             Cloud: the sky's elevation behind it (as the sky's light).
 // [3] cloud   cloud shadow, 0 = none .. 255 = deepest
+//             Cloud: the sky's closeness to the sun behind it (as the sky's tone).
 // [4] glow    point light (the torch), 0..255
 // [5] tone    material detail, 0..255 with 128 = none (patches, joints, strata).
 //             Sky: closeness to the sun, 255 * (1 - angle / pi).
 //             Star: brightness of the star.
 //             Water: Fresnel share of reflected sky, 0..255.
+//             Cloud: coverage, 255 = solid; less at the edge, where the cloud
+//             dissolves into the sky behind it.
 // [6..7] dist distance along the ray in decimetres, little-endian uint16;
 //             65535 = infinitely far (sky).
 export const HIT_STRIDE = 8;

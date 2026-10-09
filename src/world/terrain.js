@@ -32,7 +32,7 @@ export function roadDist(x, z) {
 }
 
 function naturalHeight(x, z) {
-  let h = GROUND + 0.5 + 1.5 * fbm(x / 160, z / 160, SEED + 1, 3) + 0.35 * fbm(x / 45, z / 45, SEED + 2, 2);
+  let h = GROUND + 0.5 + 1.5 * fbm(x / 160, z / 160, SEED + 1, 3) + 0.9 * fbm(x / 55, z / 55, SEED + 2, 2) + 0.25 * fbm(x / 18, z / 18, SEED + 9, 2);
   // long shallow rises toward the west, east and south rims
   const edge = Math.min(x, N - x, z + 40);
   const rim = smoothstep(115, 0, edge);
@@ -40,12 +40,20 @@ function naturalHeight(x, z) {
   // one low rounded hill
   const dh = Math.hypot(x - HILL.x, z - HILL.z) / HILL.r;
   if (dh < 1) h += HILL.h * 0.5 * (1 + Math.cos(dh * Math.PI));
-  // the ridge along the north edge
+  // the ridge along the north edge: a rising massif and a few peaks on it,
+  // carved by ridged noise into ribs and gullies
   const t = smoothstep(RIDGE.z0, RIDGE.z1, z);
-  if (t > 0) {
-    const crest = 0.72 + 0.2 * fbm(x / 120, 3.3, SEED + 4, 3)
-      + 0.22 * Math.exp(-(((x - 214) / 52) ** 2)) + 0.15 * Math.exp(-(((x - 350) / 42) ** 2));
-    h += RIDGE.h * Math.pow(t, 1.7) * crest + 11 * t * ridged(x / 38, z / 38, SEED + 5, 3) - 4 * t;
+  const foot = smoothstep(RIDGE.z0 - 70, RIDGE.z0 + 50, z);
+  if (foot > 0) {
+    let peak = 0;
+    for (const [px, pz, ph, pr] of RIDGE.peaks) {
+      const u = Math.hypot(x - px, (z - pz) * 1.1) / pr;
+      if (u < 3.5) peak = Math.max(peak, ph * Math.exp(-1.5 * u));
+    }
+    peak *= foot;
+    const rib = ridged(x / 30, z / 36, SEED + 5, 4);
+    h += RIDGE.base * Math.pow(t, 1.3) * (0.75 + 0.25 * fbm(x / 80, 7.7, SEED + 4, 3));
+    h += peak * (0.85 + 0.15 * fbm(x / 26, z / 26, SEED + 6, 2)) + foot * t * (7 + peak * 0.3) * (rib - 0.35);
   }
   return h;
 }
@@ -152,12 +160,12 @@ export function buildTerrain() {
       const slope = 1 - ny;
       const rd = k < 170 ? roadDist(i, k) : 99;
       wRoad[j] = 255 * (1 - smoothstep(ROAD.half - ROAD.soft / 2, ROAD.half + ROAD.soft / 2, rd));
-      const dn = lakeDist(i, k) + 0.04 * fine[j];
-      wSand[j] = 255 * (1 - smoothstep(1.1, 1.22, dn)) * (h < WATER + 1.6 ? 1 : 0);
-      const high = smoothstep(GROUND + 28, GROUND + 52, h);
-      wRock[j] = 255 * Math.min(1, smoothstep(0.24, 0.40, slope) + 0.75 * high);
-      const snowLine = h + 7 * tone[j];
-      wSnow[j] = 255 * smoothstep(86, 96, snowLine) * (1 - smoothstep(0.42, 0.6, slope));
+      const dn = lakeDist(i, k) + 0.03 * fine[j] + 0.02 * tone[j];
+      wSand[j] = 255 * (1 - smoothstep(1.01, 1.06, dn)) * (h < WATER + 1.0 ? 1 : 0);
+      const high = smoothstep(GROUND + 26, GROUND + 44, h + 6 * tone[j]);
+      wRock[j] = 255 * Math.min(1, smoothstep(0.26, 0.42, slope) + high);
+      const snowLine = h + 6 * tone[j];
+      wSnow[j] = 255 * smoothstep(80, 90, snowLine) * (1 - smoothstep(0.55, 0.75, slope));
     }
   }
 

@@ -12,15 +12,16 @@ export function sunDir(hour) {
   return [-Math.sin(th), Math.cos(th) * Math.cos(LAT), -Math.cos(th) * Math.sin(LAT)];
 }
 
-// The moon runs about ten hours behind the sun, a little higher in the sky.
+// The moon runs thirteen hours behind the sun, a little higher in the sky:
+// below the horizon at dusk, high in the south-east late at night.
 export function moonDir(hour) {
-  const th = (hour - 12 - 10.5) / 24 * Math.PI * 2;
+  const th = (hour - 12 - 13) / 24 * Math.PI * 2;
   const lat = LAT - 0.18;
   return [-Math.sin(th), Math.cos(th) * Math.cos(lat), -Math.cos(th) * Math.sin(lat)];
 }
 
 export const WIND = [2.4, 0];          // metres a second, due east
-export const CLOUD_SPAN = 4400;        // clouds wrap east-west over this width
+export const CLOUD_SPAN = 7600;        // clouds wrap east-west over this width
 export const CLOUD_CX = 256;           // centred on the valley
 
 // Hand-placed cluster centres (x, z at t = 0) and their base heights. The
@@ -34,20 +35,24 @@ const CLUSTERS = [
   [1100, 2900, 940, 1.1], [-1300, 1700, 900, 0.95],
   // east and west, and behind
   [1500, 500, 920, 1.0], [-1100, 400, 900, 0.9], [900, -1500, 930, 1.05], [-700, -1400, 960, 1.0],
+  // low in the east, seen across the wall at dusk
+  [2700, 1500, 900, 2.0], [3100, 300, 880, 1.9], [2300, 2600, 940, 1.9], [3300, -900, 920, 1.8],
+  [-2600, 900, 950, 1.6], [-2400, 2400, 980, 1.6]
 ];
 
 export function buildClouds() {
   const clusters = CLUSTERS.map(([x, z, base, scale], c) => {
     const r = (n) => hash2(c, n, SEED + 61);
-    const main = (190 + 70 * r(1)) * scale;
-    const puffs = [[0, 0, main * 0.42, main]];
+    const main = (210 + 70 * r(1)) * scale;
+    // flat-bottomed domes: puff centres sit a little above the base, so the
+    // cut underneath is wide
+    const puffs = [[0, 0, main * 0.3, main]];
     const n = 4 + Math.floor(3 * r(2));
     for (let p = 0; p < n; p++) {
       const a = r(10 + p) * Math.PI * 2;
-      const d = main * (0.55 + 0.6 * r(20 + p));
-      const pr = main * (0.45 + 0.35 * r(30 + p));
-      // flatter and wider east-west
-      puffs.push([Math.cos(a) * d * 1.35, Math.sin(a) * d * 0.7, pr * 0.35 + main * 0.05 * r(40 + p), pr]);
+      const d = main * (0.55 + 0.5 * r(20 + p));
+      const pr = main * (0.5 + 0.3 * r(30 + p));
+      puffs.push([Math.cos(a) * d * 1.7, Math.sin(a) * d * 0.6, pr * 0.2, pr]);
     }
     let reach = 0;
     for (const [dx, dz, , pr] of puffs) reach = Math.max(reach, Math.hypot(dx, dz) + pr);

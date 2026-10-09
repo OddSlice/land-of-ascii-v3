@@ -3,7 +3,9 @@
 // light), the cloud shadows, and the torch.
 import { NN, LEVELS } from '../../world/terrain.js';
 import { N } from '../../world/layout.js';
-import { sunDir, moonDir, clusterAt } from '../../world/sky.js';
+import { sunDir, moonDir, WIND } from '../../world/sky.js';
+import { fbm } from '../../world/noise.js';
+import { SEED } from '../../world/layout.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
@@ -119,7 +121,6 @@ export class Light {
     this.S = [];                       // ground shadow per level, 0..1
     this.key = null;
     this.cloud = new Float32Array(CLOUD_GRID * CLOUD_GRID);
-    this.puffs = new Float32Array(4 * 256);
   }
 
   // Called once per frame with the frame's hour and clock.
@@ -172,51 +173,26 @@ export class Light {
     return smooth(-0.15, 0.5, v - y);
   }
 
-  // Cloud shadow on a coarse grid over the valley, from the puffs that can
-  // reach it. Soft: a puff darkens the ground most under its middle.
+  // Cloud shadow on a coarse grid over the valley: large soft patches from a
+  // low-frequency field that drifts with the wind, cast along the light so
+  // they slide across slopes the right way. Fixed to the land, so walking
+  // never makes them crawl.
   updateClouds(t) {
     const g = this.cloud;
-    g.fill(0);
-    this.cloudsOn = false;
-    if (this.L[1] < 0.08) return;
     const L = this.isSun ? this.sun : this.moon;
-    if (L[1] < 0.08) return;
-    const P = this.puffs;
-    let np = 0;
+    this.cloudsOn = L[1] > 0.08;
+    if (!this.cloudsOn) return;
     const H = this.world.terrain.levels[0].H;
-    const ground = 14;
-    for (const cl of this.world.clouds.clusters) {
-      const [cx, cz, fade] = clusterAt(cl, t);
-      if (fade <= 0) continue;
-      // where the cluster's shadow lands
-      const k = (cl.base + 150 - ground) / L[1];
-      const sx = cx - L[0] * k, sz = cz - L[2] * k;
-      const reach = cl.reach * fade / L[1];
-      if (sx < -reach || sx > N + reach || sz < -reach || sz > N + reach) continue;
-      for (const [dx, dz, dy, r] of cl.puffs) {
-        if (np >= 255) break;
-        P[np * 4] = cx + dx; P[np * 4 + 1] = cl.base + dy; P[np * 4 + 2] = cz + dz; P[np * 4 + 3] = r * fade;
-        np++;
-      }
-    }
-    if (!np) return;
-    this.cloudsOn = true;
-    const [lx, ly, lz] = L;
+    const lift = 900;                       // height of the cloud layer
+    const ox = WIND[0] * t, oz = WIND[1] * t;
     for (let gz = 0; gz < CLOUD_GRID; gz++) {
       for (let gx = 0; gx < CLOUD_GRID; gx++) {
         const x = gx * CLOUD_STEP, z = gz * CLOUD_STEP;
         const y = H[Math.round(z) * NN + Math.round(x)];
-        let best = 0;
-        for (let p = 0; p < np; p++) {
-          const ox = P[p * 4] - x, oy = P[p * 4 + 1] - y, oz = P[p * 4 + 2] - z, r = P[p * 4 + 3];
-          const tc = ox * lx + oy * ly + oz * lz;
-          if (tc <= 0) continue;
-          const b2 = ox * ox + oy * oy + oz * oz - tc * tc;
-          if (b2 >= r * r) continue;
-          const s = smooth(1.0, 0.35, Math.sqrt(b2) / r);
-          if (s > best) best = s;
-        }
-        g[gz * CLOUD_GRID + gx] = best;
+        const k = (lift - y) / L[1];
+        const cx = x + L[0] * k - ox + 1920, cz = z + L[2] * k - oz + 1740;
+        const n = fbm(cx / 105, cz / 85, SEED + 91, 3);
+        g[gz * CLOUD_GRID + gx] = smooth(0.0, 0.11, n);
       }
     }
   }
@@ -235,4 +211,4 @@ export class Light {
 export function torchPower(t) {
   return 1 + 0.07 * Math.sin(t * 9.1) + 0.05 * Math.sin(t * 23.7 + 1.3) + 0.03 * Math.sin(t * 41.3 + 0.4);
 }
-export const TORCH_RANGE = 9;
+export const TORCH_RANGE = 11;

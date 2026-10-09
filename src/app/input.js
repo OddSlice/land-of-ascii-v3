@@ -19,6 +19,7 @@ export class Input {
     target.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
       this.dragging = true;
+      this.lastX = e.clientX; this.lastY = e.clientY;
       if (!this.locked && target.requestPointerLock) {
         try {
           const p = target.requestPointerLock();
@@ -28,7 +29,12 @@ export class Input {
     });
     addEventListener('mouseup', () => { this.dragging = false; });
     addEventListener('mousemove', (e) => {
-      if (this.locked || this.dragging) { this.look.dx += e.movementX; this.look.dy += e.movementY; }
+      if (this.locked) { this.look.dx += e.movementX; this.look.dy += e.movementY; return; }
+      // dragging: from the cursor's own positions (some engines report no movementX)
+      if (this.dragging) {
+        this.look.dx += e.clientX - this.lastX; this.look.dy += e.clientY - this.lastY;
+        this.lastX = e.clientX; this.lastY = e.clientY;
+      }
     });
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === target; });
     document.addEventListener('pointerlockerror', () => { this.locked = false; });

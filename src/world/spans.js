@@ -14,9 +14,9 @@ export function buildSpans() {
   for (let z = WALL.z0; z < WALL.z1; z++) {
     for (let x = WALL.x0; x < WALL.x1; x++) {
       let f = 0;
-      // merlons on both parapets, one metre wide every two metres
+      // merlons on both parapets
       const edgeRow = z === WALL.z0 || z === WALL.z1 - 1;
-      if (edgeRow && (x - WALL.x0) % 2 === 0) f |= SPAN_MERLON;
+      if (edgeRow && (x - WALL.x0) % (WALL.merlonW + WALL.merlonGap) < WALL.merlonW) f |= SPAN_MERLON;
       // the two end blocks stand a little taller all across
       if (x === WALL.x0 || x === WALL.x1 - 1) f |= SPAN_MERLON;
       if (x >= GATE.x0 && x < GATE.x1) f |= SPAN_ARCH;

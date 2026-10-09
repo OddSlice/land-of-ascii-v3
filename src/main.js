@@ -257,6 +257,13 @@ Object.assign(lab, {
     });
   },
   stats() { return { ...timing }; },
+  // Walk with the given keys held for a number of seconds of game time, in
+  // fixed 1/60 s steps (for tests; the frame rate does not matter).
+  walk(keys, seconds) {
+    const held = Object.fromEntries(keys.map((k) => [k, true]));
+    for (let i = 0; i < Math.round(seconds * 60); i++) player.update(1 / 60, held);
+    return { x: player.x, z: player.z, feet: player.feet };
+  },
   // FNV-1a over the whole cell buffer, to compare workers with ?threads=0.
   cellHash() {
     let h = 0x811c9dc5;
@@ -264,5 +271,16 @@ Object.assign(lab, {
     return (h >>> 0).toString(16).padStart(8, '0');
   },
   atlasReport() { return [...atlases.values()].map((a) => ({ cw: a.cw, ch: a.ch, fontPx: +a.fontPx.toFixed(2), shades: a.report })); },
+  // The atlas for a cell width as a PNG data URL (white ink on black), for checking glyphs.
+  atlasPNG(cw) {
+    const a = cw ? (atlases.get(cw) || buildAtlas(cw, cw * 2)) : atlases.get(grid.cw);
+    const c = document.createElement('canvas');
+    c.width = a.width; c.height = a.height;
+    const g = c.getContext('2d');
+    const img = g.createImageData(a.width, a.height);
+    for (let i = 0; i < a.cov.length; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = a.cov[i]; img.data[i * 4 + 3] = 255; }
+    g.putImageData(img, 0, 0);
+    return { url: c.toDataURL('image/png'), report: a.report, fontPx: a.fontPx };
+  },
   world: { buildMs: world.buildMs, trees: world.objects.trees.length, bushes: world.objects.bushes.length },
 });

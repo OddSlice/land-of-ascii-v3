@@ -20,7 +20,12 @@ export const FAMILY = MAT_NAMES.map((name) => {
   return Uint8Array.from([...m.glyphs], add);
 });
 
-if (GLYPHS.length > 256) throw new Error('more than 256 glyphs');
+
+// The shade blocks, light to heavy: resolve uses them where one thing
+// dissolves into another (a cloud's edge into the sky).
+export const SHADE_STEPS = Uint8Array.from(['░', '▒', '▓'], add);
 
 // Glyphs the atlas draws by hand when the font renders them badly.
 export const SHADES = { '░': 0.25, '▒': 0.5, '▓': 0.75, '█': 1 };
+
+if (GLYPHS.length > 256) throw new Error('more than 256 glyphs');

@@ -24,6 +24,7 @@ let failed = false;
 try {
   const lab = await openLab(browser, url, { built: !!a.built, threads: a.threads, density: a.density });
   const { page } = lab;
+  await page.evaluate(() => window.lab.setHud(false));
   const cams = await page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, ref: c.ref, refLabel: c.refLabel, time: c.time })));
   const shots = [];
   const shoot = async (file) => {

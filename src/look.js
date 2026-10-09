@@ -21,7 +21,7 @@ export const LOOK = {
   fovY: 60,
 
   // Hours the 1, 2, 3 keys jump to.
-  hours: { day: 12.5, dusk: 17.85, night: 23.0 },
+  hours: { day: 14.0, dusk: 17.85, night: 23.0 },
 
   // Clamps applied to every colour after lighting, haze and ink.
   clamp: {
@@ -32,6 +32,15 @@ export const LOOK = {
 
   // Ordered dither between rungs of a ladder, in rungs (0 = hard steps).
   dither: 0.7,
+
+  // Light to colour: a surface's colour sits between its shade and lit
+  // colours at light^curve, so shadows deepen faster than highlights.
+  curve: 1.45,
+
+  // How much a material's detail (its tone) moves the rung up or down the
+  // ladder, so neighbouring cells do not all wear the same glyph. The detail
+  // is fixed to the land, so this does not crawl as you walk.
+  toneRung: 0.45,
 
   // Haze: the share of the horizon colour mixed in at distance d is
   // 1 - exp(-d / dist), times `max`.
@@ -50,20 +59,20 @@ export const LOOK = {
   // changes its colour.
   materials: {
     sky:     { glyphs: ' ',          ink: { lit: 0.00, dark: 0.00 } },
-    cloud:   { glyphs: ' .:░▒',      ink: { lit: -0.06, dark: 0.10 } },
+    cloud:   { glyphs: ' .:░▒',      ink: { lit: -0.07, dark: 0.12 } },
     sun:     { glyphs: '@',          ink: { lit: -0.06, dark: -0.06 }, emissive: true },
     moon:    { glyphs: '@',          ink: { lit: -0.10, dark: -0.10 }, emissive: true },
     star:    { glyphs: '.+*',        ink: { lit: 0.9, dark: 0.9 }, emissive: true },
-    grass:   { glyphs: '.,:;"*%#',   ink: { lit: -0.13, dark: 0.32 }, tone: 0.10 },
-    dirt:    { glyphs: '.:-=+#',     ink: { lit: -0.12, dark: 0.30 }, tone: 0.08 },
-    sand:    { glyphs: '.,:;=░',     ink: { lit: -0.10, dark: 0.30 }, tone: 0.06 },
-    rock:    { glyphs: '.:=%#▒',     ink: { lit: -0.13, dark: 0.30 }, tone: 0.10 },
-    snow:    { glyphs: ' .-=+',      ink: { lit: -0.08, dark: 0.22 }, tone: 0.05 },
-    water:   { glyphs: '-~=≈',       ink: { lit: 0.10, dark: 0.28 }, tone: 0.0 },
-    stone:   { glyphs: '.:=#▒▓',     ink: { lit: -0.14, dark: 0.30 }, tone: 0.16 },
-    conifer: { glyphs: '.:^*%#▒',    ink: { lit: -0.15, dark: 0.30 }, tone: 0.10 },
-    trunk:   { glyphs: ':|!I#',      ink: { lit: -0.15, dark: 0.30 } },
-    bush:    { glyphs: '.:o%&@',     ink: { lit: -0.15, dark: 0.30 }, tone: 0.08 },
+    grass:   { glyphs: ',:;"+*%#',   ink: { lit: -0.30, dark: 0.50 }, tone: 0.20 },
+    dirt:    { glyphs: '.:-=+#',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.10 },
+    sand:    { glyphs: '.,:;=+',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.08 },
+    rock:    { glyphs: ':=%#▒▓',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.14 },
+    snow:    { glyphs: '.-=+*',      ink: { lit: -0.14, dark: 0.36 }, tone: 0.06 },
+    water:   { glyphs: '-~=≈',       ink: { lit: 0.16, dark: 0.40 }, tone: 0.0 },
+    stone:   { glyphs: ':=#▒▓█',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.18 },
+    conifer: { glyphs: ':^*%#&▒',    ink: { lit: -0.28, dark: 0.50 }, tone: 0.12 },
+    trunk:   { glyphs: ':|!I#',      ink: { lit: -0.28, dark: 0.46 } },
+    bush:    { glyphs: ':o%&@',      ink: { lit: -0.28, dark: 0.50 }, tone: 0.10 },
     wood:    { glyphs: ':|!I',       ink: { lit: -0.15, dark: 0.30 } },
     flame:   { glyphs: '*^&@',       ink: { lit: 0.25, dark: 0.25 }, emissive: true },
   },
@@ -77,22 +86,22 @@ export const LOOK = {
   // reaches the surface.
   keys: {
     day: {
-      sky:    { high: '#465b9a', horizon: '#7186a3', glow: '#a9b4c4', glowSize: 0.12 },
-      cloud:  { lit: '#d2d4dc', shade: '#565a78' },
-      light:  { ambient: 0.30, direct: 0.80, cloudShadow: 0.55, castShadow: 0.92 },
-      haze:   { colour: '#7d8ea8', dist: 520, max: 0.82 },
-      torch:  { colour: '#ffb060', strength: 0.10 },
+      sky:    { high: '#465b9a', horizon: '#62769a', glow: '#9aa7bd', glowSize: 0.12 },
+      cloud:  { lit: '#dfe1e8', shade: '#4c5070' },
+      light:  { ambient: 0.30, direct: 0.80, cloudShadow: 0.62, castShadow: 0.92 },
+      haze:   { colour: '#6f819e', dist: 700, max: 0.72 },
+      torch:  { colour: '#ffb060', strength: 0.04 },
       stars:  0,
       sun:    '#f4eedc',
       moon:   '#c8ccd6',
-      grass:  { lit: '#7d9746', shade: '#34402c' },
+      grass:  { lit: '#6f8a3e', shade: '#2f3b29' },
       dirt:   { lit: '#8f7d64', shade: '#433a33' },
       sand:   { lit: '#93805e', shade: '#4a4036' },
-      rock:   { lit: '#857b6e', shade: '#444348' },
-      snow:   { lit: '#c4bdb6', shade: '#6d6c78' },
-      water:  { lit: '#4a5868', shade: '#3a4552', sky: '#7f90ad' },
+      rock:   { lit: '#8a7e6d', shade: '#383842' },
+      snow:   { lit: '#d6cfc6', shade: '#737586' },
+      water:  { lit: '#334152', shade: '#2a3544', sky: '#647693' },
       stone:  { lit: '#9a958d', shade: '#4d4b50' },
-      conifer:{ lit: '#45583e', shade: '#253024' },
+      conifer:{ lit: '#3f5239', shade: '#212b20' },
       trunk:  { lit: '#5e4b3a', shade: '#2e2620' },
       bush:   { lit: '#55703a', shade: '#28331f' },
       wood:   { lit: '#6a5340', shade: '#342a22' },
@@ -103,7 +112,7 @@ export const LOOK = {
       cloud:  { lit: '#cba189', shade: '#4a3f58' },
       light:  { ambient: 0.30, direct: 0.55, cloudShadow: 0.25, castShadow: 0.80 },
       haze:   { colour: '#5e4d5c', dist: 420, max: 0.85 },
-      torch:  { colour: '#ff9f50', strength: 0.55 },
+      torch:  { colour: '#ff9f50', strength: 0.30 },
       stars:  0.15,
       sun:    '#f0b07a',
       moon:   '#b8b6c4',
@@ -125,7 +134,7 @@ export const LOOK = {
       cloud:  { lit: '#3b3b47', shade: '#1a1b23' },
       light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70 },
       haze:   { colour: '#1a1e29', dist: 330, max: 0.80 },
-      torch:  { colour: '#ff9a4a', strength: 1.0 },
+      torch:  { colour: '#ffb15a', strength: 0.55 },
       stars:  1,
       sun:    '#f4eedc',
       moon:   '#c9ccd4',

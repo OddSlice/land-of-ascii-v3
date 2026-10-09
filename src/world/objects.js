@@ -12,9 +12,9 @@ export function groundAt(ground, x, z) {
   return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
 }
 
-function conifer(x, z, base, s) {
+function conifer(x, z, base, s, tall = 1) {
   const r = (n) => hash2(s, n, SEED + 31);
-  const h = 13 + 7.5 * r(1);
+  const h = (13 + 7.5 * r(1)) * tall;
   const R = 2.0 + 0.9 * r(2);
   const c0 = 2.0 + 1.2 * r(3);
   const T = 7 + Math.floor(3 * r(4));
@@ -41,19 +41,19 @@ export function buildObjects(terrain) {
     let placed = 0;
     for (let tries = 0; tries < st.count * 60 && placed < st.count; tries++) {
       const a = hash2(s, tries, SEED + 41) * Math.PI * 2;
-      const rr = st.r * Math.sqrt(hash2(s, tries, SEED + 42));
-      const x = st.x + Math.cos(a) * rr * 1.25, z = st.z + Math.sin(a) * rr * 0.85;
-      if (lakeDist(x, z) < 1.12) continue;
+      const rr = Math.sqrt(hash2(s, tries, SEED + 42));
+      const x = st.x + Math.cos(a) * rr * st.rx, z = st.z + Math.sin(a) * rr * st.rz;
+      if (lakeDist(x, z) < 1.1) continue;
       if (roadDist(x, z) < 5) continue;
       if (z > WALL.z0 - 8 && z < WALL.z1 + 8) continue;
       // loose: keep a clear gap between trunks, with the odd close pair
       let ok = true;
       for (const t of trees) {
         const d = Math.hypot(t.x - x, t.z - z);
-        if (d < 4.6) { ok = false; break; }
+        if (d < st.gap) { ok = false; break; }
       }
       if (!ok) continue;
-      trees.push(conifer(x, z, groundAt(ground, x, z) - 0.3, s * 1000 + placed));
+      trees.push(conifer(x, z, groundAt(ground, x, z) - 0.3, s * 1000 + placed, st.tall || 1));
       placed++;
     }
     s++;

@@ -1,6 +1,6 @@
 // What the remaining rays see: the sky gradient, cumulus clouds, the sun or
 // moon disc, and stars. Clouds are clusters of puffs cut flat underneath;
-// their edges are dithered by an ordered pattern so they break up into cells
+// their edges are stippled with a scattered threshold so they break up into cells
 // the way the reference footage does. Stars are projected from fixed
 // directions onto the cell they fall in, so they never blink as you turn.
 import { MAT, HIT_STRIDE } from '../../contract.js';
@@ -80,8 +80,8 @@ export class SkyPass {
 
   cloud(v, dx, dy, dz, cx, cy, Lc, m, ci) {
     const ex = v.ex, ey = v.ey, ez = v.ez;
-    const dither = BAYER[(cy & 3) * 4 + (cx & 3)];
-    let best = Infinity, bl = 0, bdist = 0;
+    const jitter = hash2(cx, cy, SEED + 83) - 0.5;
+    let best = Infinity, bl = 0, bdist = 0, bcover = 0;
     for (const c of this.cl) {
       // bounding sphere of the cluster
       const ox = c.x - ex, oy = c.cy - ey, oz = c.z - ez;
@@ -111,26 +111,32 @@ export class SkyPass {
           eps = 1 - q2 / (r * r);
         }
         if (t0 >= best) continue;
-        // dithered, lumpy edge a couple of cells wide
-        const edgeW = Math.min(0.6, Math.max(0.05, 7 * v.colAngle * t0 / r));
+        // a lumpy edge a couple of cells wide, dissolving into the sky
+        const edgeW = Math.min(0.6, Math.max(0.08, 9 * v.colAngle * t0 / r));
         const hx = (ex + dx * t0 - px) / r, hy = (ey + dy * t0 - py) / r, hz = (ez + dz * t0 - pz) / r;
-        const lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.5
-          + vnoise(hx * 7.3 - hz * 3.1, hy * 7.3 + hz * 5.9 + k * 3, SEED + 82) * 0.25;
-        const cover = (eps + lumps * Math.min(0.5, 2.5 * edgeW)) / edgeW;
-        if (cover < dither) continue;
+        const lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
+          + vnoise(hx * 6.1 - hz * 2.9, hy * 6.1 + hz * 4.3 + k * 3, SEED + 82) * 0.2;
+        const cover = (eps + lumps * Math.min(0.45, 2.2 * edgeW)) / edgeW + jitter * 0.35;
+        if (cover < 0.15) continue;
         best = t0;
         bdist = t0;
+        bcover = cover > 1 ? 1 : cover;
         // bright tops, grey undersides, the sunny side lit
         let nx, ny, nz;
         if (underside) { nx = 0; ny = -1; nz = 0; } else { nx = hx; ny = hy; nz = hz; }
         const up = ny * 0.5 + 0.5;
         const sunny = Math.max(0, nx * Lc[0] + ny * Lc[1] + nz * Lc[2]);
         const height = Math.min(1, Math.max(0, (ey + dy * t0 - c.base) / (c.main * 1.1)));
-        bl = Math.min(1, Math.max(0, (0.12 + 0.5 * up + 0.38 * sunny) * (0.55 + 0.45 * height) - (underside ? 0.12 : 0)));
+        // a fairly sharp turn from the lit body to the grey underside
+        const body = smooth(0.18, 0.62, up);
+        bl = Math.min(1, Math.max(0, (0.18 + 0.62 * body + 0.3 * sunny) * (0.7 + 0.3 * height) - (underside ? 0.25 : 0)));
       }
     }
     if (best === Infinity) return false;
-    m.write(ci, MAT.CLOUD, bl, 0, 0, 0, 0, Math.min(6500, bdist));
+    // the sky behind the cloud, for its dissolving edge
+    const sun = this.light.sun;
+    const ang = Math.acos(Math.max(-1, Math.min(1, dx * sun[0] + dy * sun[1] + dz * sun[2])));
+    m.write(ci, MAT.CLOUD, bl, dy, 1 - ang / Math.PI, 0, bcover * 2 - 1, Math.min(6500, bdist));
     return true;
   }
 
