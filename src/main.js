@@ -264,6 +264,8 @@ Object.assign(lab, {
     for (let i = 0; i < Math.round(seconds * 60); i++) player.update(1 / 60, held);
     return { x: player.x, z: player.z, feet: player.feet };
   },
+  // A copy of the whole cell buffer (for tools that compare frames).
+  cells() { return full.slice(); },
   // FNV-1a over the whole cell buffer, to compare workers with ?threads=0.
   cellHash() {
     let h = 0x811c9dc5;

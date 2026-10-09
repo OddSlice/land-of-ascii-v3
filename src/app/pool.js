@@ -3,10 +3,15 @@
 // another's. A worker error stops rendering and is shown on screen.
 
 /* global __WORKER_SOURCE__ */
+// The built single-file page carries the worker's bundled source inline.
+const INLINE = typeof __WORKER_SOURCE__ !== 'undefined' ? __WORKER_SOURCE__ : null;
+
 function workerURL() {
-  // The built single-file page carries the worker's bundled source inline.
-  if (typeof __WORKER_SOURCE__ !== 'undefined') {
-    return URL.createObjectURL(new Blob([__WORKER_SOURCE__], { type: 'text/javascript' }));
+  // Opened as a local file, Chromium refuses module workers from blob URLs,
+  // so there the source goes in a data URL (still a module worker).
+  if (INLINE) {
+    if (location.protocol === 'file:') return `data:text/javascript;charset=utf-8,${encodeURIComponent(INLINE)}`;
+    return URL.createObjectURL(new Blob([INLINE], { type: 'text/javascript' }));
   }
   return new URL('../worker.js', import.meta.url);
 }

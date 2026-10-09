@@ -12,7 +12,12 @@ export function cellWidth(preset, dpr) {
 // The grid for a picture area of cssW x cssH CSS pixels.
 export function layout(preset, cssW, cssH, dpr) {
   const cw = cellWidth(preset, dpr), ch = cw * 2;
-  const cols = Math.max(8, Math.floor(Math.floor(cssW * dpr) / cw));
-  const rows = Math.max(4, Math.floor(Math.floor(cssH * dpr) / ch));
+  let cols = Math.max(8, Math.floor(Math.floor(cssW * dpr) / cw));
+  let rows = Math.max(4, Math.floor(Math.floor(cssH * dpr) / ch));
+  // the canvas must also be a whole number of CSS pixels, or some engines
+  // (WebKit) composite it through a slow scaling path
+  const whole = (n) => Math.abs(n / dpr - Math.round(n / dpr)) < 1e-6;
+  for (let k = 0; k < 8 && cols > 8 && !whole(cols * cw); k++) cols--;
+  for (let k = 0; k < 8 && rows > 4 && !whole(rows * ch); k++) rows--;
   return { preset, cw, ch, cols, rows, cells: cols * rows };
 }

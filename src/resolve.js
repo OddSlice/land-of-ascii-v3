@@ -76,6 +76,7 @@ export function makePalette(hour) {
     inkDark: Float32Array.from(mats.map((m) => m.ink.dark)),
     toneAmp: Float32Array.from(mats.map((m) => m.tone || 0)),
     emissive: Uint8Array.from(mats.map((m) => (m.emissive ? 1 : 0))),
+    curve: Float32Array.from(mats.map((m) => m.curve || LOOK.curve)),
     inkFloor: hex(LOOK.inkFloor),
   };
   cacheHour = hour;
@@ -117,7 +118,7 @@ const sky3 = [0, 0, 0];
 // Resolve a stripe. `hits` and `cells` cover columns c0..c0+sw-1, all rows.
 export function resolveStripe(pal, hits, cells, sw, rows, c0) {
   const { lit, shade, k } = pal;
-  const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade, curve = LOOK.curve, toneRung = LOOK.toneRung;
+  const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade, toneRung = LOOK.toneRung;
   const haze = k.haze, torch = k.torch;
   const [ifr, ifg, ifb] = pal.inkFloor;
   for (let cy = 0; cy < rows; cy++) {
@@ -161,7 +162,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0) {
         // a lit surface
         const L = pal.ambient + pal.direct * light * (1 - pal.castK * sh) * (1 - pal.cloudK * cl);
         const t0 = L < 0 ? 0 : L > 1 ? 1 : L;
-        const t = Math.pow(t0, curve);
+        const t = Math.pow(t0, pal.curve[m]);
         const j = m * 3;
         r = shade[j] + (lit[j] - shade[j]) * t;
         g = shade[j + 1] + (lit[j + 1] - shade[j + 1]) * t;
