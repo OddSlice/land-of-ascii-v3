@@ -35,12 +35,15 @@ try {
     await page.evaluate(() => window.lab.setHud(false));
     for (let d = 0; d < 4; d++) {
       for (const cam of cams) {
+        // keep the window in front: macOS throttles a covered window's frames
+        await page.bringToFront();
         await page.evaluate(({ d, cam }) => { window.lab.setDensity(d); window.lab.camera(cam); window.lab.freeze(window.lab.cameras[cam].time, 0); }, { d, cam });
         await page.evaluate(() => window.lab.whenIdle());
         await page.evaluate(() => window.lab.timings(60));            // warm up
         const t = await page.evaluate((n) => window.lab.timings(n), frames);
         await lab.check();
-        const st = await page.evaluate(() => window.lab.state());
+        const st = await page.evaluate(() => ({ ...window.lab.state(), visible: document.visibilityState }));
+        if (st.visible !== 'visible') console.log(`warning: page was ${st.visible} while timing`);
         const iv = t.map((x) => x.interval).filter((x) => x > 0);
         const row = {
           browser: name, density: d + 1, cells: st.cells, grid: `${st.cols}x${st.rows}`, cam,
