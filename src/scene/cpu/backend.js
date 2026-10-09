@@ -1,0 +1,35 @@
+// Scene backend A: the CPU column march. It fills a HitBuffer (src/contract.js)
+// for a stripe of columns. The same code runs in each worker and, with
+// ?threads=0, on the main thread.
+import { makeView, StripeRays } from './view.js';
+import { Light, torchPower } from './light.js';
+import { Marcher } from './march.js';
+import { ObjectPass } from './objects.js';
+import { SkyPass } from './sky.js';
+import { HIT_STRIDE } from '../../contract.js';
+
+export function createCpuBackend(world) {
+  const light = new Light(world);
+  const rays = new StripeRays();
+  const marcher = new Marcher(world, light);
+  const objects = new ObjectPass(world, light);
+  const sky = new SkyPass(world, light);
+  const T = world.objects.torch;
+
+  return {
+    name: 'cpu-march',
+    // Fill `hits` (HIT_STRIDE bytes per cell, row-major over columns c0..c1-1)
+    // for one frame.
+    render(frame, c0, c1, hits) {
+      const v = makeView(frame);
+      light.update(frame.hour, frame.t);
+      rays.build(v, c0, c1);
+      if (hits.length < rays.cells * HIT_STRIDE) throw new Error('hit buffer too small');
+      const torch = { x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t) };
+      marcher.run(v, rays, hits, frame, torch);
+      objects.run(v, rays, marcher, frame, torch);
+      sky.prepare(frame.t);
+      sky.run(v, rays, marcher, frame);
+    },
+  };
+}
