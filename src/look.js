@@ -88,7 +88,9 @@ export const LOOK = {
     warm: 0.2,                       // how far the bed is tinted toward the shallow colour
     tint: 0.4,                       // the least share of deep-water colour, even in the shallows
     torchSurface: 0.5,               // torchlight on the surface itself
-    glitter: 2.6,                    // degrees: the sun or moon as a rippled surface catches it
+    // the sun or moon caught by ripples: a broken path, narrow across, long
+    // toward the viewer (degrees), sparkling at `rate` changes a second
+    glitter: { width: 2.4, length: 20, density: 0.85, rate: 4 },
     reflectCap: 1200,                // metres a reflected ray marches at most
     ripple: {
       strength: 0.1,                 // scales every wave's slope

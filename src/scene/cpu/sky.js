@@ -66,10 +66,10 @@ export class SkyPass {
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
     }
     this.stars(v, rays, hits);
-    // what mirrored rays that met nothing see: the sky above the water, with
-    // the sun or moon caught over a wider patch by the ripples (the glitter)
-    const gl = Math.max(LOOK.water.glitter * Math.PI / 180, sunR);
-    const cosGlitter = Math.cos(gl), cosGlitterMoon = Math.cos(Math.max(gl * 0.8, moonR));
+    // what mirrored rays that met nothing see: the sky above the water, and
+    // the sun or moon in a broken glitter path
+    const G = LOOK.water.glitter, D2R = Math.PI / 180;
+    const tick = Math.floor(frame.t * G.rate);
     for (let ci = 0; ci < rays.cells; ci++) {
       if (rays.rdepth[ci] !== Infinity) continue;
       const p = rays.plane[ci] - jlo;
@@ -79,7 +79,22 @@ export class SkyPass {
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE + REC;
       if (dy > 0.01 && this.cloud(v, rays.rey[ci], dx, dy, dz, cx, cy, Lc, m, ci, 1)) continue;
-      this.skyRecord(hits, o, dx, dy, dz, cosGlitter, cosGlitterMoon);
+      this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
+      if (hits[o] !== MAT.SKY) continue;
+      // the glitter: near the light's direction, narrow across and long in
+      // height, broken up by a sparkle fixed to the water and the clock
+      const Lg = sun[1] > -0.02 ? sun : moon[1] > -0.02 ? moon : null;
+      if (!Lg) continue;
+      const hl = Math.hypot(Lg[0], Lg[2]) || 1;
+      const across = Math.abs(Math.atan2(dx * Lg[2] - dz * Lg[0], (dx * Lg[0] + dz * Lg[2]) / hl * hl) );
+      const up = Math.asin(Math.max(-1, Math.min(1, dy))) - Math.asin(Math.max(-1, Math.min(1, Lg[1])));
+      const aw = across / (G.width * D2R), al = Math.abs(up) / (G.length * D2R);
+      if (aw >= 1 || al >= 1) continue;
+      const pr = (1 - aw * aw) * (1 - al) * G.density;
+      const wx = v.ex + rays.pdx[p] * rays.rdw[ci], wz = v.ez + rays.pdz[p] * rays.rdw[ci];
+      if (hash2(Math.floor(wx * 1.7), Math.floor(wz * 1.7) * 7919 + tick, SEED + 99) >= pr) continue;
+      hits[o] = Lg === sun ? MAT.SUN : MAT.MOON;
+      hits[o + 1] = (255 * Math.min(1, 0.55 + pr) + 0.5) | 0;
     }
     this.mirroredStars(v, rays, hits);
   }

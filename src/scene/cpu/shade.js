@@ -9,6 +9,8 @@ import { rippleSlope, waterRays } from './water.js';
 import { bil2, bil1, bilU8 } from './sample.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
+// detail of a given size fades as the cell's footprint grows past it
+const fadeOf = (size, fp) => 1 - smooth(size * 0.3, size * 1.1, fp);
 const NRM = [0, 0];
 
 // Normal of a level without stored normals, from its heights around (x, z).
@@ -80,10 +82,9 @@ const methods = {
     // footprint of the cell on the ground, for fading detail that would alias
     const graze = Math.abs(this.dx * nx + s * ny + this.dz * nz) / len;
     const fp = D * len * v.colAngle / Math.max(0.04, graze);
-    const fade = (size) => 1 - smooth(size * 0.3, size * 1.1, fp);
     const N = this.N, NN = this.NN;
     const fine = bil1(T.fine, x, z, N, NN);
-    const jitter = fine * fade(1.5);
+    const jitter = fine * fadeOf(1.5, fp);
     let mat;
     if (bilU8(T.wWater, x, z, N, NN) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && bilU8(T.wRoad, x, z, N, NN) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
@@ -106,8 +107,8 @@ const methods = {
       lam = nx * Ld[0] + ny * Ld[1] + nz * Ld[2];
       if (lam < 0) lam = 0;
       const patch = bil1(T.tone, x, z, N, NN);
-      if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fade(3) + 0.6 * patch + 0.3 * fine * fade(2);
-      else tone = 0.75 * patch * fade(5) + 0.45 * fine * fade(1.8);
+      if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fadeOf(3, fp) + 0.6 * patch + 0.3 * fine * fadeOf(2, fp);
+      else tone = 0.75 * patch * fadeOf(5, fp) + 0.45 * fine * fadeOf(1.8, fp);
     }
     const glow = this.glowAt(x, y, z, nx, ny, nz);
     this.write(ci, rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
@@ -126,8 +127,9 @@ const methods = {
     const wr = waterRays(s, g);
     const glow = this.glowAt(x, W, z, 0, 1, 0);
     this.write(ci, 0, MAT.WATER, light.L[1], shadow, cloud, glow, wr.F * 2 - 1, D * len);
-    const sr = wr.sr, st = wr.st;
-    this.refract(ci, x, W, z, st);
+    const sr = wr.sr, st = wr.st, F = wr.F;
+    // where the surface is nearly all mirror the bed cannot show: no bed ray
+    if (F < 0.85) this.refract(ci, x, W, z, st);
     this.addReflection(ci, sr, D, W);
   },
 
@@ -136,10 +138,10 @@ const methods = {
     const { world, light } = this;
     const T = world.terrain, N = this.N, NN = this.NN;
     const dx = this.dx, dz = this.dz;
-    const step = 0.3 / -st;                    // 0.3 m down per step
+    const step = 0.5 / -st;                    // half a metre down per step; the bed is smooth
     let pu = 0, pd = W - bil1(T.ground, x, z, N, NN);   // height of the ray above the bed
     let u = 0, hit = false;
-    for (let k = 1; k <= 48; k++) {
+    for (let k = 1; k <= 32; k++) {
       u = k * step;
       const d = W + st * u - bil1(T.ground, x + dx * u, z + dz * u, N, NN);
       if (d <= 0) { u = pu + (u - pu) * (pd / (pd - d)); hit = true; break; }
