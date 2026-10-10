@@ -28,7 +28,7 @@ export const LOOK = {
   choices: {
     tree:     { label: 'conifers', key: '7', default: 'A', options: { A: 'tidy tiers', B: 'rough and dark' } },
     cloud:    { label: 'clouds',   key: '8', default: 'A', options: { A: 'cumulus', B: 'banks' } },
-    meadow:   { label: 'meadow',   key: '9', default: 0,   options: { 0: 'plain', 1: 'soft patches', 2: 'strong patches' } },
+    meadow:   { label: 'meadow',   key: '9', default: 0,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
     shallows: { label: 'shallows', key: '0', default: 'warm', options: { warm: 'warm bed', blue: 'even blue' } },
   },
 

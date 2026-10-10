@@ -34,7 +34,10 @@ export class LookPanel {
   update(look) {
     if (!this.on) return;
     const rows = Object.entries(CH).map(([name, c]) => {
-      const opts = Object.entries(c.options).map(([k, label]) => (String(look[name]) === k ? `[${k} ${label}]` : ` ${k} ${label} `));
+      const opts = Object.entries(c.options).map(([k, label]) => {
+        const t = label.startsWith(k) ? label : `${k} ${label}`;
+        return String(look[name]) === k ? `[${t}]` : ` ${t} `;
+      });
       return `${c.key}  ${c.label.padEnd(9)} ${opts.join('  ')}`;
     });
     const text = `look  (L closes)\n${rows.join('\n')}`;
