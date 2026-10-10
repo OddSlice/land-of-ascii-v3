@@ -1,0 +1,258 @@
+{
+ "saved": "2026-10-10T15:19:35.350Z",
+ "density": 3,
+ "frames": [
+  {
+   "name": "lab 1 road to the wall (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 0,
+   "length": 322560
+  },
+  {
+   "name": "lab 1 road to the wall (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 322560,
+   "length": 322560
+  },
+  {
+   "name": "lab 1 road to the wall (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 645120,
+   "length": 322560
+  },
+  {
+   "name": "lab 2 meadow, cloud shadow, ridge (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 967680,
+   "length": 322560
+  },
+  {
+   "name": "lab 2 meadow, cloud shadow, ridge (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 1290240,
+   "length": 322560
+  },
+  {
+   "name": "lab 2 meadow, cloud shadow, ridge (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 1612800,
+   "length": 322560
+  },
+  {
+   "name": "lab 3 lake shore, treeline (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 1935360,
+   "length": 322560
+  },
+  {
+   "name": "lab 3 lake shore, treeline (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 2257920,
+   "length": 322560
+  },
+  {
+   "name": "lab 3 lake shore, treeline (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 2580480,
+   "length": 322560
+  },
+  {
+   "name": "lab 4 gate at night, torch (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 2903040,
+   "length": 322560
+  },
+  {
+   "name": "lab 4 gate at night, torch (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 3225600,
+   "length": 322560
+  },
+  {
+   "name": "lab 4 gate at night, torch (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 3548160,
+   "length": 322560
+  },
+  {
+   "name": "lab 5 dusk across the wall (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 3870720,
+   "length": 322560
+  },
+  {
+   "name": "lab 5 dusk across the wall (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 4193280,
+   "length": 322560
+  },
+  {
+   "name": "lab 5 dusk across the wall (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 4515840,
+   "length": 322560
+  },
+  {
+   "name": "lab 6 low over the lake (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 4838400,
+   "length": 322560
+  },
+  {
+   "name": "lab 6 low over the lake (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 5160960,
+   "length": 322560
+  },
+  {
+   "name": "lab 6 low over the lake (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 5483520,
+   "length": 322560
+  },
+  {
+   "name": "lab 7 forest edge across the meadow (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 5806080,
+   "length": 322560
+  },
+  {
+   "name": "lab 7 forest edge across the meadow (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 6128640,
+   "length": 322560
+  },
+  {
+   "name": "lab 7 forest edge across the meadow (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 6451200,
+   "length": 322560
+  },
+  {
+   "name": "lab 8 inside the stand, looking out (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 6773760,
+   "length": 322560
+  },
+  {
+   "name": "lab 8 inside the stand, looking out (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 7096320,
+   "length": 322560
+  },
+  {
+   "name": "lab 8 inside the stand, looking out (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 7418880,
+   "length": 322560
+  },
+  {
+   "name": "lab 9 far treeline (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 7741440,
+   "length": 322560
+  },
+  {
+   "name": "lab 9 far treeline (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 8064000,
+   "length": 322560
+  },
+  {
+   "name": "lab 9 far treeline (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 8386560,
+   "length": 322560
+  },
+  {
+   "name": "stress 1 stress: dense forest (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 8709120,
+   "length": 322560
+  },
+  {
+   "name": "stress 1 stress: dense forest (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 9031680,
+   "length": 322560
+  },
+  {
+   "name": "stress 1 stress: dense forest (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 9354240,
+   "length": 322560
+  },
+  {
+   "name": "stress 2 stress: across the lake (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 9676800,
+   "length": 322560
+  },
+  {
+   "name": "stress 2 stress: across the lake (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 9999360,
+   "length": 322560
+  },
+  {
+   "name": "stress 2 stress: across the lake (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 10321920,
+   "length": 322560
+  },
+  {
+   "name": "stress 3 stress: ridge-top vista (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 10644480,
+   "length": 322560
+  },
+  {
+   "name": "stress 3 stress: ridge-top vista (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 10967040,
+   "length": 322560
+  },
+  {
+   "name": "stress 3 stress: ridge-top vista (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 11289600,
+   "length": 322560
+  }
+ ]
+}
