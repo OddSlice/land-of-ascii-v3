@@ -1,25 +1,58 @@
-// Walking on the ground: WASD at 4.5 m/s (Shift 8), gravity, the wall and
-// tree trunks block, the gate can be walked through and the wall's top
-// walked along, the lake is not walked into past wading depth.
+// Moving through the world. WASD walks at 4.5 m/s (Shift runs at 8), gravity
+// pulls, the wall and tree trunks block, the gate can be walked through and
+// the wall's top walked along.
+//
+// The lab and the stress scene keep their simple rules: walking speed is
+// horizontal and water deeper than half a metre stops you.
+//
+// The generated world (`rules: 'world'`) has the rules a real landscape needs
+// (the numbers are in world/scale.js):
+// - walking speed is measured along the ground, so hills neither speed you
+//   up nor let you glide down;
+// - ground steeper than 45 degrees cannot be walked up, and ground steeper
+//   than 50 degrees slides you down it;
+// - you wade, slower as the water deepens, to chest depth, then swim slowly
+//   with the eye just above the surface;
+// - falling does no harm;
+// - F toggles flying at 50 m/s, for looking around (W and S fly where you
+//   look, Space rises).
 import { EYE } from '../world/layout.js';
 import { groundAt } from '../world/objects.js';
-import { archY, SPAN_ARCH, SPAN_MERLON } from '../world/spans.js';
+import { archY, spanAt, SPAN_ARCH, SPAN_MERLON } from '../world/spans.js';
+import { SCALE } from '../world/scale.js';
 
 const WALK = 4.5, RUN = 8, RADIUS = 0.3, STEP = 0.6, HEAD = 1.8, GRAVITY = 18;
 
 export class Player {
-  constructor(world) {
+  constructor(world, { rules = 'lab' } = {}) {
     this.world = world;
+    this.rules = rules;
     this.x = 0; this.z = 0; this.feet = 0; this.vy = 0;
     this.yaw = 0; this.pitch = 0;
+    this.flying = false;
+    this.mode = 'walk';           // walk, wade, swim, slide, fly, fall
+    // trunks in 16 m buckets, so collisions only look at the trees nearby
+    const T = world.objects.trees, B = 16, n = Math.ceil(world.N / B);
+    this.tb = { B, n, cells: Array.from({ length: n * n }, () => []) };
+    for (const t of T) {
+      const gx = Math.min(n - 1, Math.max(0, Math.floor(t.x / B))), gz = Math.min(n - 1, Math.max(0, Math.floor(t.z / B)));
+      this.tb.cells[gz * n + gx].push(t);
+    }
+    this.surface = { ground: world.terrain.levels[0].H, N: world.terrain.N, NN: world.terrain.NN };
   }
 
   get eye() { return this.feet + EYE; }
 
   place(x, z, yaw, pitch, feet) {
     this.x = x; this.z = z; this.yaw = yaw; this.pitch = pitch;
-    this.feet = feet !== undefined ? feet : this.supportAt(x, z, 1e9);
+    this.feet = feet !== undefined ? feet : this.rules === 'world' ? this.restAt(x, z) : this.supportAt(x, z, 1e9);
     this.vy = 0;
+  }
+
+  toggleFly() {
+    this.flying = !this.flying;
+    this.vy = 0;
+    this.mode = this.flying ? 'fly' : 'fall';
   }
 
   // The highest thing to stand on at (x, z) that is not above the feet by
@@ -29,11 +62,17 @@ export class Player {
     const sp = this.world.spans, N = this.world.N;
     const ix = Math.floor(x), iz = Math.floor(z);
     if (ix >= 0 && iz >= 0 && ix < N && iz < N) {
-      const s = sp.idx[iz * N + ix];
+      const s = spanAt(sp, ix, iz);
       const top = s >= 0 ? sp.y1[s] + (sp.flags[s] & SPAN_MERLON ? sp.merlon : 0) : 0;
       if (s >= 0 && top <= feet + STEP) y = Math.max(y, top);
     }
     return y;
+  }
+
+  // Where the feet rest at (x, z): on the ground, or swimming in deep water.
+  restAt(x, z) {
+    const g = this.supportAt(x, z, 1e9), w = groundAt(this.surface, x, z);
+    return w - g > SCALE.chest ? w + SCALE.swimEye - EYE : g;
   }
 
   // Would a body standing with its feet at `feet` at (x, z) hit anything?
@@ -45,7 +84,7 @@ export class Player {
     for (let iz = Math.floor(z - RADIUS); iz <= Math.floor(z + RADIUS); iz++) {
       for (let ix = Math.floor(x - RADIUS); ix <= Math.floor(x + RADIUS); ix++) {
         if (ix < 0 || iz < 0 || ix >= N || iz >= N) continue;
-        const s = sp.idx[iz * N + ix];
+        const s = spanAt(sp, ix, iz);
         if (s < 0) continue;
         let y0 = sp.y0[s];
         if (sp.flags[s] & SPAN_ARCH) {
@@ -57,18 +96,28 @@ export class Player {
         if (y0 < hi && top > lo) return true;
       }
     }
-    for (const t of this.world.objects.trees) {
-      const dx = x - t.x, dz = z - t.z, r = 0.3 + RADIUS;
-      if (dx * dx + dz * dz < r * r && feet < t.trunkTop) return true;
+    const { B, n, cells } = this.tb;
+    const gx = Math.floor(x / B), gz = Math.floor(z / B);
+    for (let a = gz - 1; a <= gz + 1; a++) {
+      for (let b = gx - 1; b <= gx + 1; b++) {
+        if (a < 0 || b < 0 || a >= n || b >= n) continue;
+        for (const t of cells[a * n + b]) {
+          const dx = x - t.x, dz = z - t.z, r = 0.3 + RADIUS;
+          if (dx * dx + dz * dz < r * r && feet < t.trunkTop) return true;
+        }
+      }
     }
-    // no wading in deeper than half a metre
-    const T = this.world.terrain;
-    const g = groundAt(T, x, z), w = groundAt({ ground: T.levels[0].H, N: T.N, NN: T.NN }, x, z);
-    if (w - g > 0.5 && feet < w) return true;
+    if (this.rules !== 'world') {
+      // no wading in deeper than half a metre
+      const T = this.world.terrain;
+      const g = groundAt(T, x, z), w = groundAt(this.surface, x, z);
+      if (w - g > 0.5 && feet < w) return true;
+    }
     return false;
   }
 
   update(dt, keys) {
+    if (this.rules === 'world') { this.updateWorld(dt, keys); return; }
     let f = 0, s = 0;
     if (keys.KeyW) f += 1;
     if (keys.KeyS) f -= 1;
@@ -108,5 +157,128 @@ export class Player {
       return;
     }
   }
-}
 
+  // ---- the generated world's rules -------------------------------------------
+
+  // Slope of the ground at (x, z): rise over run, and the way down.
+  slopeAt(x, z) {
+    const T = this.world.terrain, e = 0.5;
+    const sx = (groundAt(T, x + e, z) - groundAt(T, x - e, z)) / (2 * e), sz = (groundAt(T, x, z + e) - groundAt(T, x, z - e)) / (2 * e);
+    return { s: Math.hypot(sx, sz), dx: -sx, dz: -sz };
+  }
+
+  depthAt(x, z) { return groundAt(this.surface, x, z) - groundAt(this.world.terrain, x, z); }
+
+  updateWorld(dt, keys) {
+    let f = 0, s = 0;
+    if (keys.KeyW) f += 1;
+    if (keys.KeyS) f -= 1;
+    if (keys.KeyD) s += 1;
+    if (keys.KeyA) s -= 1;
+    const len = Math.hypot(f, s);
+    if (len > 0) { f /= len; s /= len; }
+    const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
+    const ux = f * sy + s * cy, uz = f * cy - s * sy;
+    const N = this.world.N;
+    if (this.flying) {
+      // where you look, including up and down; Space rises
+      const cp = Math.cos(this.pitch), spch = Math.sin(this.pitch);
+      let vx = (f * sy * cp + s * cy), vz = (f * cy * cp - s * sy), vy = f * spch + (keys.Space ? 1 : 0);
+      const vl = Math.hypot(vx, vy, vz);
+      if (vl > 0) {
+        const k = SCALE.fly * dt / vl;
+        this.x = Math.min(N - 1, Math.max(1, this.x + vx * k));
+        this.z = Math.min(N - 1, Math.max(1, this.z + vz * k));
+        this.feet += vy * k;
+      }
+      // never into the ground or the water
+      this.feet = Math.max(this.feet, groundAt(this.surface, this.x, this.z) + 0.5 - EYE + 0.2, this.supportAt(this.x, this.z, this.feet));
+      this.mode = 'fly';
+      return;
+    }
+    const depth = this.depthAt(this.x, this.z);
+    const swimming = depth > SCALE.chest;
+    if (len > 0) {
+      let speed;
+      if (swimming) speed = SCALE.swim;
+      else {
+        speed = keys.ShiftLeft || keys.ShiftRight ? SCALE.run : SCALE.walk;
+        // wading: slower as the water deepens
+        if (depth > 0) speed *= 1 - (1 - SCALE.wade) * Math.min(1, depth / SCALE.chest);
+      }
+      // the distance to go along the ground, in steps of at most 0.2 m
+      let budget = speed * dt;
+      for (let guard = 0; budget > 1e-6 && guard < 64; guard++) {
+        const h = Math.min(0.2, budget);
+        const done = swimming ? this.trySwim(ux * h, uz * h) : this.tryWalk(ux, uz, h);
+        if (done <= 0) break;
+        budget -= done;
+      }
+    }
+    // standing, sliding, falling or floating
+    const d2 = this.depthAt(this.x, this.z), wl = groundAt(this.surface, this.x, this.z);
+    const ground = this.supportAt(this.x, this.z, this.feet);
+    // past chest depth you float, the eye just above the surface (where the
+    // bottom is not yet that deep, the feet stay on it)
+    const rest = d2 > SCALE.chest ? Math.max(ground, wl + SCALE.swimEye - EYE) : ground;
+    if (this.feet > rest + 1e-3) {
+      // falling (no harm done on landing), into water or onto the ground
+      this.vy -= GRAVITY * dt;
+      this.feet += this.vy * dt;
+      if (this.feet <= rest) { this.feet = rest; this.vy = 0; }
+      this.mode = this.feet <= rest ? (d2 > SCALE.chest ? 'swim' : 'walk') : 'fall';
+      return;
+    }
+    if (d2 > SCALE.chest) { this.feet = rest; this.vy = 0; this.mode = 'swim'; return; }
+    this.feet = ground; this.vy = 0;
+    // too steep to stand on: slide down it
+    const sl = this.slopeAt(this.x, this.z);
+    if (sl.s > SCALE.slide && ground >= groundAt(this.world.terrain, this.x, this.z) - 1e-3) {
+      const dl = Math.hypot(sl.dx, sl.dz) || 1, step = SCALE.slideSpeed * dt;
+      const nx = this.x + sl.dx / dl * step, nz = this.z + sl.dz / dl * step;
+      if (!this.blocked(nx, nz, this.feet - 1)) { this.x = nx; this.z = nz; this.feet = this.supportAt(nx, nz, this.feet); }
+      this.mode = 'slide';
+      return;
+    }
+    this.mode = d2 > 0.05 ? 'wade' : 'walk';
+  }
+
+  // One step taking h metres along the ground, in direction (ux, uz) (or,
+  // sliding along what blocks, along one axis of it): on a slope the step is
+  // shorter across the map, so hills slow you down both ways. Returns the
+  // distance used along the ground (0: blocked).
+  tryWalk(ux, uz, h) {
+    for (const [ax, az] of [[ux, uz], [ux, 0], [0, uz]]) {
+      const al = Math.hypot(ax, az);
+      if (al < 1e-6) continue;
+      // how steep the way ahead is, then a step that long along it
+      const probe = h * al;
+      const k = (this.supportAt(this.x + ax * h, this.z + az * h, this.feet) - this.feet) / probe;
+      const run = probe / Math.sqrt(1 + k * k), nx = this.x + ax / al * run, nz = this.z + az / al * run;
+      const g = this.supportAt(nx, nz, this.feet);
+      const rise = g - this.feet;
+      // ground steeper than 45 degrees cannot be walked up (a span's step can)
+      const onGround = g <= groundAt(this.world.terrain, nx, nz) + 1e-3;
+      if (onGround ? rise > SCALE.climb * run + 1e-3 : rise > STEP) continue;
+      if (this.blocked(nx, nz, Math.max(g, this.feet))) continue;
+      this.x = nx; this.z = nz;
+      // follow the ground down; a drop steeper than this is a fall instead
+      const follow = rise > 0 || -rise < Math.max(0.15, 2 * run);
+      if (follow) this.feet = g;
+      return Math.hypot(run, follow ? rise : 0) / al;
+    }
+    return 0;
+  }
+
+  // One swimming stroke: free in the water, and out onto a bank wherever
+  // the bank is not too steep to walk up.
+  trySwim(mx, mz) {
+    const nx = this.x + mx, nz = this.z + mz, h = Math.hypot(mx, mz);
+    const g = this.supportAt(nx, nz, 1e9), wl = groundAt(this.surface, nx, nz);
+    if (g > wl - SCALE.chest && (g - groundAt(this.world.terrain, this.x, this.z)) > SCALE.climb * h + 0.02) return 0;
+    if (this.blocked(nx, nz, Math.max(this.feet, g))) return 0;
+    this.x = nx; this.z = nz;
+    if (g > this.feet) this.feet = g;
+    return h;
+  }
+}

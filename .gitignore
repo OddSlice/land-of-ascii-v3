@@ -6,3 +6,5 @@ shots/*
 !shots/phase0c/
 .DS_Store
 .claude/
+.vercel/
+!shots/phase1/

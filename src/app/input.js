@@ -55,6 +55,8 @@ export class Input {
       case 'KeyH': a.toggleHud(); break;
       case 'KeyX': a.toggleScene(); break;
       case 'KeyL': a.toggleLook(); break;
+      case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
+      case 'KeyM': if (a.toggleMap) a.toggleMap(); break;
       default: {
         // the look panel's keys (LOOK.choices)
         for (const [name, c] of Object.entries(LOOK.choices)) if (e.code === `Digit${c.key}`) a.cycleLook(name);

@@ -25,6 +25,14 @@ export const FAMILY = MAT_NAMES.map((name) => {
 // dissolves into another (a cloud's edge into the sky).
 export const SHADE_STEPS = Uint8Array.from(['░', '▒', '▓'], add);
 
+// The overhead map's marks (LOOK.map), added after everything else so no
+// earlier glyph's index changes.
+const MG = LOOK.map.glyphs;
+export const MAP_GLYPH = {
+  fort: add(MG.fort), village: add(MG.village), viewpoint: add(MG.viewpoint), spawn: add(MG.spawn), you: add(MG.you),
+  heading: Uint8Array.from(MG.heading, add),
+};
+
 // Glyphs the atlas draws by hand when the font renders them badly.
 export const SHADES = { '░': 0.25, '▒': 0.5, '▓': 0.75, '█': 1 };
 

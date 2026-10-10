@@ -1,12 +1,19 @@
-// Land of Ascii v3, phases 0a and 0b: the Look Lab. Boot, the main loop, and
-// the debug handle (window.lab) the tools use. ?stress=1 (or X) swaps in the
-// stress scene, a big world for measuring the renderer; the lab's own scene is
-// untouched by it.
+// Land of Ascii v3: boot, the main loop, and the debug handle (window.lab)
+// the tools use. The page opens on the generated world (phase 1), built from
+// a seed (?seed=, R for a new one). Two tools stay behind URL options:
+// ?lab=1 is the Look Lab's fixed valley (phases 0a-0c) and ?stress=1 (or X
+// from the lab) the stress scene, a big world for measuring the renderer.
 import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
 import { START, EYE } from './world/layout.js';
+import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
+import { packWorld, unpackWorld, worldHash } from './world/pack.js';
+import { shadowStore } from './scene/cpu/light.js';
+import { buildInWorker, SharedShadows } from './app/worldboot.js';
+import { MapView } from './app/map.js';
+import { groundAt } from './world/objects.js';
 import { Presenter } from './present/gl.js';
 import { buildAtlas } from './present/atlas.js';
 import { Pool } from './app/pool.js';
@@ -27,9 +34,17 @@ const DEG = Math.PI / 180;
 const CLOCK_RATE = 1 / 60;      // T: one game hour per real minute
 
 const STRESS = params.get('stress') === '1';
+const LAB = !STRESS && params.get('lab') === '1';
+const WORLD = !STRESS && !LAB;
+const SEED = WORLD ? (params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED) : 0;
+// Shared memory needs the page to be cross-origin isolated (the Vercel copy
+// sends the headers). Without it (GitHub Pages, a file on disk) every worker
+// holds its own copy of the world, so the world falls back to at most four.
+const ISOLATED = !!self.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
 const threadsParam = params.get('threads');
-const THREADS = threadsParam !== null ? Math.max(0, parseInt(threadsParam, 10) || 0)
-  : Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 2));
+const AUTO = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 2));
+const THREADS = threadsParam !== null ? Math.max(0, parseInt(threadsParam, 10) || 0) : WORLD && !ISOLATED ? Math.min(4, AUTO) : AUTO;
+const SHARED = WORLD && ISOLATED && THREADS > 0;
 
 const state = {
   hour: LOOK.hours.day, t: 0,
@@ -59,17 +74,23 @@ addEventListener('error', (e) => fail(`${e.message} (${e.filename}:${e.lineno})`
 addEventListener('unhandledrejection', (e) => fail(String(e.reason && e.reason.stack || e.reason)));
 
 
-// Workers build their own copy of the world, so they start first. In the
-// stress scene the page builds one too, in steps with a progress line (only
-// what walking needs, unless it also renders with ?threads=0).
-let pool = null;
+// The lab and the stress scene: workers build their own copy of the world,
+// so they start first. In the stress scene the page builds one too, in steps
+// with a progress line (only what walking needs, unless it also renders with
+// ?threads=0). The generated world is built once, in its own worker (or on
+// the page with ?threads=0), then handed to the render workers.
+let pool = null, packed = null, shadows = null;
 const progress = { page: 0, workers: THREADS ? 0 : 1 };
 function showProgress() {
   const p = Math.min(progress.page, progress.workers);
   $('progress').style.display = 'block';
   $('progress').textContent = `building the stress scene … ${Math.floor(p * 100)}%`;
 }
-if (THREADS > 0) {
+function worldProgress(stage, p) {
+  $('progress').style.display = 'block';
+  $('progress').textContent = `building the world (seed ${SEED}) · ${stage} … ${Math.floor(p * 100)}%`;
+}
+if (THREADS > 0 && !WORLD) {
   pool = new Pool(THREADS, fail, {
     scene: STRESS ? 'stress' : 'default',
     onProgress: (p) => { progress.workers = p; showProgress(); },
@@ -78,6 +99,31 @@ if (THREADS > 0) {
 }
 const nextTask = () => new Promise((resolve) => { const ch = new MessageChannel(); ch.port1.onmessage = resolve; ch.port2.postMessage(0); });
 async function makeWorld() {
+  if (WORLD) {
+    const t0 = performance.now();
+    if (THREADS === 0) {
+      // all on the page, in steps, so the progress line still paints
+      const gen = generateWorld(SEED);
+      let r;
+      while (!(r = gen.next()).done) { worldProgress(r.value.stage, r.value.p); await nextTask(); }
+      packed = packWorld(r.value, null);
+    } else {
+      packed = await buildInWorker(SEED, SHARED, worldProgress);
+    }
+    worldBuild.total = performance.now() - t0;
+    const w = unpackWorld(packed);
+    worldProgress('starting the workers', 0.96);
+    if (THREADS > 0) {
+      // with shared memory every worker reads the one world, and cast
+      // shadows come from one shadow worker into two shared stores; without
+      // it each worker gets its own copy and sweeps its own shadows
+      const stores = SHARED ? { V: [], S: [] } : null;
+      if (SHARED) for (let b = 0; b < 2; b++) { const st = shadowStore(w, SharedArrayBuffer); stores.V.push(st.V); stores.S.push(st.S); }
+      pool = new Pool(THREADS, fail, { scene: 'world', init: { world: packed, shared: SHARED, shadows: stores } });
+      if (SHARED) shadows = new SharedShadows(w, packed, stores, pool, fail);
+    }
+    return w;
+  }
   if (!STRESS) return buildWorld();
   const gen = buildStressWorld({ render: THREADS === 0 });
   let r;
@@ -85,14 +131,16 @@ async function makeWorld() {
   progress.page = 1;
   return r.value;
 }
+const worldBuild = { total: 0 };
 const world = await makeWorld();
-const CAMS = STRESS ? world.cameras : CAMERAS;
-const player = new Player(world);
+const CAMS = STRESS || WORLD ? world.cameras : CAMERAS;
+const player = new Player(world, { rules: WORLD ? 'world' : 'lab' });
 const canvas = $('view');
 const presenter = new Presenter(canvas);
 const hud = new Hud($('hud'));
 const ref = new RefView($('ref'));
 const lookPanel = new LookPanel($('look'));
+const map = WORLD ? new MapView(world) : null;
 
 // glyph atlases for all four densities, built once
 const dpr = Math.max(1, Math.round((window.devicePixelRatio || 1) * 100) / 100);
@@ -128,22 +176,32 @@ function useCamera(i) {
   setTime(c.time);
   if (ref.on && c.ref) ref.show(c);
 }
-const start = STRESS ? world.start : START;
+const start = STRESS || WORLD ? world.start : START;
 standAt(start.x, start.z, start.yaw, start.pitch);
 if (STRESS) state.camName = 'stress: start';
+if (WORLD) { state.camName = 'spawn'; state.cam = -1; }
 
 const input = new Input(canvas, {
   time: setTime,
   toggleClock: () => { state.running = !state.running; state.frozen = false; },
   nextCamera: () => useCamera((state.cam + 1) % CAMS.length),
   toggleGlyphs: () => { presenter.glyphs = !presenter.glyphs; },
-  // the stress scene has no reference frames
-  toggleRef: () => { if (STRESS) return; ref.toggle(CAMERAS[state.cam]); relayout(); },
+  // R: in the lab, the reference frame (the stress scene has none); in the
+  // world, a new world from a new seed (the page reloads with it, so the
+  // old world's memory is freed)
+  toggleRef: () => {
+    if (WORLD) { const q = new URLSearchParams(location.search); q.set('seed', String((Math.random() * 1e6) >>> 0)); location.search = q.toString(); return; }
+    if (STRESS) return;
+    ref.toggle(CAMERAS[state.cam]); relayout();
+  },
   toggleScene: () => {
+    if (WORLD) return;
     const q = new URLSearchParams(location.search);
-    if (STRESS) q.delete('stress'); else q.set('stress', '1');
+    if (STRESS) { q.delete('stress'); q.set('lab', '1'); } else { q.delete('lab'); q.set('stress', '1'); }
     location.search = q.toString();
   },
+  toggleFly: () => { if (WORLD) player.toggleFly(); },
+  toggleMap: () => { if (map) map.toggle(); },
   toggleHud: () => hud.toggle(),
   toggleLook: () => lookPanel.toggle(),
   cycleLook: (name) => { state.look = nextOption(state.look, name); },
@@ -153,7 +211,7 @@ const input = new Input(canvas, {
 relayout();
 
 function makeFrame() {
-  return {
+  const f = {
     seq: ++state.seq,
     cam: { x: player.x, y: player.eye, z: player.z, yaw: player.yaw, pitch: player.pitch },
     cols: grid.cols, rows: grid.rows,
@@ -162,6 +220,9 @@ function makeFrame() {
     hour: state.hour, t: state.t,
     look: state.look,
   };
+  // which shared shadow store this frame reads
+  if (shadows) f.shadow = shadows.frame;
+  return f;
 }
 
 // ---- rendering --------------------------------------------------------------
@@ -257,8 +318,10 @@ function tick(now) {
     state.t += dt;
     if (state.running) state.hour = (state.hour + dt * CLOCK_RATE) % 24;
   }
+  if (shadows) shadows.update(state.hour);
   try {
-    if (local) renderLocal();
+    if (map && map.on) { if (started || local) presentMap(); }
+    else if (local) renderLocal();
     else if (started) {
       // show the newest finished frame whose refresh has come (an older one
       // still waiting has been overtaken, and is dropped), then ask for the
@@ -286,7 +349,8 @@ function tick(now) {
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
     threads: THREADS, hour: state.hour, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
-    stress: STRESS, buildMs: buildMs(), sweepMs: light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
+    stress: STRESS, buildMs: buildMs(), sweepMs: shadows ? shadows.sweepMs : light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
+    world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on) } : null,
   });
   lookPanel.update(state.look);
   requestAnimationFrame(tick);
@@ -298,8 +362,18 @@ function keyName(h) {
 }
 
 // the stress scene's build time: the workers' (they build everything), or the page's
-const buildMs = () => (pool ? pool.buildMs : world.buildMs);
-const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => { started = true; $('progress').style.display = 'none'; });
+const buildMs = () => (WORLD ? worldBuild.total : pool ? pool.buildMs : world.buildMs);
+// (with shared shadows, frames wait for the first sweep)
+const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => (shadows ? (worldProgress('casting shadows', 0.98), shadows.first) : null))
+  .then(() => { started = true; $('progress').style.display = 'none'; });
+
+// M: the overhead map, drawn in the same cells, instead of the view
+function presentMap() {
+  const cells = map.render(grid.cols, grid.rows, player);
+  full = cells;
+  presenter.upload(0, grid.cols, cells);
+  presenter.draw();
+}
 requestAnimationFrame(tick);
 
 // ---- the debug handle ---------------------------------------------------------
@@ -308,6 +382,9 @@ Object.assign(lab, {
   ready,
   threads: THREADS,
   stress: STRESS,
+  scene: WORLD ? 'world' : STRESS ? 'stress' : 'lab',
+  seed: SEED,
+  shared: SHARED,
   cameras: CAMS,
   // Stand at a fixed camera (0..8, or 0..2 in the stress scene); also sets its time of day.
   camera(i) { useCamera(i); },
@@ -347,7 +424,7 @@ Object.assign(lab, {
       hour: state.hour, t: state.t, frozen: state.frozen, running: state.running,
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
-      isolated: !!self.crossOriginIsolated, look: { ...state.look },
+      isolated: !!self.crossOriginIsolated, shared: SHARED, look: { ...state.look }, mode: player.mode, flying: player.flying,
       pace: local ? 1 : pacer.every, lag: local ? 0 : pacer.lag, refresh: pacer.refresh,
     };
   },
@@ -394,6 +471,28 @@ Object.assign(lab, {
   },
   world: {
     kind: world.kind, N: world.N, trees: world.objects.trees.length, bushes: world.objects.bushes.length, torches: world.objects.torches.length,
-    get buildMs() { return buildMs(); }, get sweepMs() { return light.sweepMs; },
+    get buildMs() { return buildMs(); }, get sweepMs() { return shadows ? shadows.sweepMs : light.sweepMs; },
+    seed: SEED, sites: world.sites, roads: world.roads ? world.roads.map((r) => ({ id: r.id, to: r.to, x: Array.from(r.x), z: Array.from(r.z) })) : null,
+    times: world.times || null,
+  },
+  // The generated world's arrays, hashed (the same seed must give the same bytes on any thread).
+  worldHash() { return packed ? worldHash(packed) : null; },
+  // Fly (F) on or off.
+  setFly(on) { if (WORLD && player.flying !== !!on) player.toggleFly(); },
+  // The overhead map (M) on or off.
+  setMap(on) { if (map && map.on !== !!on) map.toggle(); },
+  // Turn to a yaw (degrees) without moving.
+  face(yaw) { player.yaw = yaw * DEG; },
+  // The ground and the drawn surface (the water's level where there is water) at a point.
+  ground(x, z) {
+    const T = world.terrain;
+    return { ground: groundAt(T, x, z), surface: groundAt({ ground: T.levels[0].H, N: T.N, NN: T.NN }, x, z) };
+  },
+  // Memory the page and its workers use, where the browser can say
+  // (Chromium, cross-origin isolated).
+  async memory() {
+    if (!performance.measureUserAgentSpecificMemory) return null;
+    const m = await performance.measureUserAgentSpecificMemory();
+    return { bytes: m.bytes, breakdown: m.breakdown.map((b) => ({ bytes: b.bytes, types: b.types, scope: b.attribution.map((a) => a.scope).join(',') })) };
   },
 });

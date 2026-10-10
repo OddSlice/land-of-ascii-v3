@@ -5,8 +5,8 @@ import { createCpuBackend } from './scene/cpu/backend.js';
 import { makePalette, resolveStripe } from './resolve.js';
 import { HIT_STRIDE, CELL_STRIDE } from './contract.js';
 
-export function createStripeRenderer(world) {
-  const backend = createCpuBackend(world);
+export function createStripeRenderer(world, opts) {
+  const backend = createCpuBackend(world, opts);
   let hits = new Uint8Array(0);
   return {
     backend: backend.name,

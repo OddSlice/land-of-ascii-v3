@@ -1,0 +1,5 @@
+reference/
+shots/
+node_modules/
+.claude/
+.vercel/

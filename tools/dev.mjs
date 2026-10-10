@@ -17,7 +17,10 @@ http.createServer((req, res) => {
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    // cross-origin isolated, as on Vercel, so the workers can share memory
+    // (NOISO=1 serves without it, as GitHub Pages does)
+    const iso = process.env.NOISO ? {} : { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' };
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...iso });
     res.end(data);
   });
 }).listen(PORT, () => console.log(`Look Lab: http://localhost:${PORT}/`));

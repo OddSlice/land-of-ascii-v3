@@ -16,7 +16,7 @@
 // The built single-file page carries the worker's bundled source inline.
 const INLINE = typeof __WORKER_SOURCE__ !== 'undefined' ? __WORKER_SOURCE__ : null;
 
-function workerURL() {
+export function workerURL() {
   // Opened as a local file, Chromium refuses module workers from blob URLs,
   // so there the source goes in a data URL (still a module worker).
   if (INLINE) {
@@ -27,7 +27,9 @@ function workerURL() {
 }
 
 export class Pool {
-  constructor(count, onError, { scene = 'default', onProgress = () => {} } = {}) {
+  // `init`: more for each worker's init message (the generated world: the
+  // packed world, shared or not, and the shared shadow stores).
+  constructor(count, onError, { scene = 'default', onProgress = () => {}, init = {} } = {}) {
     this.count = count;
     this.onError = onError;
     this.onProgress = onProgress;
@@ -37,16 +39,22 @@ export class Pool {
     this.flying = [];         // frames asked for and not yet back, oldest first
     this.finished = [];       // frames back and not yet shown, oldest first
     this.failed = false;
+    this.whenReady = new Promise((res) => { this.readyResolve = res; });
     const url = workerURL();
     for (let i = 0; i < count; i++) {
       const w = new Worker(url, { type: 'module', name: `render-${i}` });
       w.onmessage = (e) => this.message(i, e.data);
       w.onerror = (e) => { e.preventDefault(); this.fail(`render worker ${i}: ${e.message || 'failed to load or crashed'} ${e.filename ? `(${e.filename}:${e.lineno})` : ''}`); };
       w.onmessageerror = () => this.fail(`render worker ${i}: a message could not be read`);
-      w.postMessage({ type: 'init', id: i, scene });
       this.workers.push(w);
+      try {
+        w.postMessage({ type: 'init', id: i, scene, ...init });
+      } catch (err) {
+        // shared memory that cannot be sent (the page is not isolated after all)
+        this.fail(`render worker ${i}: the world could not be handed over: ${err && err.message || err}`);
+        return;
+      }
     }
-    this.whenReady = new Promise((res) => { this.readyResolve = res; });
   }
 
   fail(msg) {
