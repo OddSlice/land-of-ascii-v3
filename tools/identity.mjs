@@ -32,12 +32,13 @@ try {
     const lab = await openLab(browser, url, { built: !!a.built, threads: n, stress });
     for (let i = 0; i < views.length; i++) {
       const v = views[i];
-      const h = await lab.page.evaluate(async (v) => {
+      const h = await lab.page.evaluate(async ({ v, look }) => {
+        if (look && window.lab.setLook) window.lab.setLook(look);
         if (v.free) window.lab.setCamera(v.free); else window.lab.camera(v.cam);
         window.lab.freeze(v.t, 12.5);
         await window.lab.whenIdle();
         return window.lab.cellHash();
-      }, v);
+      }, { v, look: a.look ? Object.fromEntries(a.look.split(',').map((kv) => kv.split('='))) : null });
       await lab.check();
       (table[`${stress ? 'stress' : 'lab'} ${i}`] ||= {})[n] = h;
     }

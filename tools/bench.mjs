@@ -9,6 +9,10 @@
 //
 //   node tools/bench.mjs [--browser chromium,firefox,webkit] [--threads 8,4] [--density 3,4]
 //                        [--scene lab|stress|both] [--frames 240] [--built] [--out file.json]
+//                        [--look tree=B,cloud=B,meadow=2,shallows=blue] [--root DIR]
+//
+// --look sets the look candidates for every run; --root measures another
+// build's folder (for example a copy of an earlier phase) instead of this one.
 //
 // "worker" is the slowest stripe's march + resolve in a frame; "verdict" is
 // that plus the main thread's draw, per frame (the phase 0b decision rule).
@@ -19,7 +23,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab, ROOT } from './lib/serve.mjs';
+import { serve, args, openLab, parseLook, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const browsers = (a.browser || 'chromium,firefox,webkit').split(',');
@@ -28,6 +32,7 @@ const densities = String(a.density || '3,4').split(',').map(Number);
 const frames = Number(a.frames || 240);
 const scenes = { lab: [false], stress: [true], both: [false, true] }[a.scene || 'both'];
 const TOP_CELLS = 52480;
+const look = parseLook(a.look);
 
 // What else is busy right now (the harness's own browsers are not up yet).
 const busy = execSync('ps -Ao %cpu,comm -r | head -8').toString().trim().split('\n').slice(1)
@@ -38,14 +43,14 @@ const med = (xs) => { const s = [...xs].sort((p, q) => p - q); return s[Math.flo
 const pct = (xs, p) => { const s = [...xs].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
 const r2 = (x) => +x.toFixed(2);
 
-const { server, url } = await serve();
+const { server, url } = await serve(a.root || ROOT);
 const rows = [];
 try {
   for (const name of browsers) {
     const browser = await launch(name, { headless: name === 'webkit' });
     for (const threads of threadCounts) {
       for (const stress of scenes) {
-        const lab = await openLab(browser, url, { built: !!a.built, threads, stress });
+        const lab = await openLab(browser, url, { built: !!a.built, threads, stress, look });
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));
         const ncams = await page.evaluate(() => window.lab.cameras.length);
@@ -71,7 +76,7 @@ try {
               march: r2(med(t.map((x) => x.march))), resolve: r2(med(t.map((x) => x.resolve))),
               worker: r2(med(t.map((x) => x.worker))), draw: r2(med(t.map((x) => x.draw))),
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
-              isolated: st.isolated, dpr: st.dpr,
+              isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
               ...(stress ? world : {}),
             };
             rows.push(row);

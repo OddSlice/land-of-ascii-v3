@@ -3,12 +3,13 @@
 // The videos go to shots/walks/, which is kept out of git.
 //
 //   node tools/walk.mjs [--only lake,forest,stress-lake,ridge] [--threads 8] [--density 4] [--headed]
+//                       [--look tree=B,cloud=B,meadow=2,shallows=blue] [--suffix name]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to turn.
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, args, ROOT } from './lib/serve.mjs';
+import { serve, args, parseLook, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const OUT = path.join(ROOT, 'shots', 'walks');
@@ -37,6 +38,7 @@ try {
     const q = new URLSearchParams();
     if (a.threads) q.set('threads', String(a.threads));
     if (a.density) q.set('density', String(a.density));
+    for (const [k, v] of Object.entries(parseLook(a.look) || {})) q.set(k, v);
     if (w.stress) q.set('stress', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
@@ -58,7 +60,7 @@ try {
     const secs = (Date.now() - t0) / 1000;
     const video = page.video();
     await ctx.close();
-    const file = path.join(OUT, `${w.name}.webm`);
+    const file = path.join(OUT, `${w.name}${a.suffix ? `-${a.suffix}` : ''}.webm`);
     await video.saveAs(file);
     await video.delete();
     if (errors.length || s1.errors.length) throw new Error(`${w.name}: page errors\n${[...errors, ...s1.errors].join('\n')}`);

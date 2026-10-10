@@ -5,12 +5,25 @@
 //                                                  what the glyphs add over flat colour (shots/phase0a/)
 //   node tools/lookbook.mjs --phase 0b [--built] [--density 4]   docs/phase0b.md: the lake at day, dusk and night,
 //                                                  and the stress scene's cameras (shots/phase0b/)
+//   node tools/lookbook.mjs --phase 0c --ref DIR [--built]   docs/phase0c.md: each look candidate at near, middle
+//       and far distance, and the three fixes before (the build in DIR, e.g. a copy of phase 0b) and after
+//       (shots/phase0c/)
+//   node tools/lookbook.mjs --regress [--save] [--built]
+//       the regression lookbook: the twelve fixed cameras (nine in the lab,
+//       three in the stress scene) at day, dusk and night with every clock
+//       frozen and the default look, compared cell for cell with the saved
+//       set in tools/regress/ (--save replaces it). Reports the share of
+//       cells that changed in each frame, so a later phase can show it did
+//       not disturb the look by accident.
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { launch, workbench, dataURL, writeDataURL } from './lib/browser.mjs';
 import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 
 const a = args();
+if (a.regress) { await regress(); process.exit(process.exitCode || 0); }
+if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
 const OUT = path.join(SHOTS, `phase${PHASE}`);
@@ -121,4 +134,199 @@ try {
 } finally {
   await browser.close();
   server.close();
+}
+
+// ---- the regression lookbook ------------------------------------------------
+
+async function regress() {
+  const DIR = path.join(ROOT, 'tools', 'regress');
+  const times = ['day', 'dusk', 'night'];
+  const density = Number(a.density || 3);
+  const { server, url } = await serve();
+  const browser = await launch('chromium');
+  const frames = [];
+  try {
+    for (const stress of [false, true]) {
+      const lab = await openLab(browser, url, { built: !!a.built, stress, density, threads: 8 });
+      const { page } = lab;
+      const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
+      for (let i = 0; i < cams.length; i++) {
+        for (const t of times) {
+          const cells = await page.evaluate(async ({ i, t }) => {
+            const L = window.lab;
+            L.resetLook();
+            L.camera(i); L.freeze(t, 0);
+            await L.whenIdle();
+            const st = L.state();
+            return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
+          }, { i, t });
+          await lab.check();
+          frames.push({ name: `${stress ? 'stress' : 'lab'} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
+        }
+      }
+      await lab.ctx.close();
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  if (a.save) {
+    fs.mkdirSync(DIR, { recursive: true });
+    let off = 0;
+    const index = frames.map((f) => { const e = { name: f.name, cols: f.cols, rows: f.rows, offset: off, length: f.data.length }; off += f.data.length; return e; });
+    const all = Buffer.concat(frames.map((f) => Buffer.from(f.data)));
+    fs.writeFileSync(path.join(DIR, 'cells.bin.gz'), zlib.gzipSync(all, { level: 9 }));
+    fs.writeFileSync(path.join(DIR, 'index.json'), JSON.stringify({ saved: new Date().toISOString(), density, frames: index }, null, 1));
+    console.log(`saved ${frames.length} frames to tools/regress/ (${(fs.statSync(path.join(DIR, 'cells.bin.gz')).size / 1e6).toFixed(1)} MB)`);
+    return;
+  }
+  const index = JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8'));
+  const saved = zlib.gunzipSync(fs.readFileSync(path.join(DIR, 'cells.bin.gz')));
+  console.log(`compared with the set saved ${index.saved} (density ${index.density})\n`);
+  console.log('| frame | cells changed | visibly changed (glyph, or a colour step over 6 levels) |');
+  console.log('|---|---|---|');
+  let worst = 0;
+  for (const f of frames) {
+    const e = index.frames.find((x) => x.name === f.name);
+    if (!e || e.cols !== f.cols || e.rows !== f.rows) { console.log(`| ${f.name} | not comparable (no saved frame of this size) | |`); process.exitCode = 1; continue; }
+    const old = saved.subarray(e.offset, e.offset + e.length);
+    let ch = 0, vis = 0;
+    for (let k = 0; k < f.data.length; k += 8) {
+      let diff = false, far = f.data[k + 3] !== old[k + 3];
+      for (let c = 0; c < 8; c++) if (f.data[k + c] !== old[k + c]) diff = true;
+      for (const c of [0, 1, 2, 4, 5, 6]) if (Math.abs(f.data[k + c] - old[k + c]) > 6) far = true;
+      if (diff) ch++;
+      if (diff && far) vis++;
+    }
+    const n = f.data.length / 8;
+    worst = Math.max(worst, ch / n);
+    console.log(`| ${f.name} | ${(100 * ch / n).toFixed(2)}% | ${(100 * vis / n).toFixed(2)}% |`);
+  }
+  console.log(`\nlargest change: ${(100 * worst).toFixed(2)}% of a frame's cells`);
+}
+
+// ---- phase 0c: the candidates side by side, and the fixes before and after ----
+
+async function phase0c() {
+  const OUT0 = path.join(ROOT, 'shots', 'phase0c');
+  fs.mkdirSync(OUT0, { recursive: true });
+  const browser = await launch('chromium');
+  const servers = [];
+  const labs = {};
+  // a page per build and scene, opened when first needed
+  const labFor = async (root, stress) => {
+    const key = `${root}|${stress}`;
+    if (!labs[key]) {
+      const sv = await serve(root);
+      servers.push(sv.server);
+      labs[key] = await openLab(browser, sv.url, { built: !!a.built, stress, density: a.density || 3 });
+      await labs[key].page.evaluate(() => window.lab.setHud(false));
+    }
+    return labs[key];
+  };
+  // one frame: { stress, at: [x, z, yaw, pitch, y?] or cam, time, look }
+  const grab = async (root, v) => {
+    const lab = await labFor(root, !!v.stress);
+    await lab.page.evaluate((v) => {
+      const L = window.lab;
+      if (L.resetLook) { L.resetLook(); if (v.look) L.setLook(v.look); }
+      if (v.cam !== undefined) L.camera(v.cam);
+      else L.setCamera({ x: v.at[0], z: v.at[1], yaw: v.at[2], pitch: v.at[3], y: v.at[4] });
+      L.freeze(v.time || 'day', 0);
+    }, v);
+    await lab.page.evaluate(() => window.lab.whenIdle());
+    await lab.check();
+    const buf = await (await lab.page.$('#view')).screenshot();
+    return `data:image/png;base64,${buf.toString('base64')}`;
+  };
+  const bench = await workbench(browser);
+  // a grid of frames: rows (with labels) by columns (with labels); `crop`
+  // is an optional [x0, y0, x1, y1] of each frame, as fractions
+  const grid = (title, colLabels, rowLabels, cells, crop) => bench.evaluate(async ({ title, colLabels, rowLabels, cells, crop }) => {
+    const ims = await Promise.all(cells.flat().map(loadImage));
+    const [x0, y0, x1, y1] = crop || [0, 0, 1, 1];
+    const sw = ims[0].width * (x1 - x0), sh = ims[0].height * (y1 - y0);
+    const nc = colLabels.length, nr = rowLabels.length;
+    const cw = Math.round(1560 / nc), ch = Math.round(cw * sh / sw);
+    const pad = 10, top = 52, left = 0;
+    const c = document.createElement('canvas');
+    c.width = left + nc * (cw + pad) + pad; c.height = top + nr * (ch + 26 + pad);
+    const g = c.getContext('2d');
+    g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+    g.font = '12px Menlo, monospace'; g.fillStyle = '#d0cabd';
+    colLabels.forEach((l, k) => g.fillText(l, left + pad + k * (cw + pad), 44));
+    g.imageSmoothingQuality = 'high';
+    for (let r = 0; r < nr; r++) {
+      for (let k = 0; k < nc; k++) {
+        const im = ims[r * nc + k], x = left + pad + k * (cw + pad), y = top + r * (ch + 26 + pad);
+        g.drawImage(im, im.width * x0, im.height * y0, sw, sh, x, y, cw, ch);
+      }
+      g.fillStyle = '#b8b2a4'; g.fillText(rowLabels[r], left + pad, top + r * (ch + 26 + pad) + ch + 17);
+    }
+    return c.toDataURL('image/jpeg', 0.86);
+  }, { title, colLabels, rowLabels, cells, crop });
+  const save = (name, url) => writeDataURL(path.join(OUT0, name), url);
+  try {
+    // the candidates: rows near, middle, far; columns the options
+    const cand = async (name, title, axis, options, names, rows) => {
+      const cells = [];
+      for (const r of rows) {
+        const row = [];
+        for (const o of options) row.push(await grab(ROOT, { ...r.v, look: { ...(r.v.look || {}), [axis]: o } }));
+        cells.push(row);
+      }
+      save(name, await grid(title, options.map((o, k) => `${axis} ${o}: ${names[k]}`), rows.map((r) => r.label), cells, rows[0].crop));
+    };
+    await cand('trees.jpg', 'Conifers, treatment A and B: near, middle, far (day)', 'tree', ['A', 'B'], ['tidy tiers', 'rough and dark'], [
+      { label: 'near: inside the far-shore stand, looking out', v: { at: [356, 320, 175, 3] } },
+      { label: 'middle: a stand edge across the meadow (50-90 m)', v: { at: [276, 248, -97, 1] } },
+      { label: 'far: the far-shore stand from the south end (250 m)', v: { at: [345, 60, 4, 1] } },
+      { label: 'stress: in the dense forest', v: { stress: true, cam: 0 } },
+    ]);
+    await cand('clouds.jpg', 'Clouds, treatment A and B: overhead, middle sky, horizon, dusk', 'cloud', ['A', 'B'], ['cumulus', 'banks'], [
+      { label: 'overhead', v: { at: [300, 120, 170, 45] } },
+      { label: 'middle of the sky', v: { at: [262, 225, -8, 12] } },
+      { label: 'to the horizon (stress lake)', v: { stress: true, cam: 1 } },
+      { label: 'dusk', v: { at: [182, 112, 58, 2], time: 'dusk' } },
+    ]);
+    await cand('meadow.jpg', 'Meadow mottling, strengths 0, 1, 2: near, middle, far (day)', 'meadow', [0, 1, 2], ['none (phase 0b)', 'soft patches', 'strong patches'], [
+      { label: 'near', v: { at: [262, 200, -8, -14] } },
+      { label: 'middle', v: { at: [262, 225, -8, 2] } },
+      { label: 'far (stress, ridge-top vista)', v: { stress: true, cam: 2 } },
+    ]);
+    await cand('shallows.jpg', 'Shallows, warm bed and even blue: near, middle, far (day)', 'shallows', ['warm', 'blue'], ['warm bed (phase 0b)', 'even blue'], [
+      { label: 'near: the lake shore', v: { at: [327, 232.5, -12, -7] } },
+      { label: 'middle: low over the lake', v: { at: [356, 229.6, 2, -12] } },
+      { label: 'far: across the stress lake', v: { stress: true, cam: 1 } },
+    ]);
+    // the fixes, before (the reference build) and after (this build, default look)
+    if (a.ref) {
+      const fix = async (name, title, rows, crop) => {
+        const cells = [];
+        for (const r of rows) cells.push([await grab(a.ref, r.v), await grab(ROOT, r.v)]);
+        save(name, await grid(title, ['before (phase 0b)', 'after (phase 0c)'], rows.map((r) => r.label), cells, crop));
+      };
+      await fix('fix-torches.jpg', 'Fix 1: distant torch flames fade instead of standing out as bright blocks', [
+        { label: 'stress, ridge-top vista by day: the river torches', v: { stress: true, cam: 2 } },
+        { label: 'stress, across the lake at night', v: { stress: true, cam: 1, time: 'night' } },
+        { label: 'lab, the road to the wall by day: the gate torch', v: { at: [252.6, 86, 0, 0] } },
+      ]);
+      await fix('fix-treelines.jpg', 'Fix 2: far stands keep a jagged top of single tips, then soften into a ragged band', [
+        { label: 'stress, across the lake: the far shore (400-600 m), enlarged', v: { stress: true, cam: 1 } },
+      ], [0.55, 0.3, 1, 0.5]);
+      await fix('fix-treelines-lab.jpg', 'Fix 2: the far-shore stand from the south end of the valley (250 m)', [
+        { label: 'lab, far treeline', v: { at: [345, 60, 4, 1] } },
+      ]);
+      await fix('fix-forest.jpg', 'Fix 3: inside a forest: varied trunks, a canopy with gaps and depth, a shaded forest floor', [
+        { label: 'stress, dense forest by day', v: { stress: true, cam: 0 } },
+        { label: 'lab, inside the far-shore stand', v: { at: [356, 320, 175, 3] } },
+      ]);
+    }
+  } finally {
+    for (const l of Object.values(labs)) await l.ctx.close();
+    await browser.close();
+    for (const sv of servers) sv.close();
+  }
+  console.log(fs.readdirSync(OUT0).map((f) => `shots/phase0c/${f} ${(fs.statSync(path.join(OUT0, f)).size / 1024).toFixed(0)} KB`).join('\n'));
 }

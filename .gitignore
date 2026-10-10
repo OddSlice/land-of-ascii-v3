@@ -3,5 +3,6 @@ reference/
 shots/*
 !shots/phase0a/
 !shots/phase0b/
+!shots/phase0c/
 .DS_Store
 .claude/
