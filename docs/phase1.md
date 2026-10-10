@@ -5,7 +5,7 @@ Written 11 Oct 2026. Phase 1 replaces the lab with a real world. The page now op
 Nothing else is in the world: no buildings beyond the 0A wall and gate, no villages (only their sites), no people or animals, no inventory, goals, new plants or weather.
 
 **Live:**
-- **Vercel (main address, shared memory):** ⟨VERCEL⟩
+- **Vercel (main address, shared memory):** https://land-of-ascii-v3.vercel.app/ (deployed from `main`; it sends the two isolation headers, so the workers share one world)
 - **GitHub Pages (no shared memory, the fallback):** https://oddslice.github.io/land-of-ascii-v3/
 - The lab: `?lab=1`. The stress scene: `?stress=1`. Both are unchanged, and X still switches between them.
 - A seed: `?seed=N`. **The default seed is 3.**
