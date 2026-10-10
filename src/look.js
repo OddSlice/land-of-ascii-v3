@@ -21,15 +21,17 @@ export const LOOK = {
   fovY: 60,
 
   // The look candidates (phase 0c), chosen live in the look panel (L), by URL
-  // (?tree=B&cloud=B&meadow=2&shallows=blue) or with lab.setLook(). Each has
+  // (?tree=A&cloud=A&meadow=0&shallows=warm) or with lab.setLook(). Each has
   // its options with a short name for the panel, the default, and the key
   // that cycles it. Every candidate varies only with world position or an
   // object's own identity, never with the screen or the clock.
+  // Locked in phase 1: the defaults are the settled look (conifers B, clouds
+  // B, meadow 2, blue shallows); the other options stay for comparison.
   choices: {
-    tree:     { label: 'conifers', key: '7', default: 'A', options: { A: 'tidy tiers', B: 'rough and dark' } },
-    cloud:    { label: 'clouds',   key: '8', default: 'A', options: { A: 'cumulus', B: 'banks' } },
-    meadow:   { label: 'meadow',   key: '9', default: 0,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
-    shallows: { label: 'shallows', key: '0', default: 'warm', options: { warm: 'warm bed', blue: 'even blue' } },
+    tree:     { label: 'conifers', key: '7', default: 'B', options: { A: 'tidy tiers', B: 'rough and dark' } },
+    cloud:    { label: 'clouds',   key: '8', default: 'B', options: { A: 'cumulus', B: 'banks' } },
+    meadow:   { label: 'meadow',   key: '9', default: 2,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
+    shallows: { label: 'shallows', key: '0', default: 'blue', options: { warm: 'warm bed', blue: 'even blue' } },
   },
 
   // Hours the 1, 2, 3 keys jump to.
@@ -176,6 +178,18 @@ export const LOOK = {
   // Ink floor: on near-black cells the glyph is lightened by at least this
   // colour times the ink amount, so night glyphs still carry light.
   inkFloor: '#2a2c34',
+
+  // The overhead map (M, phase 1). The land is drawn by the same resolve
+  // step and day palette as the view, seen from straight above and lit by
+  // the day's sun; these are only the marks laid over it. `heading`: the
+  // glyphs that point the player's way (up, up-right, right, down-right).
+  map: {
+    glyphs: { fort: '#', village: 'o', viewpoint: '*', spawn: '+', you: '@', heading: ['|', '/', '-', '\\'] },
+    mark: '#f0e6cc',          // the sites
+    you: '#ffb060',           // the player and their heading
+    markBg: '#1c1d22',        // behind a mark, so it reads on any ground
+    frame: '#0d0e12',         // round the map
+  },
 
   // Keyframes. Every material has `lit` (full sun) and `shade` (no direct
   // light) colours; the resolve step blends between them by the light that
