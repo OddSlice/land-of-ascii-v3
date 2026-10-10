@@ -20,6 +20,7 @@ export const MAT = {
   GRASS: 5, DIRT: 6, SAND: 7, ROCK: 8, SNOW: 9, WATER: 10,
   STONE: 11, CONIFER: 12, TRUNK: 13, BUSH: 14, WOOD: 15, FLAME: 16,
   BED: 17,                         // the silt of a lake or river bed
+  FLOOR: 18,                       // the needle-strewn ground under a stand of trees
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;
@@ -60,6 +61,11 @@ export const MAT_NONE = 255;
 //             Sky: closeness to the sun, 255 * (1 - angle / pi).
 //             Star: brightness of the star.
 //             Water (R0): Fresnel share of the mirror, 0..255.
+//             Flame: how much of the drawn flame is really flame, 255 = all.
+//             A distant flame is drawn at least two rows tall so it cannot
+//             blink; below its true size it is faded toward what is behind
+//             it (resolve takes that from the next cell up its column, or
+//             down, for a reflection).
 //             Cloud: coverage, 255 = solid; less at the edge, where the cloud
 //             dissolves into the sky behind it.
 // [6..7] dist distance along the ray in decimetres, little-endian uint16;
@@ -89,6 +95,8 @@ export const CELL_STRIDE = 8;
 //   aspect,                   width / height of the picture in pixels
 //   hour,                     time of day, 0..24
 //   t,                        animation clock in seconds (clouds, flame)
+//   look: { tree, cloud, meadow, shallows }   the look candidates in use
+//                             (LOOK.choices); missing keys take the defaults
 // }
 // Cell (cx, cy) has its centre at screen position
 //   x = 2 (cx + 0.5) / cols - 1,  y = 1 - 2 (cy + 0.5) / rows   (both -1..1)

@@ -19,6 +19,8 @@
   #ref .note { display: none; padding: 24px 18px; width: 260px; font: 12px/1.5 Menlo, monospace; color: #b9b4a8; }
   #ref.missing img, #ref.missing .label { display: none; }
   #ref.missing .note { display: block; }
+  #look { position: fixed; right: 10px; top: 8px; padding: 6px 9px; font: 11px/1.6 Menlo, Consolas, monospace; color: #dcd7cb;
+    white-space: pre; pointer-events: none; background: rgba(10, 11, 14, .62); }
   #progress { position: fixed; left: 0; right: 0; top: 45%; display: none; text-align: center;
     font: 12px/1.5 Menlo, Consolas, monospace; color: #dcd7cb; white-space: pre; }
   #error { position: fixed; inset: 0; display: none; z-index: 10; padding: 28px; background: #3a1010; color: #ffd9cf;
@@ -36,6 +38,7 @@
 </div>
 <div id="hud"></div>
 <div id="progress"></div>
+<div id="look" style="display:none"></div>
 <div id="error"></div>
 <script type="module" src="/src/main.js"></script>
 </body>

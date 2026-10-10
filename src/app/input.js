@@ -1,3 +1,5 @@
+import { LOOK } from '../look.js';
+
 // Keyboard and mouse. Mouse look uses pointer lock after a click; where the
 // lock is refused (the Claude app's browser pane, some embeds) dragging with
 // the mouse looks around instead, and the arrow keys always do.
@@ -52,9 +54,14 @@ export class Input {
       case 'KeyR': a.toggleRef(); break;
       case 'KeyH': a.toggleHud(); break;
       case 'KeyX': a.toggleScene(); break;
+      case 'KeyL': a.toggleLook(); break;
+      default: {
+        // the look panel's keys (LOOK.choices)
+        for (const [name, c] of Object.entries(LOOK.choices)) if (e.code === `Digit${c.key}`) a.cycleLook(name);
+        break;
+      }
       case 'Minus': case 'NumpadSubtract': a.density(-1); break;
       case 'Equal': case 'NumpadAdd': a.density(1); break;
-      default: break;
     }
   }
 

@@ -15,6 +15,7 @@ import { Player } from './app/player.js';
 import { Input } from './app/input.js';
 import { Hud } from './app/hud.js';
 import { RefView } from './app/refview.js';
+import { LookPanel, lookFrom, nextOption } from './app/lookpanel.js';
 import { CAMERAS } from './app/cameras.js';
 import { layout, cellWidth, TARGETS } from './app/grid.js';
 import { MAX_PITCH } from './scene/cpu/view.js';
@@ -37,6 +38,8 @@ const state = {
   // density 3 by default (the phase 0b verdict); ?density=1..4 or −/+ for the others
   preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1)) : 2,
   cam: 0, camName: CAMERAS[0].name,
+  // the look candidates in use (LOOK.choices), from the URL or the defaults
+  look: lookFrom(Object.fromEntries(['tree', 'cloud', 'meadow', 'shallows'].map((k) => [k, params.get(k)]))),
   seq: 0, presented: 0, failed: false,
 };
 
@@ -88,6 +91,7 @@ const canvas = $('view');
 const presenter = new Presenter(canvas);
 const hud = new Hud($('hud'));
 const ref = new RefView($('ref'));
+const lookPanel = new LookPanel($('look'));
 
 // glyph atlases for all four densities, built once
 const dpr = Math.max(1, Math.round((window.devicePixelRatio || 1) * 100) / 100);
@@ -140,6 +144,8 @@ const input = new Input(canvas, {
     location.search = q.toString();
   },
   toggleHud: () => hud.toggle(),
+  toggleLook: () => lookPanel.toggle(),
+  cycleLook: (name) => { state.look = nextOption(state.look, name); },
   density: (d) => { state.preset = Math.max(0, Math.min(3, state.preset + d)); relayout(); },
 });
 
@@ -153,6 +159,7 @@ function makeFrame() {
     fovY: LOOK.fovY * DEG,
     aspect: grid.cols / (2 * grid.rows),
     hour: state.hour, t: state.t,
+    look: state.look,
   };
 }
 
@@ -255,6 +262,7 @@ function tick(now) {
     threads: THREADS, hour: state.hour, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
     stress: STRESS, buildMs: buildMs(), sweepMs: light.sweepMs, settled: light.settled,
   });
+  lookPanel.update(state.look);
   requestAnimationFrame(tick);
 }
 
@@ -275,7 +283,7 @@ Object.assign(lab, {
   threads: THREADS,
   stress: STRESS,
   cameras: CAMS,
-  // Stand at a fixed camera (0..5, or 0..2 in the stress scene); also sets its time of day.
+  // Stand at a fixed camera (0..8, or 0..2 in the stress scene); also sets its time of day.
   camera(i) { useCamera(i); },
   // Place the eye. Angles in degrees; without y the feet stand on the ground,
   // with y the eye stays at that height until a walk key is pressed.
@@ -297,13 +305,20 @@ Object.assign(lab, {
   setGlyphs(on) { presenter.glyphs = !!on; },
   setHud(on) { if (hud.visible !== !!on) hud.toggle(); },
   setRef(on) { if (ref.on !== !!on) { ref.toggle(CAMERAS[state.cam]); relayout(); } },
+  // The look candidates: setLook({ tree, cloud, meadow, shallows }) (any of
+  // them), resetLook() back to the defaults, look() the ones in use;
+  // setLookPanel(on) shows the panel.
+  setLook(look) { state.look = lookFrom(look, state.look); return { ...state.look }; },
+  resetLook() { state.look = lookFrom({}); return { ...state.look }; },
+  look() { return { ...state.look }; },
+  setLookPanel(on) { if (lookPanel.on !== !!on) lookPanel.toggle(); },
   state() {
     return {
       x: player.x, z: player.z, eye: player.eye, yaw: player.yaw / DEG, pitch: player.pitch / DEG,
       hour: state.hour, t: state.t, frozen: state.frozen, running: state.running,
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
-      isolated: !!self.crossOriginIsolated,
+      isolated: !!self.crossOriginIsolated, look: { ...state.look },
     };
   },
   // Resolves once a frame made after this call is on screen, with cast
