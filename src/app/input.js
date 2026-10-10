@@ -51,6 +51,7 @@ export class Input {
       case 'KeyG': a.toggleGlyphs(); break;
       case 'KeyR': a.toggleRef(); break;
       case 'KeyH': a.toggleHud(); break;
+      case 'KeyX': a.toggleScene(); break;
       case 'Minus': case 'NumpadSubtract': a.density(-1); break;
       case 'Equal': case 'NumpadAdd': a.density(1); break;
       default: break;

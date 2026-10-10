@@ -15,7 +15,9 @@ export function serve() {
       const file = path.join(ROOT, p);
       fs.readFile(file, (err, data) => {
         if (err) { res.writeHead(404); res.end(); return; }
-        res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+        // cross-origin isolation, so Firefox and WebKit give fine-grained timers
+        res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store',
+          'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' });
         res.end(data);
       });
     });
@@ -38,7 +40,7 @@ export function args(argv = process.argv.slice(2)) {
 
 // Open the lab in a page and wait until it is running. Fails on any page
 // error or worker failure.
-export async function openLab(browser, base, { built = false, threads, density, width = 1440, height = 900, dpr = 2 } = {}) {
+export async function openLab(browser, base, { built = false, threads, density, stress = false, width = 1440, height = 900, dpr = 2 } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr });
   const page = await ctx.newPage();
   const errors = [];
@@ -47,9 +49,10 @@ export async function openLab(browser, base, { built = false, threads, density, 
   const q = new URLSearchParams();
   if (threads !== undefined) q.set('threads', String(threads));
   if (density !== undefined) q.set('density', String(density));
+  if (stress) q.set('stress', '1');
   const url = `${base}/${built ? 'index.html' : ''}${q.toString() ? `?${q}` : ''}`;
   await page.goto(url);
-  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: stress ? 180000 : 30000 });
   await page.evaluate(() => window.lab.ready);
   const check = async () => {
     const labErrors = await page.evaluate(() => window.lab.errors);

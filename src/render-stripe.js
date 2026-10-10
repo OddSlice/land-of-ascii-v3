@@ -19,7 +19,7 @@ export function createStripeRenderer(world) {
       const cells = new Uint8Array(n * CELL_STRIDE);
       resolveStripe(makePalette(frame.hour), hits, cells, sw, frame.rows, c0);
       const t2 = performance.now();
-      return { cells, march: t1 - t0, resolve: t2 - t1 };
+      return { cells, march: t1 - t0, resolve: t2 - t1, settled: backend.settled, sweepMs: backend.sweepMs };
     },
   };
 }

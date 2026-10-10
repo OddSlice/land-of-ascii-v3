@@ -17,6 +17,11 @@ export function createCpuBackend(world) {
 
   return {
     name: 'cpu-march',
+    // false while cast shadows are still catching up with the light
+    get settled() { return !light.pending; },
+    // the time one whole shadow sweep took (the first, done at once)
+    get sweepMs() { return light.sweepMs; },
+    get cull() { return objects.stats; },
     // Fill `hits` (HIT_STRIDE bytes per cell, row-major over columns c0..c1-1)
     // for one frame.
     render(frame, c0, c1, hits) {

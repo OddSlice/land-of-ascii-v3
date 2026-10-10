@@ -1,8 +1,11 @@
-// Land of Ascii v3, phase 0a: the Look Lab. Boot, the main loop, and the
-// debug handle (window.lab) the tools use.
+// Land of Ascii v3, phases 0a and 0b: the Look Lab. Boot, the main loop, and
+// the debug handle (window.lab) the tools use. ?stress=1 (or X) swaps in the
+// stress scene, a big world for measuring the renderer; the lab's own scene is
+// untouched by it.
 import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
+import { buildStressWorld } from './world/stress.js';
 import { START, EYE } from './world/layout.js';
 import { Presenter } from './present/gl.js';
 import { buildAtlas } from './present/atlas.js';
@@ -21,6 +24,7 @@ const params = new URLSearchParams(location.search);
 const DEG = Math.PI / 180;
 const CLOCK_RATE = 1 / 60;      // T: one game hour per real minute
 
+const STRESS = params.get('stress') === '1';
 const threadsParam = params.get('threads');
 const THREADS = threadsParam !== null ? Math.max(0, parseInt(threadsParam, 10) || 0)
   : Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 2));
@@ -49,7 +53,34 @@ addEventListener('error', (e) => fail(`${e.message} (${e.filename}:${e.lineno})`
 addEventListener('unhandledrejection', (e) => fail(String(e.reason && e.reason.stack || e.reason)));
 
 
-const world = buildWorld();
+// Workers build their own copy of the world, so they start first. In the
+// stress scene the page builds one too, in steps with a progress line (only
+// what walking needs, unless it also renders with ?threads=0).
+let pool = null;
+const progress = { page: 0, workers: THREADS ? 0 : 1 };
+function showProgress() {
+  const p = Math.min(progress.page, progress.workers);
+  $('progress').style.display = 'block';
+  $('progress').textContent = `building the stress scene … ${Math.floor(p * 100)}%`;
+}
+if (THREADS > 0) {
+  pool = new Pool(THREADS, fail, {
+    scene: STRESS ? 'stress' : 'default',
+    onProgress: (p) => { progress.workers = p; showProgress(); },
+  });
+  if (STRESS) pool.whenReady.then(() => { progress.workers = 1; });
+}
+const nextTask = () => new Promise((resolve) => { const ch = new MessageChannel(); ch.port1.onmessage = resolve; ch.port2.postMessage(0); });
+async function makeWorld() {
+  if (!STRESS) return buildWorld();
+  const gen = buildStressWorld({ render: THREADS === 0 });
+  let r;
+  while (!(r = gen.next()).done) { progress.page = r.value; showProgress(); await nextTask(); }
+  progress.page = 1;
+  return r.value;
+}
+const world = await makeWorld();
+const CAMS = STRESS ? world.cameras : CAMERAS;
 const player = new Player(world);
 const canvas = $('view');
 const presenter = new Presenter(canvas);
@@ -83,20 +114,28 @@ function setTime(name) {
   state.running = false;
 }
 function useCamera(i) {
-  const c = CAMERAS[i];
+  const c = CAMS[i];
   state.cam = i; state.camName = c.name;
   standAt(c.x, c.z, c.yaw, c.pitch);
   setTime(c.time);
-  if (ref.on) ref.show(c);
+  if (ref.on && c.ref) ref.show(c);
 }
-standAt(START.x, START.z, START.yaw, START.pitch);
+const start = STRESS ? world.start : START;
+standAt(start.x, start.z, start.yaw, start.pitch);
+if (STRESS) state.camName = 'stress: start';
 
 const input = new Input(canvas, {
   time: setTime,
   toggleClock: () => { state.running = !state.running; state.frozen = false; },
-  nextCamera: () => useCamera((state.cam + 1) % CAMERAS.length),
+  nextCamera: () => useCamera((state.cam + 1) % CAMS.length),
   toggleGlyphs: () => { presenter.glyphs = !presenter.glyphs; },
-  toggleRef: () => { ref.toggle(CAMERAS[state.cam]); relayout(); },
+  // the stress scene has no reference frames
+  toggleRef: () => { if (STRESS) return; ref.toggle(CAMERAS[state.cam]); relayout(); },
+  toggleScene: () => {
+    const q = new URLSearchParams(location.search);
+    if (STRESS) q.delete('stress'); else q.set('stress', '1');
+    location.search = q.toString();
+  },
   toggleHud: () => hud.toggle(),
   density: (d) => { state.preset = Math.max(0, Math.min(3, state.preset + d)); relayout(); },
 });
@@ -117,11 +156,16 @@ function makeFrame() {
 // ---- rendering --------------------------------------------------------------
 
 const timing = { fps: 0, march: 0, resolve: 0, draw: 0 };
+const light = { settled: false, sweepMs: 0 };
 let lastPresent = 0;
 const waiters = [];
 let collectors = [];
 
-function presented(seq, march, resolve, drawMs, latency) {
+// march and resolve are each the slowest stripe's; worker is the slowest
+// stripe's march + resolve together
+function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worker) {
+  light.settled = settled;
+  if (sweepMs > light.sweepMs) light.sweepMs = sweepMs;
   const now = performance.now();
   const interval = lastPresent ? now - lastPresent : 0;
   lastPresent = now;
@@ -130,15 +174,14 @@ function presented(seq, march, resolve, drawMs, latency) {
   timing.resolve += (resolve - timing.resolve) * 0.2;
   timing.draw += (drawMs - timing.draw) * 0.2;
   state.presented = seq;
-  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency });
+  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker });
   for (let i = waiters.length - 1; i >= 0; i--) {
-    if (seq >= waiters[i].seq) { const w = waiters.splice(i, 1)[0]; requestAnimationFrame(() => requestAnimationFrame(w.resolve)); }
+    if (seq >= waiters[i].seq && settled) { const w = waiters.splice(i, 1)[0]; requestAnimationFrame(() => requestAnimationFrame(w.resolve)); }
   }
 }
 
-let local = null, pool = null;
+let local = null;
 if (THREADS === 0) local = createStripeRenderer(world);
-else pool = new Pool(THREADS, fail);
 
 function renderLocal() {
   const f = makeFrame();
@@ -147,24 +190,27 @@ function renderLocal() {
   full = r.cells;
   presenter.upload(0, f.cols, r.cells);
   presenter.draw();
-  presented(f.seq, r.march, r.resolve, performance.now() - t0, 0);
+  presented(f.seq, r.march, r.resolve, performance.now() - t0, 0, r.settled, r.sweepMs, r.march + r.resolve);
 }
 
 function presentPool(res) {
   if (res.frame.cols !== grid.cols || res.frame.rows !== grid.rows) return;   // stale size
   const t0 = performance.now();
-  let march = 0, resolve = 0;
+  let march = 0, resolve = 0, worker = 0, settled = true, sweepMs = 0;
   const rows = grid.rows;
   for (const p of res.parts) {
     presenter.upload(p.c0, p.c1, p.cells);
     march = Math.max(march, p.march);
     resolve = Math.max(resolve, p.resolve);
+    worker = Math.max(worker, p.march + p.resolve);
+    settled = settled && p.settled;
+    sweepMs = Math.max(sweepMs, p.sweepMs);
     // keep a whole copy for lab.cellHash()
     const sw = p.c1 - p.c0;
     for (let y = 0; y < rows; y++) full.set(p.cells.subarray(y * sw * CELL_STRIDE, (y + 1) * sw * CELL_STRIDE), (y * grid.cols + p.c0) * CELL_STRIDE);
   }
   presenter.draw();
-  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent);
+  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent, settled, sweepMs, worker);
 }
 
 let last = performance.now();
@@ -198,6 +244,7 @@ function tick(now) {
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
     threads: THREADS, hour: state.hour, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
+    stress: STRESS, buildMs: buildMs(), sweepMs: light.sweepMs, settled: light.settled,
   });
   requestAnimationFrame(tick);
 }
@@ -207,7 +254,9 @@ function keyName(h) {
   return d <= k && d <= n ? 'day' : k <= n ? 'dusk' : 'night';
 }
 
-const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => { started = true; });
+// the stress scene's build time: the workers' (they build everything), or the page's
+const buildMs = () => (pool ? pool.buildMs : world.buildMs);
+const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => { started = true; $('progress').style.display = 'none'; });
 requestAnimationFrame(tick);
 
 // ---- the debug handle ---------------------------------------------------------
@@ -215,8 +264,9 @@ requestAnimationFrame(tick);
 Object.assign(lab, {
   ready,
   threads: THREADS,
-  cameras: CAMERAS,
-  // Stand at a fixed camera (0..4); also sets its time of day.
+  stress: STRESS,
+  cameras: CAMS,
+  // Stand at a fixed camera (0..5, or 0..2 in the stress scene); also sets its time of day.
   camera(i) { useCamera(i); },
   // Place the eye. Angles in degrees; without y the feet stand on the ground.
   setCamera({ x, z, y, yaw = 0, pitch = 0 }) {
@@ -241,10 +291,12 @@ Object.assign(lab, {
       x: player.x, z: player.z, eye: player.eye, yaw: player.yaw / DEG, pitch: player.pitch / DEG,
       hour: state.hour, t: state.t, frozen: state.frozen, running: state.running,
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
-      threads: THREADS, presented: state.presented, camName: state.camName,
+      threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
+      isolated: !!self.crossOriginIsolated,
     };
   },
-  // Resolves once a frame made after this call is on screen.
+  // Resolves once a frame made after this call is on screen, with cast
+  // shadows caught up.
   whenIdle() {
     return ready.then(() => new Promise((resolve) => waiters.push({ seq: state.seq + 1, resolve })));
   },
@@ -256,7 +308,7 @@ Object.assign(lab, {
       collectors.push(list);
     });
   },
-  stats() { return { ...timing }; },
+  stats() { return { ...timing, ...light }; },
   // Walk with the given keys held for a number of seconds of game time, in
   // fixed 1/60 s steps (for tests; the frame rate does not matter).
   walk(keys, seconds) {
@@ -284,5 +336,8 @@ Object.assign(lab, {
     g.putImageData(img, 0, 0);
     return { url: c.toDataURL('image/png'), report: a.report, fontPx: a.fontPx };
   },
-  world: { buildMs: world.buildMs, trees: world.objects.trees.length, bushes: world.objects.bushes.length },
+  world: {
+    kind: world.kind, N: world.N, trees: world.objects.trees.length, bushes: world.objects.bushes.length, torches: world.objects.torches.length,
+    get buildMs() { return buildMs(); }, get sweepMs() { return light.sweepMs; },
+  },
 });

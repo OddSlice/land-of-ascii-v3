@@ -39,8 +39,10 @@ const CLUSTERS = [
   [-2600, 900, 950, 1.6], [-2400, 2400, 980, 1.6]
 ];
 
-export function buildClouds() {
-  const clusters = CLUSTERS.map(([x, z, base, scale], c) => {
+// `shift` moves every cluster, for maps centred elsewhere than the lab's valley.
+export function buildClouds(shift = 0) {
+  const clusters = CLUSTERS.map(([x0, z0, base, scale], c) => {
+    const x = x0 + shift, z = z0 + shift;
     const r = (n) => hash2(c, n, SEED + 61);
     const main = (210 + 70 * r(1)) * scale;
     // flat-bottomed domes: puff centres sit a little above the base, so the

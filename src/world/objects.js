@@ -14,7 +14,7 @@ export function groundAt(T, x, z) {
   return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
 }
 
-function conifer(x, z, base, s, tall = 1) {
+export function conifer(x, z, base, s, tall = 1) {
   const r = (n) => hash2(s, n, SEED + 31);
   const h = (13 + 7.5 * r(1)) * tall;
   const R = 2.0 + 0.9 * r(2);

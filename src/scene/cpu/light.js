@@ -54,59 +54,59 @@ export function buildOccluders(world) {
 }
 
 // V[node] = height of the shadow volume over the node: anything below it is
-// in shadow. Swept from the light's side of the grid, one row at a time,
-// each node reading the row before it, so it is one pass over the grid.
-function sweep(occ, V, lx, lz, tanE, n, NN) {
-  const NEG = -1e9;
+// in shadow. Swept from the light's side of the grid one line at a time, each
+// node reading the line before it, so it is one pass over the grid; on a big
+// grid the pass is spread over several frames.
+const NEG = -1e9;
+
+function sweepLine(job, occ, V, n, NN) {
+  const { xdom, s, frac, drop, line } = job;
+  const prev = line + s;
   const lerpAt = (arr, base, stride, pos) => {
     if (pos <= 0) return arr[base];
     if (pos >= n) return arr[base + n * stride];
     const p0 = Math.floor(pos), f = pos - p0;
     return arr[base + p0 * stride] * (1 - f) + arr[base + (p0 + 1) * stride] * f;
   };
-  if (Math.abs(lx) >= Math.abs(lz)) {
-    const sx = lx > 0 ? 1 : -1;
-    const sz = lz / Math.abs(lx);
-    const drop = tanE * Math.sqrt(1 + sz * sz);
-    const first = lx > 0 ? n : 0;
-    for (let k = 0; k <= n; k++) V[k * NN + first] = NEG;
-    for (let i = first - sx; i >= 0 && i <= n; i -= sx) {
-      const ip = i + sx;
-      for (let k = 0; k <= n; k++) {
-        const pos = k + sz;
-        const o = lerpAt(occ, ip, NN, pos), v = lerpAt(V, ip, NN, pos);
-        V[k * NN + i] = (o > v ? o : v) - drop;
-      }
+  if (xdom) {
+    for (let k = 0; k <= n; k++) {
+      const pos = k + frac;
+      const o = lerpAt(occ, prev, NN, pos), v = lerpAt(V, prev, NN, pos);
+      V[k * NN + line] = (o > v ? o : v) - drop;
     }
   } else {
-    const sz = lz > 0 ? 1 : -1;
-    const sx = lx / Math.abs(lz);
-    const drop = tanE * Math.sqrt(1 + sx * sx);
-    const first = lz > 0 ? n : 0;
-    for (let i = 0; i <= n; i++) V[first * NN + i] = NEG;
-    for (let k = first - sz; k >= 0 && k <= n; k -= sz) {
-      const kp = k + sz;
-      for (let i = 0; i <= n; i++) {
-        const pos = i + sx;
-        const o = lerpAt(occ, kp * NN, 1, pos), v = lerpAt(V, kp * NN, 1, pos);
-        V[k * NN + i] = (o > v ? o : v) - drop;
-      }
+    for (let i = 0; i <= n; i++) {
+      const pos = i + frac;
+      const o = lerpAt(occ, prev * NN, 1, pos), v = lerpAt(V, prev * NN, 1, pos);
+      V[line * NN + i] = (o > v ? o : v) - drop;
     }
   }
 }
 
-function downsample(src, n) {
+// Rows k0..k1-1 of a level from the level below (a tent filter), clamped at
+// the edges like terrain.js's downsample, with the same sums in the same order.
+function downsampleRows(src, n, out, k0, k1) {
   const m = n >> 1, mm = m + 1, nn = n + 1;
-  const out = new Float32Array(mm * mm);
   const at = (i, k) => src[Math.min(n, Math.max(0, k)) * nn + Math.min(n, Math.max(0, i))];
-  for (let k = 0; k <= m; k++) {
+  for (let k = k0; k < k1; k++) {
+    const K = 2 * k;
+    const edgeRow = K === 0 || K === n;
     for (let i = 0; i <= m; i++) {
-      const I = 2 * i, K = 2 * k;
-      out[k * mm + i] = (4 * at(I, K) + 2 * (at(I - 1, K) + at(I + 1, K) + at(I, K - 1) + at(I, K + 1))
-        + at(I - 1, K - 1) + at(I + 1, K - 1) + at(I - 1, K + 1) + at(I + 1, K + 1)) / 16;
+      const I = 2 * i;
+      let s;
+      if (edgeRow || I === 0 || I === n) {
+        s = 4 * at(I, K);
+        s += 2 * (at(I - 1, K) + at(I + 1, K) + at(I, K - 1) + at(I, K + 1));
+        s += at(I - 1, K - 1) + at(I + 1, K - 1) + at(I - 1, K + 1) + at(I + 1, K + 1);
+      } else {
+        const c = K * nn + I, u = c - nn, d = c + nn;
+        s = 4 * src[c];
+        s += 2 * (src[c - 1] + src[c + 1] + src[u] + src[d]);
+        s += src[u - 1] + src[u + 1] + src[d - 1] + src[d + 1];
+      }
+      out[k * mm + i] = s / 16;
     }
   }
-  return out;
 }
 
 export class Light {
@@ -115,10 +115,18 @@ export class Light {
     this.N = world.N; this.NN = world.NN;
     this.occ = buildOccluders(world);
     this.V = new Float32Array(world.NN * world.NN);
-    this.S = [];                       // ground shadow per level, 0..1
+    // ground shadow per level, 0..1
+    this.S = [];
+    for (let L = 0, n = world.N; L < LEVELS; L++, n >>= 1) this.S.push(new Float32Array((n + 1) * (n + 1)));
     this.key = null;
-    // the cloud-shadow grid: 8 m apart on the lab's valley, coarser on big maps
-    this.G = world.N <= 512 ? 65 : 129;
+    this.job = null;                   // a shadow sweep in progress
+    // grid nodes worked per frame while a sweep is spread out, about 3 ms
+    // (the lab's valley is done in one go)
+    this.budget = world.N <= 512 ? Infinity : 256 * 1024;
+    this.stale = false;                // the light moved during a sweep
+    this.sweepMs = 0;
+    // the cloud-shadow grid: 8 m apart on the lab's valley, 32 m on the big map
+    this.G = 65;
     this.step = world.N / (this.G - 1);
     this.cloud = new Float32Array(this.G * this.G);
   }
@@ -143,25 +151,71 @@ export class Light {
     const q = Math.round(hour * 240);
     const key = (this.isSun ? 's' : 'm') + q;
     if (key !== this.key) {
-      this.key = key;
-      const hq = q / 240;
-      const Lq = this.isSun ? sunDir(hq) : moonDir(hq);
-      const eq = Math.max(0.035, Lq[1]);
-      const hh = Math.hypot(Lq[0], Lq[2]) || 1;
-      this.shadowStep(Lq[0] / hh, Lq[2] / hh, eq / Math.sqrt(1 - eq * eq));
+      const first = this.key === null;
+      this.key = key; this.keyHour = q / 240;
+      // a sweep under way finishes first, then the next starts from the light
+      // as it is then, so shadows keep up while the clock runs
+      if (this.job) this.stale = true;
+      else this.startSweep();
+      // the very first sweep is done at once, and timed
+      if (first) { const t0 = performance.now(); this.runSweep(Infinity); this.sweepMs = performance.now() - t0; }
+    }
+    if (this.job) {
+      this.runSweep(this.budget);
+      if (!this.job && this.stale) { this.stale = false; this.startSweep(); this.runSweep(this.budget); }
     }
     this.updateClouds(t);
   }
 
-  shadowStep(lx, lz, tanE) {
-    const { V, occ, N, NN } = this;
-    sweep(occ, V, lx, lz, tanE, N, NN);
-    const ground = this.world.terrain.levels[0].H;
-    const S0 = new Float32Array(NN * NN);
-    for (let j = 0; j < S0.length; j++) S0[j] = smooth(-0.1, 0.45, V[j] - ground[j]);
-    this.S = [S0];
-    let n = N;
-    for (let L = 1; L < LEVELS; L++) { this.S.push(downsample(this.S[L - 1], n)); n >>= 1; }
+  // True while cast shadows are still being brought up to date.
+  get pending() { return this.job !== null; }
+
+  startSweep() {
+    const Lq = this.isSun ? sunDir(this.keyHour) : moonDir(this.keyHour);
+    const eq = Math.max(0.035, Lq[1]);
+    const hh = Math.hypot(Lq[0], Lq[2]) || 1;
+    const lx = Lq[0] / hh, lz = Lq[2] / hh, tanE = eq / Math.sqrt(1 - eq * eq);
+    const n = this.N, NN = this.NN, V = this.V;
+    const xdom = Math.abs(lx) >= Math.abs(lz);
+    const s = xdom ? (lx > 0 ? 1 : -1) : (lz > 0 ? 1 : -1);
+    const frac = xdom ? lz / Math.abs(lx) : lx / Math.abs(lz);
+    const first = s > 0 ? n : 0;
+    // nothing shades the line nearest the light
+    if (xdom) for (let k = 0; k <= n; k++) V[k * NN + first] = NEG;
+    else for (let i = 0; i <= n; i++) V[first * NN + i] = NEG;
+    this.job = { xdom, s, frac, drop: tanE * Math.sqrt(1 + frac * frac), line: first - s, first, phase: 0, mip: 1, row: 0, s0: false };
+    this.shadeLine(first);
+  }
+
+  // The ground shadow of one swept line.
+  shadeLine(line) {
+    const { V, N, NN } = this, job = this.job, S0 = this.S[0];
+    const H = this.world.terrain.levels[0].H;
+    if (job.xdom) for (let k = 0, j = line; k <= N; k++, j += NN) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]);
+    else for (let i = 0, j = line * NN; i <= N; i++, j++) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]);
+  }
+
+  // Work through the sweep (then the coarser levels) until `budget` nodes are done.
+  runSweep(budget) {
+    const job = this.job, n = this.N, NN = this.NN;
+    let done = 0;
+    while (job.phase === 0 && done < budget) {
+      if (job.line < 0 || job.line > n) { job.phase = 1; break; }
+      sweepLine(job, this.occ, this.V, n, NN);
+      this.shadeLine(job.line);
+      job.line -= job.s;
+      done += NN;
+    }
+    while (job.phase === 1 && done < budget) {
+      const L = job.mip;
+      if (L >= LEVELS) { this.job = null; return; }
+      const nIn = n >> (L - 1), m = nIn >> 1;
+      const rows = Math.max(1, Math.min(m + 1 - job.row, Math.ceil((budget - done) / (m + 1))));
+      downsampleRows(this.S[L - 1], nIn, this.S[L], job.row, job.row + rows);
+      job.row += rows;
+      done += rows * (m + 1);
+      if (job.row > m) { job.mip++; job.row = 0; }
+    }
   }
 
   // Shadow at any point, from the volume height (for walls and trees).
