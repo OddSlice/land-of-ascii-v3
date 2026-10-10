@@ -1,5 +1,5 @@
 {
- "saved": "2026-10-10T15:19:35.350Z",
+ "saved": "2026-10-10T21:53:40.299Z",
  "density": 3,
  "frames": [
   {
@@ -252,6 +252,174 @@
    "cols": 360,
    "rows": 112,
    "offset": 11289600,
+   "length": 322560
+  },
+  {
+   "name": "world 1 spawn view (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 11612160,
+   "length": 322560
+  },
+  {
+   "name": "world 1 spawn view (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 11934720,
+   "length": 322560
+  },
+  {
+   "name": "world 1 spawn view (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 12257280,
+   "length": 322560
+  },
+  {
+   "name": "world 2 main lake shore (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 12579840,
+   "length": 322560
+  },
+  {
+   "name": "world 2 main lake shore (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 12902400,
+   "length": 322560
+  },
+  {
+   "name": "world 2 main lake shore (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 13224960,
+   "length": 322560
+  },
+  {
+   "name": "world 3 inside a forest stand (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 13547520,
+   "length": 322560
+  },
+  {
+   "name": "world 3 inside a forest stand (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 13870080,
+   "length": 322560
+  },
+  {
+   "name": "world 3 inside a forest stand (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 14192640,
+   "length": 322560
+  },
+  {
+   "name": "world 4 forest edge across meadow (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 14515200,
+   "length": 322560
+  },
+  {
+   "name": "world 4 forest edge across meadow (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 14837760,
+   "length": 322560
+  },
+  {
+   "name": "world 4 forest edge across meadow (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 15160320,
+   "length": 322560
+  },
+  {
+   "name": "world 5 river valley (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 15482880,
+   "length": 322560
+  },
+  {
+   "name": "world 5 river valley (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 15805440,
+   "length": 322560
+  },
+  {
+   "name": "world 5 river valley (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 16128000,
+   "length": 322560
+  },
+  {
+   "name": "world 6 the coast (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 16450560,
+   "length": 322560
+  },
+  {
+   "name": "world 6 the coast (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 16773120,
+   "length": 322560
+  },
+  {
+   "name": "world 6 the coast (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 17095680,
+   "length": 322560
+  },
+  {
+   "name": "world 7 ridge-top vista (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 17418240,
+   "length": 322560
+  },
+  {
+   "name": "world 7 ridge-top vista (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 17740800,
+   "length": 322560
+  },
+  {
+   "name": "world 7 ridge-top vista (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 18063360,
+   "length": 322560
+  },
+  {
+   "name": "world 8 road approaching the fort (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 18385920,
+   "length": 322560
+  },
+  {
+   "name": "world 8 road approaching the fort (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 18708480,
+   "length": 322560
+  },
+  {
+   "name": "world 8 road approaching the fort (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 19031040,
    "length": 322560
   }
  ]
