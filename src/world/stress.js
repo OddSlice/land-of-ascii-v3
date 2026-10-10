@@ -94,8 +94,12 @@ export function* buildStressWorld({ render = true } = {}) {
     px += bx; pz += bz;
     floor = Math.min(floor, hAt(px, pz));
   }
-  // smooth the path, then carve it: a channel ~11 m wide, the water in
-  // whole-metre steps that only ever go down
+  // smooth the path, then carve it: a channel ~11 m wide, with banks that
+  // lean back where it cuts through a rise, the water in whole-metre steps
+  // that only ever go down. Depths are taken from the land as it was before
+  // any carving.
+  const pre = ground.slice();
+  const preAt = (x, z) => pre[Math.round(z) * NN + Math.round(x)];
   const sm = path.map((p, i) => {
     let sx = 0, sz = 0, c = 0;
     for (let q = Math.max(0, i - 3); q <= Math.min(path.length - 1, i + 3); q++) { sx += path[q][0]; sz += path[q][1]; c++; }
@@ -108,19 +112,22 @@ export function* buildStressWorld({ render = true } = {}) {
     const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
     for (let s = 0; s < steps; s++) {
       const x = ax + (bx - ax) * s / steps, z = az + (bz - az) * s / steps;
-      let bed = Math.min(bedPrev, hAt(x, z) - 2.2);
+      let bed = Math.min(bedPrev, preAt(x, z) - 2.2);
       if (lakeDist(x, z) < 1.02) bed = Math.min(bed, LAKE.level - 1.5);
       bedPrev = bed;
       level = Math.min(level, Math.floor(bed + 1.6));
       if (lakeDist(x, z) < 1.1) level = Math.max(LAKE.level, Math.min(level, LAKE.level));
-      for (let dz = -7; dz <= 7; dz++) {
-        for (let dx = -7; dx <= 7; dx++) {
+      // banks rise at about 35 degrees beyond the channel, as far as needed
+      const R = 7 + Math.min(40, Math.max(0, (preAt(x, z) - bed - 3.36) / 0.7));
+      const Ri = Math.ceil(R);
+      for (let dz = -Ri; dz <= Ri; dz++) {
+        for (let dx = -Ri; dx <= Ri; dx++) {
           const ix = Math.round(x) + dx, iz = Math.round(z) + dz;
           if (ix < 0 || iz < 0 || ix > N || iz > N) continue;
           const r = Math.hypot(ix - x, iz - z);
-          if (r > 7) continue;
+          if (r > R) continue;
           const j = iz * NN + ix;
-          const carved = bed + 2.4 * (r / 7) * (r / 7) * 1.4;
+          const carved = r <= 7 ? bed + 2.4 * (r / 7) * (r / 7) * 1.4 : bed + 3.36 + (r - 7) * 0.7;
           if (carved < ground[j]) ground[j] = carved;
           if (r < 5.2 && level > riverLevel[j]) riverLevel[j] = level;
         }
