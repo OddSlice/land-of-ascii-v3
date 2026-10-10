@@ -1,4 +1,4 @@
-// Shoots the five fixed cameras at day, dusk and night with every clock
+// Shoots the six fixed cameras at day, dusk and night with every clock
 // frozen, into shots/, and builds one sheet per camera that puts the frame
 // beside its reference thumbnail (reference/thumbs/, private).
 //

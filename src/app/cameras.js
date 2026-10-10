@@ -1,4 +1,4 @@
-// Five fixed cameras, each framed to match one of the reference thumbnails
+// Six fixed cameras, each framed to match one of the reference thumbnails
 // (reference/thumbs/, private). C cycles them; each brings its time of day.
 // Angles in degrees: yaw 0 looks north, 90 east; pitch up is positive.
 export const CAMERAS = [
