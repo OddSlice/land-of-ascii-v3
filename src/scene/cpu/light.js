@@ -1,8 +1,7 @@
 // Light for the CPU backend: which light is up (sun or moon), cast shadows
 // from terrain, the wall and the trees (one sweep over the grid toward the
 // light), the cloud shadows, and the torch.
-import { NN, LEVELS } from '../../world/terrain.js';
-import { N } from '../../world/layout.js';
+import { LEVELS } from '../../world/terrain.js';
 import { sunDir, moonDir, WIND } from '../../world/sky.js';
 import { fbm } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
@@ -12,7 +11,7 @@ const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ?
 // Heights that block light: the drawn surface, raised by the wall's spans,
 // the tree crowns (as cones) and the bushes. Built once.
 export function buildOccluders(world) {
-  const { terrain, spans, objects } = world;
+  const { terrain, spans, objects, N, NN } = world;
   const occ = Float32Array.from(terrain.levels[0].H);
   const { idx, y1 } = spans;
   for (let z = 0; z < N; z++) {
@@ -57,8 +56,7 @@ export function buildOccluders(world) {
 // V[node] = height of the shadow volume over the node: anything below it is
 // in shadow. Swept from the light's side of the grid, one row at a time,
 // each node reading the row before it, so it is one pass over the grid.
-function sweep(occ, V, lx, lz, tanE) {
-  const n = N;
+function sweep(occ, V, lx, lz, tanE, n, NN) {
   const NEG = -1e9;
   const lerpAt = (arr, base, stride, pos) => {
     if (pos <= 0) return arr[base];
@@ -111,16 +109,18 @@ function downsample(src, n) {
   return out;
 }
 
-const CLOUD_GRID = 65, CLOUD_STEP = N / (CLOUD_GRID - 1);
-
 export class Light {
   constructor(world) {
     this.world = world;
+    this.N = world.N; this.NN = world.NN;
     this.occ = buildOccluders(world);
-    this.V = new Float32Array(NN * NN);
+    this.V = new Float32Array(world.NN * world.NN);
     this.S = [];                       // ground shadow per level, 0..1
     this.key = null;
-    this.cloud = new Float32Array(CLOUD_GRID * CLOUD_GRID);
+    // the cloud-shadow grid: 8 m apart on the lab's valley, coarser on big maps
+    this.G = world.N <= 512 ? 65 : 129;
+    this.step = world.N / (this.G - 1);
+    this.cloud = new Float32Array(this.G * this.G);
   }
 
   // Called once per frame with the frame's hour and clock.
@@ -154,8 +154,8 @@ export class Light {
   }
 
   shadowStep(lx, lz, tanE) {
-    const { V, occ } = this;
-    sweep(occ, V, lx, lz, tanE);
+    const { V, occ, N, NN } = this;
+    sweep(occ, V, lx, lz, tanE, N, NN);
     const ground = this.world.terrain.levels[0].H;
     const S0 = new Float32Array(NN * NN);
     for (let j = 0; j < S0.length; j++) S0[j] = smooth(-0.1, 0.45, V[j] - ground[j]);
@@ -166,6 +166,7 @@ export class Light {
 
   // Shadow at any point, from the volume height (for walls and trees).
   shadowAt(x, y, z) {
+    const N = this.N, NN = this.NN;
     const i = Math.max(0, Math.min(N - 0.001, x)), k = Math.max(0, Math.min(N - 0.001, z));
     const i0 = Math.floor(i), k0 = Math.floor(k), fx = i - i0, fz = k - k0;
     const j = k0 * NN + i0, V = this.V;
@@ -182,28 +183,29 @@ export class Light {
     const L = this.isSun ? this.sun : this.moon;
     this.cloudsOn = L[1] > 0.08;
     if (!this.cloudsOn) return;
-    const H = this.world.terrain.levels[0].H;
+    const H = this.world.terrain.levels[0].H, NN = this.NN, G = this.G, step = this.step;
     const lift = 900;                       // height of the cloud layer
     const ox = WIND[0] * t, oz = WIND[1] * t;
-    for (let gz = 0; gz < CLOUD_GRID; gz++) {
-      for (let gx = 0; gx < CLOUD_GRID; gx++) {
-        const x = gx * CLOUD_STEP, z = gz * CLOUD_STEP;
+    for (let gz = 0; gz < G; gz++) {
+      for (let gx = 0; gx < G; gx++) {
+        const x = gx * step, z = gz * step;
         const y = H[Math.round(z) * NN + Math.round(x)];
         const k = (lift - y) / L[1];
         const cx = x + L[0] * k - ox + 1920, cz = z + L[2] * k - oz + 1740;
         const n = fbm(cx / 105, cz / 85, SEED + 91, 3);
-        g[gz * CLOUD_GRID + gx] = smooth(0.0, 0.11, n);
+        g[gz * G + gx] = smooth(0.0, 0.11, n);
       }
     }
   }
 
   cloudAt(x, z) {
     if (!this.cloudsOn) return 0;
-    const u = Math.max(0, Math.min(CLOUD_GRID - 1.001, x / CLOUD_STEP));
-    const w = Math.max(0, Math.min(CLOUD_GRID - 1.001, z / CLOUD_STEP));
+    const G = this.G;
+    const u = Math.max(0, Math.min(G - 1.001, x / this.step));
+    const w = Math.max(0, Math.min(G - 1.001, z / this.step));
     const i0 = Math.floor(u), k0 = Math.floor(w), fx = u - i0, fz = w - k0;
-    const j = k0 * CLOUD_GRID + i0, g = this.cloud;
-    return g[j] + (g[j + 1] - g[j]) * fx + (g[j + CLOUD_GRID] - g[j]) * fz + (g[j] - g[j + 1] - g[j + CLOUD_GRID] + g[j + CLOUD_GRID + 1]) * fx * fz;
+    const j = k0 * G + i0, g = this.cloud;
+    return g[j] + (g[j + 1] - g[j]) * fx + (g[j + G] - g[j]) * fz + (g[j] - g[j + 1] - g[j + G] + g[j + G + 1]) * fx * fz;
   }
 }
 

@@ -11,5 +11,10 @@ export function buildWorld() {
   const spans = buildSpans();
   const objects = buildObjects(terrain);
   const clouds = buildClouds();
-  return { terrain, spans, objects, clouds, buildMs: performance.now() - t0 };
+  return {
+    kind: 'default', N: terrain.N, NN: terrain.NN,
+    center: [256, 256],            // the clouds wrap round this point
+    viewDist: 1e9,                 // rays stop at the edge of the map anyway
+    terrain, spans, objects, clouds, buildMs: performance.now() - t0,
+  };
 }

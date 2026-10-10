@@ -21,13 +21,14 @@ export class ObjectPass {
     this.hit = { D: 0, nx: 0, ny: 0, nz: 0, mat: 0, f: 0 };
   }
 
-  run(v, rays, m, frame, torch) {
-    this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torch = torch;
+  run(v, rays, m, frame, torches) {
+    this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
     const { trees, bushes } = this.world.objects;
     for (const t of trees) this.object(t, t.R, t.base - 0.4, t.top + 0.2, (ci, dx, dz, s, minR, far) => this.conifer(t, dx, dz, s, minR, far));
     for (const b of bushes) this.object(b, b.rx, b.base - 0.2, b.base + b.ry * 1.6, (ci, dx, dz, s, minR, far) => this.bush(b, dx, dz, s, minR, far));
-    const T = this.world.objects.torch;
-    this.object(T, 0.4, T.base, T.flameY + 0.5, (ci, dx, dz, s, minR) => this.torchHit(T, dx, dz, s, minR));
+    this.world.objects.torches.forEach((T, i) => {
+      this.object(T, 0.4, T.base, T.flameY + 0.5, (ci, dx, dz, s, minR) => this.torchHit(T, dx, dz, s, minR, torches[i].power));
+    });
   }
 
   // Find the object's cells and test each.
@@ -78,7 +79,7 @@ export class ObjectPass {
     const D = hit.D, x = v.ex + dx * D, y = v.ey + s * D, z = v.ez + dz * D;
     const len = Math.sqrt(1 + s * s);
     if (hit.mat === MAT.FLAME) {
-      m.write(ci, MAT.FLAME, this.torch.power * 0.8, 0, 0, 1, 0, D * len);
+      m.write(ci, MAT.FLAME, hit.power * 0.8, 0, 0, 1, 0, D * len);
       return;
     }
     const L = light.L;
@@ -201,8 +202,9 @@ export class ObjectPass {
   }
 
   // The torch: a wooden post and a flame on top.
-  torchHit(T, dx, dz, s, minR) {
+  torchHit(T, dx, dz, s, minR, power) {
     const { v, hit } = this;
+    hit.power = power;
     const ox = v.ex - T.x, oz = v.ez - T.z, ey = v.ey;
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;

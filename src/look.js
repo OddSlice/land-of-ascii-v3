@@ -75,6 +75,7 @@ export const LOOK = {
     bush:    { glyphs: ':o%&@',      ink: { lit: -0.28, dark: 0.50 }, tone: 0.10 },
     wood:    { glyphs: ':|!I',       ink: { lit: -0.15, dark: 0.30 } },
     flame:   { glyphs: '*^&@',       ink: { lit: 0.25, dark: 0.25 }, emissive: true },
+    bed:     { glyphs: '.,:;',       ink: { lit: -0.20, dark: 0.40 }, tone: 0.10 },
   },
 
   // Ink floor: on near-black cells the glyph is lightened by at least this
@@ -106,6 +107,7 @@ export const LOOK = {
       bush:   { lit: '#55703a', shade: '#28331f' },
       wood:   { lit: '#6a5340', shade: '#342a22' },
       flame:  '#ffc070',
+      bed:    { lit: '#6b6148', shade: '#353026' },
     },
     dusk: {
       sky:    { high: '#4b3d5d', horizon: '#7a5a64', glow: '#c48a6e', glowSize: 0.30 },
@@ -128,6 +130,7 @@ export const LOOK = {
       bush:   { lit: '#36402e', shade: '#1d221c' },
       wood:   { lit: '#4c3a32', shade: '#261e1b' },
       flame:  '#ffb060',
+      bed:    { lit: '#544a42', shade: '#2a2526' },
     },
     night: {
       sky:    { high: '#161927', horizon: '#252438', glow: '#2c3046', glowSize: 0.10 },
@@ -150,6 +153,7 @@ export const LOOK = {
       bush:   { lit: '#191c1c', shade: '#0f1011' },
       wood:   { lit: '#221d1a', shade: '#110f0e' },
       flame:  '#ffb468',
+      bed:    { lit: '#24231f', shade: '#121210' },
     },
   },
 };

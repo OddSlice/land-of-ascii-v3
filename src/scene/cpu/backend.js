@@ -6,7 +6,7 @@ import { Light, torchPower } from './light.js';
 import { Marcher } from './march.js';
 import { ObjectPass } from './objects.js';
 import { SkyPass } from './sky.js';
-import { HIT_STRIDE } from '../../contract.js';
+import { HIT_STRIDE, REC, MAT_NONE } from '../../contract.js';
 
 export function createCpuBackend(world) {
   const light = new Light(world);
@@ -14,7 +14,6 @@ export function createCpuBackend(world) {
   const marcher = new Marcher(world, light);
   const objects = new ObjectPass(world, light);
   const sky = new SkyPass(world, light);
-  const T = world.objects.torch;
 
   return {
     name: 'cpu-march',
@@ -25,9 +24,11 @@ export function createCpuBackend(world) {
       light.update(frame.hour, frame.t);
       rays.build(v, c0, c1);
       if (hits.length < rays.cells * HIT_STRIDE) throw new Error('hit buffer too small');
-      const torch = { x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t) };
-      marcher.run(v, rays, hits, frame, torch);
-      objects.run(v, rays, marcher, frame, torch);
+      // no reflected or refracted hit until a water cell fills them
+      for (let i = 0, o = 0; i < rays.cells; i++, o += HIT_STRIDE) { hits[o + REC] = MAT_NONE; hits[o + 2 * REC] = MAT_NONE; }
+      const torches = world.objects.torches.map((T) => ({ x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t + T.phase) }));
+      marcher.run(v, rays, hits, frame, torches);
+      objects.run(v, rays, marcher, frame, torches);
       sky.prepare(frame.t);
       sky.run(v, rays, marcher, frame);
     },

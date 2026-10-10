@@ -19,11 +19,30 @@ export const MAT = {
   SKY: 0, CLOUD: 1, SUN: 2, MOON: 3, STAR: 4,
   GRASS: 5, DIRT: 6, SAND: 7, ROCK: 8, SNOW: 9, WATER: 10,
   STONE: 11, CONIFER: 12, TRUNK: 13, BUSH: 14, WOOD: 15, FLAME: 16,
+  BED: 17,                         // the silt of a lake or river bed
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;
+// Not a material: an empty record (a cell with no water has no R1 or R2).
+export const MAT_NONE = 255;
 
-// ---- HitBuffer: 8 bytes per cell ---------------------------------------------
+// ---- HitBuffer: 24 bytes per cell = three records of 8 bytes ------------------
+// R0 (bytes 0..7)    what the cell's own ray hit.
+// R1 (bytes 8..15)   for a water cell, what the ray reflected off the water
+//                    surface hit (terrain, wall, tree, sky, cloud, sun, ...),
+//                    with the same fields; `dist` is the second leg, from the
+//                    water to the hit. MAT_NONE where R0 is not water.
+// R2 (bytes 16..23)  for a water cell, what the ray refracted into the water
+//                    hit: the bed (BED, SAND, ...), lit as any surface; `dist`
+//                    is the length of the path through the water, which the
+//                    resolve step turns into depth colour. MAT_NONE elsewhere.
+// For a water cell R0's `tone` is the Fresnel share of the mirror (with the
+// ripples), and R0's shadow, cloud and glow are those of the surface point.
+// A backend that does no water rays leaves R1 and R2 MAT_NONE and resolve
+// falls back to a flat water colour. A GPU backend can fill the three records
+// from six RGBA8 render targets.
+//
+// Every record:
 // [0] mat     material id (MAT)
 // [1] light   direct light reaching the surface from the sun or moon,
 //             0..255 = 0..1 (the shading from the surface normal; cast
@@ -40,12 +59,13 @@ export const MAT_COUNT = MAT_NAMES.length;
 // [5] tone    material detail, 0..255 with 128 = none (patches, joints, strata).
 //             Sky: closeness to the sun, 255 * (1 - angle / pi).
 //             Star: brightness of the star.
-//             Water: Fresnel share of reflected sky, 0..255.
+//             Water (R0): Fresnel share of the mirror, 0..255.
 //             Cloud: coverage, 255 = solid; less at the edge, where the cloud
 //             dissolves into the sky behind it.
 // [6..7] dist distance along the ray in decimetres, little-endian uint16;
 //             65535 = infinitely far (sky).
-export const HIT_STRIDE = 8;
+export const HIT_STRIDE = 24;
+export const REC = 8;              // bytes per record; R1 at +REC, R2 at +2 REC
 export const H_MAT = 0, H_LIGHT = 1, H_SHADOW = 2, H_CLOUD = 3, H_GLOW = 4, H_TONE = 5, H_DIST = 6;
 export const DIST_FAR = 65535;
 

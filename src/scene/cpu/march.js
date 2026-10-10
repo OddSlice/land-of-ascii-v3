@@ -14,8 +14,7 @@
 // - A plane keeps a "next unfilled cell" table instead of one horizon, so
 //   anything seen through an opening is still found.
 import { MAT, HIT_STRIDE } from '../../contract.js';
-import { NN, LEVELS } from '../../world/terrain.js';
-import { N, WALL, GATE, GROUND } from '../../world/layout.js';
+import { LEVELS } from '../../world/terrain.js';
 import { SPAN_MERLON, SPAN_ARCH, archY } from '../../world/spans.js';
 import { TORCH_RANGE } from './light.js';
 
@@ -30,16 +29,18 @@ export class Marcher {
     this.ev = { d: new Float32Array(1024), o: new Float32Array(1024), c: new Int32Array(1024), a: new Int8Array(1024), n: 0 };
     const t = world.terrain;
     this.maxTop = Math.max(t.maxH, world.spans.box.top) + 0.5;
+    this.N = world.N; this.NN = world.NN;
   }
 
   // March every plane of a stripe. `hits` is the stripe's HitBuffer.
-  run(v, rays, hits, frame, torch) {
-    this.v = v; this.rays = rays; this.hits = hits; this.torch = torch;
+  run(v, rays, hits, frame, torches) {
+    this.v = v; this.rays = rays; this.hits = hits; this.torches = torches;
     this.dEnd = [];
     for (let L = 0; L < LEVELS; L++) this.dEnd.push((1 << L) / (LOD_Q * v.colAngle));
     // merlons sink into the walkway before they get thinner than about two
     // cells across or tall
-    this.merlonFar = Math.min(WALL.merlonW / (1.6 * v.colAngle), WALL.merlon / (1.6 * v.rowAngle));
+    const sp = this.world.spans;
+    this.merlonFar = Math.min(sp.merlonW / (1.6 * v.colAngle), sp.merlon / (1.6 * v.rowAngle));
     for (let p = 0; p < rays.np; p++) {
       const start = rays.pstart[p], n = rays.pstart[p + 1] - start;
       if (n) this.plane(p, start, n);
@@ -85,7 +86,7 @@ export class Marcher {
       tMaxZ = d + (dz > 0 ? (iz + 1 - pz) : (pz - iz)) * s / adz;
     };
     init(d0);
-    const maxTop = this.maxTop;
+    const maxTop = this.maxTop, N = this.N;
 
     for (let guard = 0; guard < 4000; guard++) {
       let d1;
@@ -173,7 +174,7 @@ export class Marcher {
       if (c < tmax) tmax = c;
     }
     if (tmin >= tmax) return;
-    const idx = world.spans.idx;
+    const idx = world.spans.idx, N = this.N;
     let d = tmin;
     const px = ex + dx * (d + 1e-6), pz = ez + dz * (d + 1e-6);
     let ix = Math.floor(px), iz = Math.floor(pz);
@@ -202,11 +203,11 @@ export class Marcher {
     const flags = sp.flags[s];
     const ey = v.ey, dx = this.dx, dz = this.dz;
     let y1 = sp.y1[s];
-    if (flags & SPAN_MERLON) y1 += WALL.merlon * smooth(this.merlonFar, this.merlonFar * 0.75, din);
+    if (flags & SPAN_MERLON) y1 += sp.merlon * smooth(this.merlonFar, this.merlonFar * 0.75, din);
     let y0in = sp.y0[s], y0out = y0in;
     if (flags & SPAN_ARCH) {
-      y0in = archY(v.ex + dx * din, GROUND);
-      y0out = archY(v.ex + dx * dout, GROUND);
+      y0in = archY(v.ex + dx * din, sp.gate);
+      y0out = archY(v.ex + dx * dout, sp.gate);
     }
     const lo = Math.min((y0in - ey) / din, (y0out - ey) / dout, (y1 - ey) / dout);
     const hi = Math.max((y1 - ey) / din, (y1 - ey) / dout, (y0out - ey) / dout);
@@ -256,14 +257,19 @@ export class Marcher {
   }
 
   glowAt(x, y, z, nx, ny, nz) {
-    const t = this.torch;
-    const lx = t.x - x, ly = t.y - y, lz = t.z - z;
-    const d2 = lx * lx + ly * ly + lz * lz;
-    if (d2 >= TORCH_RANGE * TORCH_RANGE) return 0;
-    const d = Math.sqrt(d2);
-    const f = 1 - d / TORCH_RANGE;
-    const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
-    return f * f * (0.35 + 0.65 * Math.max(0, c)) * t.power;
+    const ts = this.torches;
+    let sum = 0;
+    for (let i = 0; i < ts.length; i++) {
+      const t = ts[i];
+      const lx = t.x - x, ly = t.y - y, lz = t.z - z;
+      const d2 = lx * lx + ly * ly + lz * lz;
+      if (d2 >= TORCH_RANGE * TORCH_RANGE) continue;
+      const d = Math.sqrt(d2);
+      const f = 1 - d / TORCH_RANGE;
+      const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
+      sum += f * f * (0.35 + 0.65 * Math.max(0, c)) * t.power;
+    }
+    return sum;
   }
 
   ground(ci, D, s, L, beta) {
@@ -283,14 +289,14 @@ export class Marcher {
     const graze = Math.abs(this.dx * nx + s * ny + this.dz * nz) / len;
     const fp = D * len * v.colAngle / Math.max(0.04, graze);
     const fade = (size) => 1 - smooth(size * 0.3, size * 1.1, fp);
-    const fine = bil1(T.fine, x, z);
+    const fine = bil1(T.fine, x, z, this.N, this.NN);
     const jitter = fine * fade(1.5);
     let mat;
-    if (bilU8(T.wWater, x, z) > 0.5) mat = MAT.WATER;
-    else if (bilU8(T.wRoad, x, z) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
-    else if (bilU8(T.wSand, x, z) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
-    else if (bilU8(T.wSnow, x, z) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
-    else if (bilU8(T.wRock, x, z) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
+    if (bilU8(T.wWater, x, z, this.N, this.NN) > 0.5) mat = MAT.WATER;
+    else if (bilU8(T.wRoad, x, z, this.N, this.NN) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
+    else if (bilU8(T.wSand, x, z, this.N, this.NN) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
+    else if (bilU8(T.wSnow, x, z, this.N, this.NN) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
+    else if (bilU8(T.wRock, x, z, this.N, this.NN) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
     else mat = MAT.GRASS;
     const Ld = light.L;
     let lam, tone;
@@ -304,7 +310,7 @@ export class Marcher {
     } else {
       lam = nx * Ld[0] + ny * Ld[1] + nz * Ld[2];
       if (lam < 0) lam = 0;
-      const patch = bil1(T.tone, x, z);
+      const patch = bil1(T.tone, x, z, this.N, this.NN);
       if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fade(3) + 0.6 * patch + 0.3 * fine * fade(2);
       else tone = 0.75 * patch * fade(5) + 0.45 * fine * fade(1.8);
     }
@@ -330,7 +336,7 @@ export class Marcher {
     let tone = 0;
     if (ny === 0) {
       const u = nx !== 0 ? z : x;
-      const cy = (y - GROUND + 2) / 0.55;
+      const cy = (y - this.world.spans.gate.ground + 2) / 0.55;
       const row = Math.floor(cy);
       const cu = (u + (row & 1) * 0.55) / 1.1;
       const col = Math.floor(cu);
@@ -341,7 +347,7 @@ export class Marcher {
       const kJoint = 1 - smooth(0.035, 0.09, fp), kBlock = 1 - smooth(0.06, 0.2, fp);
       tone = -0.9 * joint * kJoint + 0.35 * block * kBlock;
     } else {
-      tone = 0.4 * bil1(this.world.terrain.fine, x, z);
+      tone = 0.4 * bil1(this.world.terrain.fine, x, z, this.N, this.NN);
     }
     const cloud = light.cloudAt(x, z);
     const glow = this.glowAt(x, y, z, nx, ny, nz);
@@ -366,7 +372,7 @@ function bil2(level, arr, x, z) {
   return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
 }
 
-function bil1(arr, x, z) {
+function bil1(arr, x, z, N, NN) {
   let u = x, w = z;
   if (u < 0) u = 0; else if (u > N - 1e-6) u = N - 1e-6;
   if (w < 0) w = 0; else if (w > N - 1e-6) w = N - 1e-6;
@@ -376,4 +382,4 @@ function bil1(arr, x, z) {
   return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
 }
 
-function bilU8(arr, x, z) { return bil1(arr, x, z) / 255; }
+function bilU8(arr, x, z, N, NN) { return bil1(arr, x, z, N, NN) / 255; }

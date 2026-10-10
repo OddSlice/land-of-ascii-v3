@@ -2,10 +2,12 @@
 // pass: conifers in two loose stands, a handful of bushes, the torch.
 import { hash2 } from './noise.js';
 import { SEED, STANDS, BUSHES, TORCH, WALL, WATER } from './layout.js';
-import { lakeDist, roadDist, NN } from './terrain.js';
+import { lakeDist, roadDist } from './terrain.js';
 
-export function groundAt(ground, x, z) {
-  const i = Math.max(0, Math.min(511.999, x)), k = Math.max(0, Math.min(511.999, z));
+// Height of the true ground at (x, z), bilinear between nodes.
+export function groundAt(T, x, z) {
+  const ground = T.ground, NN = T.NN, top = T.N - 0.001;
+  const i = Math.max(0, Math.min(top, x)), k = Math.max(0, Math.min(top, z));
   const i0 = Math.floor(i), k0 = Math.floor(k), fx = i - i0, fz = k - k0;
   const j = k0 * NN + i0;
   const a = ground[j], b = ground[j + 1], c = ground[j + NN], d = ground[j + NN + 1];
@@ -34,7 +36,6 @@ function conifer(x, z, base, s, tall = 1) {
 }
 
 export function buildObjects(terrain) {
-  const { ground } = terrain;
   const trees = [];
   let s = 1;
   for (const st of STANDS) {
@@ -53,7 +54,7 @@ export function buildObjects(terrain) {
         if (d < st.gap) { ok = false; break; }
       }
       if (!ok) continue;
-      trees.push(conifer(x, z, groundAt(ground, x, z) - 0.3, s * 1000 + placed, st.tall || 1));
+      trees.push(conifer(x, z, groundAt(terrain, x, z) - 0.3, s * 1000 + placed, st.tall || 1));
       placed++;
     }
     s++;
@@ -61,11 +62,11 @@ export function buildObjects(terrain) {
 
   const bushes = BUSHES.map(([x, z], n) => {
     const r = (m) => hash2(n, m, SEED + 51);
-    return { x, z, base: groundAt(ground, x, z), rx: 1.0 + 0.7 * r(1), ry: 0.75 + 0.5 * r(2), seed: n };
+    return { x, z, base: groundAt(terrain, x, z), rx: 1.0 + 0.7 * r(1), ry: 0.75 + 0.5 * r(2), seed: n };
   });
 
-  const torch = { x: TORCH.x, z: TORCH.z, base: groundAt(ground, TORCH.x, TORCH.z), h: TORCH.height };
+  const torch = { x: TORCH.x, z: TORCH.z, base: groundAt(terrain, TORCH.x, TORCH.z), h: TORCH.height, phase: 0 };
   torch.flameY = torch.base + torch.h + 0.18;
 
-  return { trees, bushes, torch, water: WATER };
+  return { trees, bushes, torches: [torch], water: WATER };
 }

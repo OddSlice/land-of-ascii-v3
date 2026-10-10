@@ -3,7 +3,6 @@
 import { fbm, ridged, vnoise, smoothstep } from './noise.js';
 import { SEED, N, GROUND, WATER, WALL, ROAD, LAKE, HILL, RIDGE } from './layout.js';
 
-export const NN = N + 1;           // nodes per side
 export const LEVELS = 4;           // level L has nodes every 2^L metres
 
 // Normalised distance from the lake's centre: 1 at its edge, wobbly.
@@ -80,7 +79,7 @@ function shapedHeight(x, z) {
 }
 
 // Tent-filter a level into the next coarser one.
-function downsample(src, n) {
+export function downsample(src, n) {
   const m = (n >> 1);
   const mm = m + 1, nn = n + 1;
   const out = new Float32Array(mm * mm);
@@ -97,7 +96,7 @@ function downsample(src, n) {
   return out;
 }
 
-function normals(H, n, size) {
+export function normals(H, n, size) {
   const nn = n + 1;
   const nx = new Float32Array(nn * nn), nz = new Float32Array(nn * nn);
   for (let k = 0; k <= n; k++) {
@@ -114,7 +113,22 @@ function normals(H, n, size) {
   return { nx, nz };
 }
 
+// The drawn surface at every level, with normals (levels without normals get
+// them computed where a ray lands).
+export function makeLevels(surface, N0, withNormals = true) {
+  const levels = [];
+  let H = surface, n = N0;
+  for (let L = 0; L < LEVELS; L++) {
+    const size = 1 << L;
+    const nrm = withNormals ? normals(H, n, size) : { nx: null, nz: null };
+    levels.push({ n, size, H, nx: nrm.nx, nz: nrm.nz });
+    if (L + 1 < LEVELS) { H = downsample(H, n); n >>= 1; }
+  }
+  return levels;
+}
+
 export function buildTerrain() {
+  const NN = N + 1;
   const ground = new Float32Array(NN * NN);     // true ground, for walking
   const surface = new Float32Array(NN * NN);    // ground or lake surface, for drawing
   const wWater = new Uint8Array(NN * NN);
@@ -139,14 +153,7 @@ export function buildTerrain() {
     }
   }
 
-  const levels = [];
-  let H = surface, n = N;
-  for (let L = 0; L < LEVELS; L++) {
-    const size = 1 << L;
-    const { nx, nz } = normals(H, n, size);
-    levels.push({ n, size, H, nx, nz });
-    if (L + 1 < LEVELS) { H = downsample(H, n); n >>= 1; }
-  }
+  const levels = makeLevels(surface, N);
 
   // material weights from the finished ground
   const { nx, nz } = levels[0];
@@ -169,5 +176,5 @@ export function buildTerrain() {
     }
   }
 
-  return { ground, levels, wWater, wRoad, wSand, wRock, wSnow, tone, fine, maxH };
+  return { N, NN, ground, levels, wWater, wRoad, wSand, wRock, wSnow, tone, fine, maxH };
 }

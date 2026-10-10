@@ -22,7 +22,6 @@ export function moonDir(hour) {
 
 export const WIND = [2.4, 0];          // metres a second, due east
 export const CLOUD_SPAN = 7600;        // clouds wrap east-west over this width
-export const CLOUD_CX = 256;           // centred on the valley
 
 // Hand-placed cluster centres (x, z at t = 0) and their base heights. The
 // first group sits south of the valley so that around midday their shadows
@@ -63,7 +62,7 @@ export function buildClouds() {
 
 // Cluster position at time t: drifted by the wind, wrapped east-west, and a
 // size factor that shrinks it to nothing near the wrap so nothing pops.
-export function clusterAt(cl, t) {
+export function clusterAt(cl, t, CLOUD_CX = 256) {
   const half = CLOUD_SPAN / 2;
   let x = cl.x + WIND[0] * t - (CLOUD_CX - half);
   x = ((x % CLOUD_SPAN) + CLOUD_SPAN) % CLOUD_SPAN + (CLOUD_CX - half);

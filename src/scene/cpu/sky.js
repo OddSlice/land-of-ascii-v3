@@ -36,7 +36,7 @@ export class SkyPass {
   prepare(t) {
     this.cl = [];
     for (const c of this.world.clouds.clusters) {
-      const [x, z, fade] = clusterAt(c, t);
+      const [x, z, fade] = clusterAt(c, t, this.world.center[0]);
       if (fade <= 0.01) continue;
       const main = c.puffs[0][3];
       this.cl.push({ x, z, fade, base: c.base, main, cy: c.base + main * 0.3, reach: c.reach * fade + 40, puffs: c.puffs, seed: c.seed });
