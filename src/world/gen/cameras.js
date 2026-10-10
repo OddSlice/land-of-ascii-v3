@@ -142,11 +142,12 @@ export function worldCameras(world, { seaDist, shore }) {
         if (rv.lake[q] >= 0) continue;
         const ax = rv.x[q] - rv.x[q - 40], az = rv.z[q] - rv.z[q - 40], bx = rv.x[q + 50] - rv.x[q], bz = rv.z[q + 50] - rv.z[q];
         const turn = Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (Math.hypot(ax, az) * Math.hypot(bx, bz) || 1))));
-        if (turn > 0.35) continue;
+        if (turn > 0.7) continue;
         const ul = Math.hypot(bx, bz) || 1, ux = bx / ul, uz = bz / ul;
         const side = (s) => heightAt(H, N, rv.x[q] + uz * s * 70, rv.z[q] - ux * s * 70) - rv.level[q];
+        // (the deepest, straightest valley wins; a shallow one only if there is no other)
         const valley = Math.min(side(1), side(-1));
-        if (valley < 5) continue;
+        if (valley < 1) continue;
         for (const s of [1, -1]) {
           const x = rv.x[q] + uz * s * (rv.hw[q] + 4), z = rv.z[q] - ux * s * (rv.hw[q] + 4);
           if (!dry(x, z) || slopeAt(x, z) > 0.3) continue;

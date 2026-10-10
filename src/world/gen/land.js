@@ -166,7 +166,7 @@ export function shapeLand(seed, N, { basins = [], hills = [], rises = [], step =
       const crag = ridged(x / 70 + 3.3, z / 70, S + 36, 2);
       const foot = 45 * smoothstep(0, 170, g);
       const m = smoothstep(50, 380, g);
-      const peaks = (SCALE.range.top - 60) * Math.pow(m, 1.25) * (0.3 + 0.7 * rv) * (0.8 + 0.2 * det) * (0.88 + 0.12 * fbm(x / 700, z / 700, S + 32, 2))
+      const peaks = (SCALE.range.top + 20) * Math.pow(m, 1.25) * (0.3 + 0.7 * rv) * (0.8 + 0.2 * det) * (0.88 + 0.12 * fbm(x / 700, z / 700, S + 32, 2))
         + 26 * m * (det - 0.45) + 12 * m * m * (crag - 0.45);
       const atShore = smoothstep(40, 380, c);
       let up = (foot + peaks) * atShore;

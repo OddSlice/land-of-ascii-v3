@@ -216,6 +216,17 @@ function clearView(ctx, x0, z0, y0, x1, z1, y1) {
 // toward the range beyond it, and a stand of forest off to one side. The
 // roads then start from it.
 export function chooseSpawn(ctx, avoid) {
+  // if the land gives no such view, the rules loosen a step at a time:
+  // lower, farther from the lake, not facing the range, any ground at all
+  for (const st of [{ up: 3, far: 650, nv: 4, range: true, prom: 0.5, g: -150 }, { up: 1, far: 900, nv: 2, range: false, prom: -Infinity, g: -60 },
+    { up: -Infinity, far: 1400, nv: 1, range: false, prom: -Infinity, g: Infinity }]) {
+    const out = spawnsWith(ctx, avoid, st);
+    if (out.length) return out;
+  }
+  return [];
+}
+
+function spawnsWith(ctx, avoid, st) {
   const { H, N, kind, wetDist, frame, F, thr, lake, lakePts } = ctx;
   const NN = N + 1, P = {};
   const ROW = 2 * Math.tan(Math.PI / 6) / 112;     // a row's angle at the default density
@@ -226,16 +237,16 @@ export function chooseSpawn(ctx, avoid) {
       const j = z * NN + x;
       if (kind[j] !== KIND.NONE || wetDist[j] < 30) continue;
       const h = H[j], eye = h + SCALE.eye;
-      if (eye - lake.level < 3) continue;
+      if (eye - lake.level < st.up) continue;
       if (Math.hypot(H[j + 3] - H[j - 3], H[j + 3 * NN] - H[j - 3 * NN]) / 6 > 0.12) continue;
       if (avoid.some((v) => Math.hypot(v.x - x, v.z - z) < 120)) continue;
       const f0 = fieldAt(F, x, z);
       if (f0 === f0 && f0 > thr - 0.05) continue;
       frame.at(x, z, P);
-      if (P.g > -150 || P.c < 150) continue;
+      if (P.g > st.g || P.c < 150) continue;
       let near = Infinity;
       for (const [px, pz] of lakePts) near = Math.min(near, Math.hypot(px - x, pz - z));
-      if (near < 100 || near > 650) continue;
+      if (near < 100 || near > st.far) continue;
       // the lake as seen from here: its visible points' angles below the
       // horizon and to either side
       let aMin = Infinity, aMax = -Infinity, sx = 0, sz = 0, nv = 0;
@@ -245,7 +256,7 @@ export function chooseSpawn(ctx, avoid) {
         if (a < aMin) aMin = a; if (a > aMax) aMax = a;
         sx += (px - x) / d; sz += (pz - z) / d; nv++;
       }
-      if (nv < 4) continue;
+      if (nv < st.nv) continue;
       const fl = Math.hypot(sx, sz), fx = sx / fl, fz = sz / fl;
       let wide = 0;
       for (const [px, pz] of lakePts) {
@@ -260,10 +271,10 @@ export function chooseSpawn(ctx, avoid) {
         if (px < 0 || pz < 0 || px > N || pz > N) break;
         if (frame.at(px, pz, P).g > 150) { toRange = 1 - d / 2600; break; }
       }
-      if (toRange <= 0) continue;
+      if (toRange <= 0 && st.range) continue;
       // a low rise
       const prom = h - ringMean(H, N, x, z, 40, 120);
-      if (prom < 0.5) continue;
+      if (prom < st.prom) continue;
       // forest to one side and not ahead
       const sector = (a0, a1, r0, r1) => {
         let n = 0, t = 0;

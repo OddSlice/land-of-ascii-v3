@@ -27,7 +27,7 @@ export function forestField(N, H, kind, wetDist, frame, seed, rivers) {
       const sx = (H[z * NN + xr] - H[z * NN + xl]) / (xr - xl), sz = (H[zu * NN + x] - H[zd * NN + x]) / (zu - zd);
       const slope = Math.hypot(sx, sz);
       frame.at(x, z, P);
-      const treeline = SEA + 185 + 30 * fbm(x / 300, z / 300, seed + 701, 2);
+      const treeline = SEA + 215 + 30 * fbm(x / 300, z / 300, seed + 701, 2);
       if (kind[j] !== KIND.NONE || wetDist[j] < 4 || slope > 0.62 || h > treeline || P.c < 45) { ff[c] = NaN; continue; }
       let f = 0.5 + 0.5 * fbm(x / 300, z / 300, seed + 702, 3) + 0.17 * fbm(x / 85, z / 85, seed + 703, 2);
       // north-facing slopes (the ground falls toward +z) hold more trees
@@ -38,7 +38,7 @@ export function forestField(N, H, kind, wetDist, frame, seed, rivers) {
       // the range's lower slopes hold the most, thinning toward the
       // treeline; the open lowland holds less, so its meadows stay wide
       f += 0.34 * smoothstep(0, 160, P.g) * smoothstep(treeline, treeline - 50, h);
-      f -= 0.1 * smoothstep(-60, -260, P.g);
+      f -= 0.14 * smoothstep(-60, -260, P.g);
       ff[c] = f;
     }
   }

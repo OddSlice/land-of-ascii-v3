@@ -3,7 +3,8 @@
 //  2. every recorded site can be reached on foot from the spawn under the
 //     walking rules (up nothing steeper than 45 degrees, down anything, since
 //     falling does no harm; through water no deeper than the chest);
-//  3. no road is steeper than its limit, nor runs through water deeper than a ford;
+//  3. no road is steeper than its limit (measured along it, over 4 m), nor
+//     runs through water deeper than a ford;
 //  4. every river runs downhill (its water never rises) to a lake or the sea;
 //  5. no tree stands in water or on a road;
 //  6. the sky test: the camera at eye level at 300 random walkable lowland
@@ -84,7 +85,9 @@ function roads(w) {
   for (const r of w.roads) {
     for (let q = 0; q + 4 < r.n; q++) {
       const y0 = groundAt(surf, r.x[q], r.z[q]), y1 = groundAt(surf, r.x[q + 4], r.z[q + 4]);
-      const run = Math.hypot(r.x[q + 4] - r.x[q], r.z[q + 4] - r.z[q]);
+      // the gradient along the road (round a hairpin the straight line is shorter)
+      let run = 0;
+      for (let u = q; u < q + 4; u++) run += Math.hypot(r.x[u + 1] - r.x[u], r.z[u + 1] - r.z[u]);
       const sl = Math.abs(y1 - y0) / Math.max(1e-6, run);
       if (sl > steep) { steep = sl; where = [Math.round(r.x[q]), Math.round(r.z[q])]; }
       deep = Math.max(deep, groundAt(surf, r.x[q], r.z[q]) - groundAt(T, r.x[q], r.z[q]));

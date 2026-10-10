@@ -116,7 +116,9 @@ export function roadLine(path, nn, N, H, wet = () => false) {
     while (u < len) { const f = u / len; xs.push(ax + (bx - ax) * f); zs.push(az + (bz - az) * f); u += 1; }
     carry = u - len;
   }
-  xs.push(P[P.length - 1][0]); zs.push(P[P.length - 1][1]);
+  // the end itself, unless the last point is already on it
+  const [ex, ez] = P[P.length - 1];
+  if (!xs.length || Math.hypot(ex - xs[xs.length - 1], ez - zs[zs.length - 1]) > 0.25) { xs.push(ex); zs.push(ez); }
   const n = xs.length;
   const g = new Float32Array(n);
   for (let q = 0; q < n; q++) g[q] = H[Math.round(zs[q]) * NN + Math.round(xs[q])];

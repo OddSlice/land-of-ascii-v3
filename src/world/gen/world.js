@@ -218,7 +218,15 @@ export function* generateWorld(seed) {
     kindMap: kind, levelMap: level,
   };
   world.cameras = worldCameras(world, { F, thr, seaDist, freshDist, shore });
+  // the first view faces the lake; where the road from the spawn leaves
+  // within 70 degrees of that, it aims between the two, so the road leads
+  // into the picture
+  const r0 = roads[0], e0 = r0.n - 1, back = Math.max(0, e0 - 30);
+  const roadYaw = Math.atan2(r0.x[back] - r0.x[e0], r0.z[back] - r0.z[e0]) * 180 / Math.PI;
+  const turn = ((roadYaw - spawn.yaw + 540) % 360) - 180;
+  if (Math.abs(turn) < 70) spawn.yaw += turn / 2;
   world.start = { x: spawn.x, z: spawn.z, yaw: spawn.yaw, pitch: 0 };
+  world.cameras[0].yaw = spawn.yaw;
   lap('finish');
   world.buildMs = performance.now() - t0;
   world.times = times;
