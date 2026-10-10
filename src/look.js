@@ -69,6 +69,9 @@ export const LOOK = {
   // heavier mark), because the mark is the light.
   // `tone`: how strongly the material's detail (patches, joints, strata)
   // changes its colour. `curve`: this material's own light curve (see below).
+  // `toneRung`: this material's own share of tone that moves the rung (else
+  // the global one): low where tone varies a lot across a small shape, so it
+  // shows as colour rather than as glyphs that crawl.
   materials: {
     sky:     { glyphs: ' ',          ink: { lit: 0.00, dark: 0.00 } },
     cloud:   { glyphs: ' .:░▒',      ink: { lit: -0.07, dark: 0.12 } },
@@ -82,7 +85,7 @@ export const LOOK = {
     snow:    { glyphs: '.-=+*',      ink: { lit: -0.14, dark: 0.36 }, tone: 0.06 },
     water:   { glyphs: '.:-=',       ink: { lit: 0.12, dark: 0.34 }, tone: 0.0 },
     stone:   { glyphs: ':=#▒▓█',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.18 },
-    conifer: { glyphs: ':^*%#&▒',    ink: { lit: -0.28, dark: 0.50 }, tone: 0.12 },
+    conifer: { glyphs: ':^*%#&▒',    ink: { lit: -0.28, dark: 0.50 }, tone: 0.14, toneRung: 0.12 },
     trunk:   { glyphs: ':|!I#',      ink: { lit: -0.28, dark: 0.46 }, tone: 0.22 },
     bush:    { glyphs: ':o%&@',      ink: { lit: -0.28, dark: 0.50 }, tone: 0.10 },
     wood:    { glyphs: ':|!I',       ink: { lit: -0.15, dark: 0.30 } },
@@ -125,7 +128,8 @@ export const LOOK = {
   // shifted off the axis (`asym`, of the crown radius), some cut short so a
   // gap shows above them (`gaps`, the share of tiers), some broken by a notch
   // (`notches`), a deeper ragged outline (`jag` over `sectors` round the
-  // trunk), clumped foliage tone (`clump`) and less light (`darken`). All of
+  // trunk), clumped foliage tone (`clump`, in `clumps` patches round each
+  // tier) and less light (`darken`). All of
   // it melts away as it gets smaller than about two cells.
   trees: {
     height: [11, 24], crown: [1.3, 2.5], bare: [0.18, 0.42], trunk: [0.15, 0.32], lean: 0.035, tiers: [6, 10],
@@ -137,7 +141,7 @@ export const LOOK = {
     // light across a tier, from its foot to its top (the sawtooth's step)
     tierLight: [0.62, 1],
     A: { jag: 0.36, sectors: 9, darken: 1, clump: 0, asym: 0, gaps: 0, notches: 0 },
-    B: { jag: 0.62, sectors: 13, darken: 0.72, clump: 0.7, asym: 0.24, gaps: 0.35, notches: 0.3 },
+    B: { jag: 0.62, sectors: 13, darken: 0.72, clump: 0.7, clumps: 5, asym: 0.24, gaps: 0.35, notches: 0.3 },
   },
 
   // Clouds. A: rounded cumulus, sizes varied, undersides soft. B: banks and
@@ -164,7 +168,8 @@ export const LOOK = {
   // behind it by how much of it is really flame (its core stays bright, its
   // rim fades), to this power (less keeps a far light brighter), and
   // by each keyframe's `flameStrength`, so by day a torch is a small pale
-  // light, not a beacon. Under `flameMark` the cell keeps what is behind's glyph.
+  // light, not a beacon; at night `flameFloor` keeps a far torch a point of
+  // light. Under `flameMark` the cell keeps what is behind's glyph.
   flameFade: 1,
   flameMark: 0.35,
 
@@ -199,7 +204,7 @@ export const LOOK = {
       bush:   { lit: '#55703a', shade: '#28331f' },
       wood:   { lit: '#6a5340', shade: '#342a22' },
       flame:  '#f0dfba',
-      flameStrength: 0.6,
+      flameStrength: 0.6, flameFloor: 0,
       bed:    { lit: '#6b6148', shade: '#353026' },
       floor:  { lit: '#4c4a33', shade: '#22231b' },
     },
@@ -226,7 +231,7 @@ export const LOOK = {
       bush:   { lit: '#36402e', shade: '#1d221c' },
       wood:   { lit: '#4c3a32', shade: '#261e1b' },
       flame:  '#ffb060',
-      flameStrength: 0.85,
+      flameStrength: 0.85, flameFloor: 0.25,
       bed:    { lit: '#544a42', shade: '#2a2526' },
       floor:  { lit: '#34312d', shade: '#1b1a1b' },
     },
@@ -253,7 +258,7 @@ export const LOOK = {
       bush:   { lit: '#191c1c', shade: '#0f1011' },
       wood:   { lit: '#221d1a', shade: '#110f0e' },
       flame:  '#ffb468',
-      flameStrength: 1,
+      flameStrength: 1, flameFloor: 0.5,
       bed:    { lit: '#24231f', shade: '#121210' },
       floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
     },

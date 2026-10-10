@@ -6,6 +6,7 @@
 //                                          views where it shows, beside the same run on a reference
 //                                          build (--ref DIR, e.g. a copy of phase 0b's sources)
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
+//   --only forest,stand                    only the runs whose label contains one of these
 //   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look tree=B]
 //
 // step is metres a frame (0.075 m = 4.5 m/s at 60 fps), dir the walking
@@ -56,7 +57,8 @@ if (a.at) {
   const at = a.at.split(',').map(Number);
   runs = [{ label: 'custom', at, stress: !!a.stress, time: a.time, step: Number(a.step ?? 0.075), dir: Number(a.dir || 0), turn: Number(a.turn || 0), look: parseLook(a.look) }];
 } else {
-  const set = SETS[a.set || 'look'];
+  const only = a.only ? String(a.only).split(',') : null;
+  const set = SETS[a.set || 'look'].filter((r) => !only || only.some((w) => r.label.includes(w)));
   runs = [];
   for (const r of set) {
     if (!r.axis) { runs.push({ ...r }); continue; }

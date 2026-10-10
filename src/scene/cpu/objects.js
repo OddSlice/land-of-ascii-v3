@@ -346,7 +346,7 @@ export class ObjectPass {
     let tone = 0.3 * t.tone + 0.55 * (hit.f * 2 - 1);
     if (cp.B) {
       // smoothly joined between sectors, so a clump has no hard edge
-      const as = (Math.atan2(hit.hz, hit.hx) / (Math.PI * 2) + 0.5) * TB.sectors, s0 = Math.floor(as), sf = as - s0;
+      const as = (Math.atan2(hit.hz, hit.hx) / (Math.PI * 2) + 0.5) * TB.clumps, s0 = Math.floor(as), sf = as - s0;
       const clump = (hash2(hit.tier * 31 + s0, t.seed, 13) * (1 - sf) + hash2(hit.tier * 31 + s0 + 1, t.seed, 13) * sf) * 2 - 1;
       tone = 0.25 * t.tone + 0.45 * (hit.f * 2 - 1) + TB.clump * clump * cp.jagK;
     }
@@ -477,9 +477,7 @@ export class ObjectPass {
         const D = (ya - ey) / s;
         if (D > 0.05 && D < best) {
           const hx = kx + dx * D, hz = kz + dz * D;
-          // darker toward the trunk, so crowns seen from below have depth
-          const h2 = hx * hx + hz * hz;
-          if (h2 <= Ra * Ra) { best = D; bnx = 0; bny = -1; bnz = 0; bf = 0.3 * Math.sqrt(h2) / Ra; bmat = MAT.CONIFER; bk = k; bhx = hx; bhz = hz; }
+          if (hx * hx + hz * hz <= Ra * Ra) { best = D; bnx = 0; bny = -1; bnz = 0; bf = 0; bmat = MAT.CONIFER; bk = k; bhx = hx; bhz = hz; }
         }
       }
     }

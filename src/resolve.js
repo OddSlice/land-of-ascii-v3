@@ -79,7 +79,7 @@ export function makePalette(hour) {
     emissive: Uint8Array.from(mats.map((m) => (m.emissive ? 1 : 0))),
     curve: Float32Array.from(mats.map((m) => m.curve || LOOK.curve)),
     inkFloor: hex(LOOK.inkFloor),
-    toneRung: LOOK.toneRung,
+    toneRung: Float32Array.from(mats.map((m) => (m.toneRung !== undefined ? m.toneRung : LOOK.toneRung))),
     water: LOOK.water || {},
   };
   cacheHour = hour;
@@ -183,7 +183,7 @@ function recordColour(pal, hits, o) {
     r += torch.colour[0] * tg; g += torch.colour[1] * tg; b += torch.colour[2] * tg;
     h = haze.max * (1 - Math.exp(-dist / haze.dist));
     r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
-    bright = t0 + tg * 2.5 + pal.toneRung * ((toneB - 128) / 127);
+    bright = t0 + tg * 2.5 + pal.toneRung[m] * ((toneB - 128) / 127);
     if (bright > 1) bright = 1; else if (bright < 0) bright = 0;
   }
   rec.r = r; rec.g = g; rec.b = b; rec.bright = bright; rec.h = h;
@@ -241,7 +241,7 @@ let faint = new Int32Array(256), faintW = new Float32Array(256);
 export function resolveStripe(pal, hits, cells, sw, rows, c0, look) {
   const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade;
   const [ifr, ifg, ifb] = pal.inkFloor;
-  const flameK = pal.k.flameStrength, flameP = LOOK.flameFade;
+  const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
   grassHue = look ? LOOK.meadow.hue[look.meadow] || 0 : 0;
   blueShallows = !!(look && look.shallows === 'blue');
   let nf = 0;
@@ -256,7 +256,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, look) {
       if (m === MAT.FLAME || mirrorFlame) {
         // a flame held at its minimum size, or any flame by day: blended
         // with what is behind it once every other cell is done
-        const w = Math.pow(hits[o + (mirrorFlame ? REC : 0) + 5] / 255, flameP) * flameK;
+        const w = (flameF + (1 - flameF) * Math.pow(hits[o + (mirrorFlame ? REC : 0) + 5] / 255, flameP)) * flameK;
         if (w < 0.999) {
           if (nf >= faint.length) { const a = new Int32Array(nf * 2); a.set(faint); faint = a; const b = new Float32Array(nf * 2); b.set(faintW); faintW = b; }
           faint[nf] = mirrorFlame ? -1 - i : i; faintW[nf] = w; nf++;
