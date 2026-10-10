@@ -1,11 +1,11 @@
-# Land of Ascii v3: the art bible (draft)
+# Land of Ascii v3: the art bible
 
-Draft of 10 Oct 2026, written in phase 0c. This is the set of rules every later phase has to obey. It records the rules the look already follows (phases 0a and 0b) and the ones phase 0c adds.
+Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look was locked. This is the set of rules every later phase has to obey. It records the rules the look follows (phases 0a and 0b), the ones phase 0c added, and the choices locked at the start of phase 1 (section 9).
 
 Three things hold it together:
 - **`src/look.js` is the only place** where colours, glyphs, ladders and strengths are set. Renderer code reads it and never hard-codes a colour.
-- **The tools hold it in place.** `tools/lookbook.mjs --regress` compares the twelve fixed cameras cell for cell with a saved set. `tools/flicker.mjs` turns blinking into a number. `tools/identity.mjs` proves the picture is the same whatever the number of workers.
-- **The open choices** at the end are decided by Martin, by eye, in the look panel (L).
+- **The tools hold it in place.** `tools/lookbook.mjs --regress` compares the twenty fixed cameras (the lab's nine, the stress scene's three, the generated world's eight) cell for cell with a saved set. `tools/flicker.mjs` turns blinking into a number. `tools/identity.mjs` proves the picture is the same whatever the number of workers.
+- **The settled choices** (section 9) were made by Martin, by eye, in the look panel (L), which stays for comparison.
 
 ---
 
@@ -201,13 +201,26 @@ Nothing else changes with the clock. **Every variation is a pure function of wor
 
 | Material | Where | Built from | With distance |
 |---|---|---|---|
-| Grass | open ground | lit/shade by sun and shadow; tone from patches 11 m across and fine grain; meadow mottling (option) | detail fades; haze |
+| Grass | open ground (the meadow) | lit/shade by sun and shadow; tone from patches 11 m across and fine grain; meadow mottling, strength 2 | detail fades; haze |
 | Forest floor (0c) | under and just round tree crowns | its own darker, browner ladder; shaded by the same shadow sweep as everything else, so it agrees between workers and with the clock frozen | as grass |
 | Dirt road | the road | ragged edge from fine grain | edge smooths |
 | Sand | beaches, river banks | as dirt | |
 | Rock | steep or high ground | strata bands along height | bands fade |
 | Snow | the high tops | | |
-| Water, bed | lake and river | three records: surface, reflection, bed (section 5) | ripples fade |
+| Water, bed | lake, river and sea | three records: surface, reflection, bed (section 5) | ripples fade |
+
+**In the generated world (phase 1)** the ground uses only these materials, from the world's data:
+- meadow everywhere it is not something else;
+- forest floor under and round the stands;
+- sand on beaches (low, gentle ground within about 34 m of the sea), in a strip round lakes and along rivers, and on the shallow beds next to them;
+- rock on faces steeper than about 32 degrees and on steep ground high in the range;
+- snow on the tops, from 235 m above the sea, not on the steepest faces;
+- dirt on the roads, pressed level across their width;
+- bed under lakes and rivers, seen through the water.
+
+There is **no marsh**: it would need a material, colours and a ladder the bible does not have (wet ground between grass and water), so it waits for a phase that adds them here first.
+
+**The sea runs to the horizon.** Past the map's edge the edge's sea goes on, and past the view distance a ray that comes down to sea level over open sea meets a calm surface whose mirror is the sky. It never ends in a line.
 
 Shading:
 - terrain is lit by its interpolated normal;
@@ -221,8 +234,8 @@ Shading:
 The shape: a bare trunk under a stack of overlapping cone tiers, each wide at its foot and narrow at its top (a sawtooth outline), with a ragged edge that turns with the angle round the trunk.
 - Seen from below, a tier's flat underside is darker toward the trunk.
 - Deep in a close stand, crowns grow narrower, so a closed canopy keeps gaps to the sky.
-- **Treatment A (tidy):** the tiered shape as in phase 0b, with the per-tree variation above.
-- **Treatment B (rough and dark):**
+- **Treatment A (tidy):** the tiered shape as in phase 0b, with the per-tree variation above. Kept in the look panel for comparison only.
+- **Treatment B (rough and dark), the settled look:**
   - tiers shifted off the axis;
   - a third of them cut short, so sky or trunk shows above;
   - some notched;
@@ -241,9 +254,14 @@ The shape: a bare trunk under a stack of overlapping cone tiers, each wide at it
 - the gradient from horizon to high, with a glow round the sun;
 - sun and moon discs at least 1.2 cells;
 - 900 stars.
-- **Clouds A (cumulus):** clusters of spheres of varied sizes, cut flat underneath, bright tops and grey undersides that are lighter at the rim.
-- **Clouds B (banks):** long broken bands of stretched puffs turned to the band's angle, with streaks along the edge; flatter and longer at dusk.
+- **Clouds A (cumulus):** clusters of spheres of varied sizes, cut flat underneath, bright tops and grey undersides that are lighter at the rim. Kept in the look panel for comparison only.
+- **Clouds B (banks), the settled look:** long broken bands of stretched puffs turned to the band's angle, with streaks along the edge; flatter and longer at dusk.
+- In the generated world the clouds are spread over its whole sky from the seed (about a kilometre apart, some places left clear), not only where the lab's valley looked.
 - A puff's dissolving edge in front of the same cloud's body is not a hole.
+
+### The overhead map (M)
+
+The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort site's wall, `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
 
 ---
 
@@ -282,18 +300,21 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 16. **Never decide the look late, or from concept art.** Compare candidates rendered by the real engine in the real world: that is what the look panel is for.
 17. **Never let an object's cost scale with its whole screen box.** Cull exactly and work per plane, as the conifer pass does. The first build's market stalls cost 2 ms because they did not.
 18. **Never show frames at uneven delays, or move the camera by a wobbling clock.** A frame shows the camera as it was when it was asked for. If some frames reach the screen a refresh later than others, turning stalls and then jumps. So every frame is shown the same number of refreshes after it was asked for, at a steady rate, a late frame is dropped rather than shown late, and time moves in whole display refreshes (`src/app/pace.js`). `tools/smooth.mjs` measures it.
+19. **Never judge terrain from the overhead map.** Height noise that looks gentle on a map is usually far too steep at eye level. The generated world is judged by the sky test (`tools/world-check.mjs`: at eye level the median frame is at least 35% sky, and under one view in ten has less than 15%) and by standing in it.
 
 ---
 
-## 9. Open choices
+## 9. Settled choices
 
-Each is a setting in `look.js` (`choices`), switched live in the look panel (L) and by URL. The defaults today are A, A, 0, warm: phase 0b's look, plus the three fixes. Once Martin locks a combination, the losing options go, and the regression set is saved again.
+Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates. They are the defaults in `look.js` (`choices`); the look panel (L) and the URL (`?tree=A&cloud=A&meadow=0&shallows=warm`) still show the others, for comparison, until a later phase removes them.
 
-**Recommended combination: conifers B, clouds B, meadow 2, shallows blue.** One URL shows it: `?tree=B&cloud=B&meadow=2&shallows=blue`. The reasons for each choice, and the measurements behind them, are in `docs/phase0c.md`.
+| Choice (key) | Settled | Why |
+|---|---|---|
+| Conifers (7) | **B, rough and dark** | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. B costs about 3% more than A in a forest and blinks no more than phase 0b walking; turning inside a forest it crawls more than phase 0b did, which Martin accepted. |
+| Clouds (8) | **B, banks** | The reference's clouds are irregular banks and broken bands, flatter and longer at dusk. |
+| Meadow (9) | **2, strong patches** | The reference's meadow is mottled in large soft patches several metres across; strength 1 is barely visible at density 3. |
+| Shallows (0) | **blue, even blue** | The reference's near water is an even blue with no bed showing. |
 
-| Choice (key) | Options | Recommendation | Why |
-|---|---|---|---|
-| Conifers (7) | A tidy tiers · B rough and dark | **B** | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. Walking, B blinks no more than phase 0b; turning inside a forest, both A and B crawl more than phase 0b did, because the canopy now has gaps. B costs about 3% more than A in the forest. |
-| Clouds (8) | A cumulus · B banks | **B** | The reference's clouds are irregular banks and broken bands, flatter and longer at dusk, not round puffs. B blinks no more than A or phase 0b and costs about the same. |
-| Meadow (9) | 0 none · 1 soft patches · 2 strong patches | **2** | The reference's meadow is mottled in large soft patches several metres across. Strength 2 is the nearest; 1 is barely visible at density 3. It blinks least of the three, walking and turning, and holds still in the walk videos. |
-| Shallows (0) | warm bed · even blue | **blue** | The reference's near water is an even blue with no bed showing. The warm bed was our reading of phase 0b's brief, not the reference. |
+Also accepted from phase 0c: the forest-floor material, and narrower crowns in dense stands.
+
+The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`).
