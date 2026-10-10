@@ -20,7 +20,7 @@ import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, hei
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, STEEP } from './roads.js';
 import { materials, detail } from './ground.js';
 import { worldCameras } from './cameras.js';
-import { makeLevels, materialCode } from '../terrain.js';
+import { makeLevels, materialCode, weightLevels } from '../terrain.js';
 import { floorField } from '../objects.js';
 import { buildSpans } from '../spans.js';
 import { buildClouds, worldCloudList } from '../sky.js';
@@ -202,6 +202,7 @@ export function* generateWorld(seed) {
   Object.assign(terrain, { wWater, wRoad, wSand, wRock, wSnow, tone: det.tone, fine: det.fine, toneK: det.toneK, maxH });
   terrain.wFloor = floorField(terrain, trees);
   terrain.code = materialCode(terrain);
+  for (const k of ['wWater', 'wRoad', 'wSand']) terrain[`${k}L`] = weightLevels(terrain[k], N);
   lap('ground');
   yield { stage: STAGES[8], p: 0.9 };
   terrain.levels = makeLevels(surface, N, false);

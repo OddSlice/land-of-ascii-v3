@@ -6,7 +6,7 @@
 import { MAT, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
 import { rippleSlope, waterRays } from './water.js';
-import { bil2, bil2S, bil1, bilU8, bilD } from './sample.js';
+import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
@@ -113,17 +113,21 @@ const methods = {
     const fine = bilD(T.fine, x, z, N, NN) * tk;
     const jitter = fine * fadeOf(1.5, fp);
     let mat;
+    // in the generated world, past the first level water, roads and sand
+    // come from their filtered copies at the level being marched, so a thin
+    // river or road fades away with distance instead of breaking into dashes
+    const thin = L > 0 && T.wWaterL;
     // a square of nothing but grass (or forest floor) needs no weighing
     let code = 0;
-    if (T.code) {
+    if (T.code && !thin) {
       const u = x < 0 ? 0 : x > N - 1e-6 ? N - 1e-6 : x, w = z < 0 ? 0 : z > N - 1e-6 ? N - 1e-6 : z;
       code = T.code[(w | 0) * N + (u | 0)];
     }
     if (code === 1) mat = MAT.GRASS;
     else if (code === 2) mat = MAT.FLOOR;
-    else if (bilU8(T.wWater, x, z, N, NN) > 0.5) mat = MAT.WATER;
-    else if (T.wRoad && bilU8(T.wRoad, x, z, N, NN) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
-    else if (bilU8(T.wSand, x, z, N, NN) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
+    else if ((thin ? this.thinW(T.wWaterL, lv, L, beta, x, z) : bilU8(T.wWater, x, z, N, NN)) > 0.5) mat = MAT.WATER;
+    else if (T.wRoad && (thin ? this.thinW(T.wRoadL, lv, L, beta, x, z) : bilU8(T.wRoad, x, z, N, NN)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
+    else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
     else if (bilU8(T.wSnow, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
     else if (bilU8(T.wRock, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
     else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
@@ -150,6 +154,13 @@ const methods = {
     }
     const glow = this.glowAt(x, y, z, nx, ny, nz);
     this.write(ci, rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
+  },
+
+  // A weight from its filtered copy at level L, blended toward L+1 by beta.
+  thinW(A, lv, L, beta, x, z) {
+    let w = bil2U8(lv[L], A[L], x, z);
+    if (beta > 0 && L + 1 < lv.length) w += (bil2U8(lv[L + 1], A[L + 1], x, z) - w) * beta;
+    return w;
   },
 
   // Meadow mottling (LOOK.meadow): soft patches several metres across and,

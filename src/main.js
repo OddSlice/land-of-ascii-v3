@@ -79,7 +79,7 @@ addEventListener('unhandledrejection', (e) => fail(String(e.reason && e.reason.s
 // with a progress line (only what walking needs, unless it also renders with
 // ?threads=0). The generated world is built once, in its own worker (or on
 // the page with ?threads=0), then handed to the render workers.
-let pool = null, packed = null, shadows = null;
+let pool = null, packed = null, shadows = null, shadowStores = null;
 const progress = { page: 0, workers: THREADS ? 0 : 1 };
 function showProgress() {
   const p = Math.min(progress.page, progress.workers);
@@ -119,6 +119,7 @@ async function makeWorld() {
       // it each worker gets its own copy and sweeps its own shadows
       const stores = SHARED ? { V: [], S: [] } : null;
       if (SHARED) for (let b = 0; b < 2; b++) { const st = shadowStore(w, SharedArrayBuffer); stores.V.push(st.V); stores.S.push(st.S); }
+      shadowStores = stores;
       pool = new Pool(THREADS, fail, { scene: 'world', init: { world: packed, shared: SHARED, shadows: stores } });
       if (SHARED) shadows = new SharedShadows(w, packed, stores, pool, fail);
     }
@@ -490,10 +491,18 @@ Object.assign(lab, {
     return { ground: groundAt(T, x, z), surface: groundAt({ ground: T.levels[0].H, N: T.N, NN: T.NN }, x, z) };
   },
   // Memory the page and its workers use, where the browser can say
-  // (Chromium, cross-origin isolated).
+  // (Chromium, cross-origin isolated). `shared`: the bytes of shared memory
+  // (the world and the shadow stores), which the browser counts again for
+  // every thread that reads them; `holders`: how many threads do.
   async memory() {
     if (!performance.measureUserAgentSpecificMemory) return null;
     const m = await performance.measureUserAgentSpecificMemory();
-    return { bytes: m.bytes, breakdown: m.breakdown.map((b) => ({ bytes: b.bytes, types: b.types, scope: b.attribution.map((a) => a.scope).join(',') })) };
+    let shared = 0;
+    if (SHARED && packed) {
+      for (const a of Object.values(packed.arrays)) shared += a.byteLength;
+      for (const st of [shadowStores.V, ...shadowStores.S]) for (const a of [].concat(st)) shared += a.byteLength;
+    }
+    return { bytes: m.bytes, shared, holders: SHARED ? THREADS + 2 : 1,
+      breakdown: m.breakdown.map((b) => ({ bytes: b.bytes, types: b.types, scope: b.attribution.map((a) => a.scope).join(',') })) };
   },
 });

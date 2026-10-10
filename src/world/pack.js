@@ -27,6 +27,7 @@ export function packWorld(world, Shared = null) {
   put('ground', T.ground);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
   for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code']) put(k, T[k]);
+  for (const k of ['wWater', 'wRoad', 'wSand']) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
   // trees: a table of numbers, and their tiers (both treatments) in one pool
   const trees = world.objects.trees;
   const tab = new Float64Array(trees.length * TREE_F);
@@ -77,6 +78,7 @@ export function unpackWorld(packed) {
     N, NN, ground: a.ground, levels, wWater: a.wWater, wRoad: a.wRoad, wSand: a.wSand, wRock: a.wRock, wSnow: a.wSnow,
     wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH,
   };
+  for (const k of ['wWater', 'wRoad', 'wSand']) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
   const trees = [], tab = a.trees, tiers = a.tiers;
   for (let q = 0; q < tab.length / TREE_F; q++) {
     const o = q * TREE_F, at = tab[o + 13], n = tab[o + 14];

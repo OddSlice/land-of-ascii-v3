@@ -101,6 +101,22 @@ function shapedHeight(x, z) {
   return h;
 }
 
+// A 0..255 weight field tent-filtered down through the coarser levels (as
+// the heights are): level L's copy at index L (index 0 is left empty). The
+// generated world draws water, roads and sand from these far off, so a thin
+// river or road shrinks by fading with distance instead of breaking up.
+export function weightLevels(w, N0) {
+  const out = [null];
+  let src = w, n = N0;
+  for (let L = 1; L < LEVELS; L++) {
+    const f = downsample(src, n);
+    n >>= 1;
+    src = Uint8Array.from(f, (v) => Math.round(v));
+    out.push(src);
+  }
+  return out;
+}
+
 // Tent-filter a level into the next coarser one.
 export function downsample(src, n) {
   const m = (n >> 1);

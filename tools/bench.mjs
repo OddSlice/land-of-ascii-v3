@@ -75,8 +75,11 @@ try {
           const mem = await page.evaluate(() => window.lab.memory().catch((e) => ({ error: String(e) })));
           const rss = browserRSS();
           const st = await page.evaluate(() => ({ shared: window.lab.shared, threads: window.lab.threads, times: window.lab.world.times }));
-          Object.assign(world, { readyMs, rss, mem: mem && mem.bytes ? Math.round(mem.bytes / 1e6) : (mem && mem.error) || null, shared: st.shared, genTimes: st.times });
-          console.log(`${name}: world built in ${Math.round(world.buildMs)} ms, first frame after ${readyMs} ms (page load included), shared ${st.shared}, memory reported ${world.mem} MB, browser processes ${rss.totalMB} MB in ${rss.processes} (largest ${rss.largestMB} MB)`);
+          // the browser counts shared memory again for every thread that reads
+          // it: counted once, the page and its workers hold `memOnce`
+          const once = mem && mem.bytes ? Math.round((mem.bytes - (mem.holders - 1) * mem.shared) / 1e6) : null;
+          Object.assign(world, { readyMs, rss, mem: mem && mem.bytes ? Math.round(mem.bytes / 1e6) : (mem && mem.error) || null, memShared: mem && mem.shared ? Math.round(mem.shared / 1e6) : null, memOnce: once, shared: st.shared, genTimes: st.times });
+          console.log(`${name}: world built in ${Math.round(world.buildMs)} ms, first frame after ${readyMs} ms (page load included), shared ${st.shared}, memory reported ${world.mem} MB (shared ${world.memShared} MB, counted once ${once} MB), browser processes ${rss.totalMB} MB in ${rss.processes} (largest ${rss.largestMB} MB)`);
         }
         for (const d of densities) {
           for (let cam = 0; cam < ncams; cam++) {
