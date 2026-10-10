@@ -390,7 +390,7 @@ export class ObjectPass {
       cp.kx[k] = kx; cp.kz[k] = kz; cp.kD0[k] = kD0; cp.kb2[k] = kx * kx + kz * kz - kD0 * kD0;
     }
     // far off the edge is smooth, the same from every side: radii once per tree
-    if (jagK === 0 && cp.tiersOf === t) return;
+    if (jagK === 0 && cp.tiersOf === t) { this.planeHeights(t); return; }
     cp.tiersOf = jagK === 0 ? t : null;
     // the ragged edge: sectors round the trunk, smoothly joined
     const S = P.sectors;
@@ -431,6 +431,25 @@ export class ObjectPass {
       if (Rb < fb) Rb = fb;
       cp.Ra[k] = Ra; cp.Rb[k] = Rb; cp.yb[k] = yb; cp.g[k] = (Rb - Ra) / (yb - ya);
     }
+    this.planeHeights(t);
+  }
+
+  // The heights this plane can meet the tree at: tiers that reach out as
+  // far as the plane passes from their axis, and the trunk if the plane
+  // passes through it. A ray that stays above or below them misses.
+  planeHeights(t) {
+    const cp = this.cp, tiers = cp.tiers;
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < cp.T; k++) {
+      const R = cp.Ra[k] > cp.Rb[k] ? cp.Ra[k] : cp.Rb[k];
+      if (R * R < cp.kb2[k]) continue;
+      if (tiers[k * TIER] < lo) lo = tiers[k * TIER];
+      if (cp.yb[k] > hi) hi = cp.yb[k];
+    }
+    const rt = Math.max(t.trunkR, cp.minR);
+    if (cp.b2 < rt * rt) { if (t.base - 0.4 < lo) lo = t.base - 0.4; if (t.trunkTop > hi) hi = t.trunkTop; }
+    cp.yLo = lo; cp.yHi = hi;
+    if (lo > hi) cp.miss = true;
   }
 
   coniferRay(t, s, ey) {
@@ -441,6 +460,7 @@ export class ObjectPass {
     // quick height test: the ray's height near the trunk
     const yNear = ey + s * (D0 - Rmax), yFar = ey + s * (D0 + Rmax);
     const yMax = Math.max(yNear, yFar), yMin = Math.min(yNear, yFar);
+    if (yMax < cp.yLo || yMin > cp.yHi) return false;
     for (let k = 0; k < T; k++) {
       const ya = tiers[k * TIER], yb = cp.yb[k];
       // tiers go up the tree: once the ray is under one it is under the rest
