@@ -8,7 +8,9 @@ export const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname)
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg' };
 
-export function serve(root = ROOT) {
+// `isolated: false` serves without the cross-origin isolation headers, as
+// GitHub Pages does (the generated world then falls back to copies).
+export function serve(root = ROOT, { isolated = true } = {}) {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -17,8 +19,8 @@ export function serve(root = ROOT) {
       fs.readFile(file, (err, data) => {
         if (err) { res.writeHead(404); res.end(); return; }
         // cross-origin isolation, so Firefox and WebKit give fine-grained timers
-        res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store',
-          'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' });
+        const iso = isolated ? { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' } : {};
+        res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...iso });
         res.end(data);
       });
     });
@@ -44,9 +46,12 @@ export function args(argv = process.argv.slice(2)) {
   return out;
 }
 
-// Open the lab in a page and wait until it is running. Fails on any page
-// error or worker failure.
-export async function openLab(browser, base, { built = false, threads, density, stress = false, look = null, width = 1440, height = 900, dpr = 2 } = {}) {
+// Open the game in a page and wait until it is running. Fails on any page
+// error or worker failure. `scene`: 'lab' (the default, for the tools written
+// before the generated world), 'stress' (or stress: true) or 'world' (with
+// `seed`).
+export async function openLab(browser, base, { built = false, threads, density, stress = false, scene, seed, look = null, width = 1440, height = 900, dpr = 2, extra = null } = {}) {
+  scene = scene || (stress ? 'stress' : 'lab');
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr });
   const page = await ctx.newPage();
   const errors = [];
@@ -55,12 +60,15 @@ export async function openLab(browser, base, { built = false, threads, density, 
   const q = new URLSearchParams();
   if (threads !== undefined) q.set('threads', String(threads));
   if (density !== undefined) q.set('density', String(density));
-  if (stress) q.set('stress', '1');
+  if (scene === 'stress') q.set('stress', '1');
+  if (scene === 'lab') q.set('lab', '1');
+  if (scene === 'world' && seed !== undefined) q.set('seed', String(seed));
+  if (extra) for (const [k, v] of Object.entries(extra)) q.set(k, String(v));
   // the look candidates (a build without them ignores these)
   if (look) for (const [k, v] of Object.entries(look)) q.set(k, String(v));
   const url = `${base}/${built ? 'index.html' : ''}${q.toString() ? `?${q}` : ''}`;
   await page.goto(url);
-  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: stress ? 180000 : 30000 });
+  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: scene === 'lab' ? 30000 : 180000 });
   await page.evaluate(() => window.lab.ready);
   const check = async () => {
     const labErrors = await page.evaluate(() => window.lab.errors);

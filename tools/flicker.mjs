@@ -6,6 +6,8 @@
 //                                          views where it shows, beside the same run on a reference
 //                                          build (--ref DIR, e.g. a copy of phase 0b's sources)
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
+//   node tools/flicker.mjs --set world     a walk through the generated world (default seed, settled
+//                                          look): meadow, forest and along the lake, from its cameras
 //   --only forest,stand                    only the runs whose label contains one of these
 //   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look tree=B]
 //
@@ -38,6 +40,18 @@ const SETS = {
     { axis: 'meadow', label: 'open meadow, turning', at: [300, 120, 160, -14], ...TURN },
     { axis: 'meadow', label: 'stress vista, turning', stress: true, cam: 2, ...TURN },
   ],
+  world: [
+    // (cameras of the generated world, found from its data; `turn` here is
+    // the camera turned that many degrees first)
+    { label: 'world, open meadow: walking', scene: 'world', cam: 3, face: 180, ...F },
+    { label: 'world, forest edge across the meadow: walking sideways', scene: 'world', cam: 3, ...W },
+    { label: 'world, inside a forest stand: walking', scene: 'world', cam: 2, ...F },
+    // (along the shore whichever way is dry and more level)
+    { label: 'world, main lake shore: walking along the shore', scene: 'world', cam: 1, dir: -90, level: true, step: 0.075, turn: 0 },
+    { label: 'world, open meadow: turning', scene: 'world', cam: 3, face: 180, ...TURN },
+    { label: 'world, inside a forest stand: turning', scene: 'world', cam: 2, ...TURN },
+    { label: 'world, main lake shore: turning', scene: 'world', cam: 1, ...TURN },
+  ],
   water: [
     { label: 'lab, meadow (no water): walking sideways', at: [262, 225, -8, 2], ...W },
     { label: 'lab, meadow (no water): turning', at: [262, 225, -8, 2], ...TURN },
@@ -55,7 +69,7 @@ const frames = Number(a.frames || 60);
 let runs;
 if (a.at) {
   const at = a.at.split(',').map(Number);
-  runs = [{ label: 'custom', at, stress: !!a.stress, time: a.time, step: Number(a.step ?? 0.075), dir: Number(a.dir || 0), turn: Number(a.turn || 0), look: parseLook(a.look) }];
+  runs = [{ label: 'custom', at, stress: !!a.stress, scene: a.scene, time: a.time, step: Number(a.step ?? 0.075), dir: Number(a.dir || 0), turn: Number(a.turn || 0), look: parseLook(a.look), y: a.y !== undefined ? Number(a.y) : undefined }];
 } else {
   const only = a.only ? String(a.only).split(',') : null;
   const set = SETS[a.set || 'look'].filter((r) => !only || only.some((w) => r.label.includes(w)));
@@ -71,24 +85,33 @@ async function measure(browser, root, list) {
   const { server, url } = await serve(root);
   const out = [];
   try {
-    for (const stress of [false, true]) {
-      const mine = list.filter((r) => !!r.stress === stress);
+    for (const scene of ['lab', 'stress', 'world']) {
+      const mine = list.filter((r) => (r.scene || (r.stress ? 'stress' : 'lab')) === scene);
       if (!mine.length) continue;
-      const lab = await openLab(browser, url, { stress, density: a.density });
+      const lab = await openLab(browser, url, { scene, density: a.density });
       for (const run of mine) {
         const r = await lab.page.evaluate(async ({ run, frames }) => {
           const L = window.lab;
-          if (L.setLook) L.setLook({ tree: 'A', cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) });
+          // (the look set compares options against the phase 0b look; the
+          // world set runs the settled look)
+          if (L.setLook) { if (run.scene === 'world') L.resetLook(); else L.setLook({ tree: 'A', cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
           let s0;
-          if (run.cam !== undefined) { L.camera(run.cam); s0 = L.state(); } else {
+          if (run.cam !== undefined) { L.camera(run.cam); if (run.face) L.face(L.state().yaw + run.face); s0 = L.state(); } else {
             L.setCamera({ x: run.at[0], z: run.at[1], yaw: run.at[2], pitch: run.at[3] });
             s0 = L.state();
+            if (run.y !== undefined) s0.eye = run.y;
           }
           L.freeze(run.time || 'day', 0);
           let prev2 = null, prev = null, blinks = 0, changed = 0, glyphBlinks = 0, colourBlinks = 0, n = 0;
-          const way = (s0.yaw + run.dir) * Math.PI / 180;
+          let dir = run.dir;
+          if (run.level) {
+            // how far the ground rises or falls, or the water deepens, over the walk
+            const cost = (d) => { const w = (s0.yaw + d) * Math.PI / 180, g0 = L.ground(s0.x, s0.z), g = L.ground(s0.x + Math.sin(w) * 4.5, s0.z + Math.cos(w) * 4.5); return Math.abs(g.ground - g0.ground) + 10 * (g.surface - g.ground); };
+            if (cost(dir + 180) < cost(dir)) dir += 180;
+          }
+          const way = (s0.yaw + dir) * Math.PI / 180;
           for (let i = 0; i < frames; i++) {
-            L.setCamera({ x: s0.x + Math.sin(way) * run.step * i, z: s0.z + Math.cos(way) * run.step * i, yaw: s0.yaw + run.turn * i, pitch: s0.pitch });
+            L.setCamera({ x: s0.x + Math.sin(way) * run.step * i, z: s0.z + Math.cos(way) * run.step * i, yaw: s0.yaw + run.turn * i, pitch: s0.pitch, ...(run.y !== undefined ? { y: run.y } : {}) });
             await L.whenIdle();
             const cur = L.cells();
             if (prev2) {

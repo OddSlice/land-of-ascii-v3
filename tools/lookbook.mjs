@@ -8,13 +8,17 @@
 //   node tools/lookbook.mjs --phase 0c --ref DIR [--built]   docs/phase0c.md: each look candidate at near, middle
 //       and far distance, and the three fixes before (the build in DIR, e.g. a copy of phase 0b) and after
 //       (shots/phase0c/)
-//   node tools/lookbook.mjs --regress [--save] [--built]
-//       the regression lookbook: the twelve fixed cameras (nine in the lab,
-//       three in the stress scene) at day, dusk and night with every clock
-//       frozen and the default look, compared cell for cell with the saved
-//       set in tools/regress/ (--save replaces it). Reports the share of
-//       cells that changed in each frame, so a later phase can show it did
-//       not disturb the look by accident.
+//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world] [--look tree=A,...]
+//       the regression lookbook: the twenty fixed cameras (nine in the lab,
+//       three in the stress scene, the generated world's eight for the
+//       default seed) at day, dusk and night with every clock frozen and the
+//       default look (or --look), compared cell for cell with the saved set
+//       in tools/regress/ (--save replaces it). Reports the share of cells
+//       that changed in each frame, so a later phase can show it did not
+//       disturb the look by accident.
+//   node tools/lookbook.mjs --phase 1 [--seeds 3,1,2,4,5] [--built]
+//       docs/phase1.md: the overhead map (M) of each seed, and the default
+//       seed's eight world cameras at day, dusk and night (shots/phase1/)
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -23,6 +27,7 @@ import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 
 const a = args();
 if (a.regress) { await regress(); process.exit(process.exitCode || 0); }
+if (String(a.phase) === '1') { await phase1(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -145,23 +150,26 @@ async function regress() {
   const { server, url } = await serve();
   const browser = await launch('chromium');
   const frames = [];
+  const scenes = String(a.scenes || 'lab,stress,world').split(',');
+  const look = a.look ? Object.fromEntries(String(a.look).split(',').map((kv) => kv.split('='))) : null;
   try {
-    for (const stress of [false, true]) {
-      const lab = await openLab(browser, url, { built: !!a.built, stress, density, threads: 8 });
+    for (const scene of scenes) {
+      const lab = await openLab(browser, url, { built: !!a.built, scene, density, threads: 8 });
       const { page } = lab;
       const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
       for (let i = 0; i < cams.length; i++) {
         for (const t of times) {
-          const cells = await page.evaluate(async ({ i, t }) => {
+          const cells = await page.evaluate(async ({ i, t, look }) => {
             const L = window.lab;
             L.resetLook();
+            if (look) L.setLook(look);
             L.camera(i); L.freeze(t, 0);
             await L.whenIdle();
             const st = L.state();
             return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
-          }, { i, t });
+          }, { i, t, look });
           await lab.check();
-          frames.push({ name: `${stress ? 'stress' : 'lab'} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
+          frames.push({ name: `${scene} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
         }
       }
       await lab.ctx.close();
@@ -329,4 +337,73 @@ async function phase0c() {
     for (const sv of servers) sv.close();
   }
   console.log(fs.readdirSync(OUT0).map((f) => `shots/phase0c/${f} ${(fs.statSync(path.join(OUT0, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+}
+
+// ---- phase 1: the generated world's maps and cameras ---------------------------
+
+async function phase1() {
+  const OUT = path.join(ROOT, 'shots', 'phase1');
+  fs.mkdirSync(OUT, { recursive: true });
+  const seeds = String(a.seeds || '3,1,2,4,5').split(',').map(Number);
+  const { server, url } = await serve();
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  try {
+    const bench = await workbench(browser);
+    // compose images in rows of `per`, each with a label, under a title
+    const compose = (srcs, labels, title, per, scale = 1) => bench.evaluate(async ({ srcs, labels, title, per, scale }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const pad = 12, top = 30, w = Math.round(ims[0].width * scale), h = Math.round(ims[0].height * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, x, y, w, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.88);
+    }, { srcs, labels, title, per, scale });
+    // the maps
+    const maps = [];
+    for (const seed of seeds) {
+      const lab = await openLab(browser, url, { built: !!a.built, scene: 'world', seed, width: 1100, height: 900 });
+      await lab.page.evaluate(async () => { window.lab.setHud(false); window.lab.freeze('day', 0); await window.lab.whenIdle(); window.lab.setMap(true); await new Promise((r) => setTimeout(r, 300)); });
+      await lab.check();
+      const src = await shot(lab.page);
+      maps.push(src);
+      writeDataURL(path.join(OUT, `map-seed-${seed}.jpg`), await compose([src], [`seed ${seed}${seed === seeds[0] ? ' (the default)' : ''}`], `Overhead map (M), seed ${seed}`, 1, 0.5));
+      await lab.ctx.close();
+    }
+    writeDataURL(path.join(OUT, 'maps.jpg'), await compose(maps, seeds.map((s, k) => `seed ${s}${k === 0 ? ' (the default)' : ''}`), 'Overhead maps (M): # fort site, o village sites, * viewpoints, + spawn, @ you', 3, 0.3));
+    // the default seed's cameras at day, dusk and night
+    const lab = await openLab(browser, url, { built: !!a.built, scene: 'world', seed: seeds[0] });
+    const { page } = lab;
+    await page.evaluate(() => window.lab.setHud(false));
+    const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const days = [];
+    for (let i = 0; i < cams.length; i++) {
+      const row = [];
+      for (const t of ['day', 'dusk', 'night']) {
+        await page.evaluate(async ({ i, t }) => { window.lab.camera(i); window.lab.freeze(t, 0); await window.lab.whenIdle(); }, { i, t });
+        await lab.check();
+        row.push(await shot(page));
+      }
+      days.push(row[0]);
+      writeDataURL(path.join(OUT, `cam-${i + 1}-${slug(cams[i])}.jpg`), await compose(row, ['day (14:00)', 'dusk (17:51)', 'night (23:00)'], `World camera ${i + 1}: ${cams[i]} (seed ${seeds[0]})`, 3, 0.25));
+      if (i === 0) writeDataURL(path.join(OUT, 'spawn.jpg'), await compose([row[0]], [`seed ${seeds[0]}, the spawn: the view the page opens on`], 'The first view', 1, 0.5));
+    }
+    writeDataURL(path.join(OUT, 'cameras-day.jpg'), await compose(days, cams.map((c, i) => `${i + 1} ${c}`), `The eight world cameras by day (seed ${seeds[0]})`, 2, 0.25));
+    await lab.ctx.close();
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase1/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    server.close();
+  }
 }

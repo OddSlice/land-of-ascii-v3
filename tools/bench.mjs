@@ -8,7 +8,7 @@
 // fine-grained timers.
 //
 //   node tools/bench.mjs [--browser chromium,firefox,webkit] [--threads 8,4] [--density 3,4]
-//                        [--scene lab|stress|both] [--frames 240] [--built] [--out file.json]
+//                        [--scene lab|stress|both|world] [--seed N] [--frames 240] [--built] [--out file.json]
 //                        [--look tree=B,cloud=B,meadow=2,shallows=blue] [--root DIR]
 //
 // --look sets the look candidates for every run; --root measures another
@@ -16,6 +16,11 @@
 //
 // "worker" is the slowest stripe's march + resolve in a frame; "verdict" is
 // that plus the main thread's draw, per frame (the phase 0b decision rule).
+// For the generated world it also records how long the world took to build
+// (in its worker, until the arrays were back on the page), how long until
+// the first frame, and the memory: what the browser reports for the page and
+// its workers where it can (Chromium), and the resident memory of the test
+// browser's processes as the system sees them.
 //
 // Before timing anything, close every other copy of the game (browser tabs,
 // the Claude app's browser pane) and check the machine is idle.
@@ -30,7 +35,14 @@ const browsers = (a.browser || 'chromium,firefox,webkit').split(',');
 const threadCounts = String(a.threads || '8,4').split(',').map(Number);
 const densities = String(a.density || '3,4').split(',').map(Number);
 const frames = Number(a.frames || 240);
-const scenes = { lab: [false], stress: [true], both: [false, true] }[a.scene || 'both'];
+const scenes = { lab: ['lab'], stress: ['stress'], both: ['lab', 'stress'], world: ['world'] }[a.scene || 'both'];
+
+// Resident memory of the test browser's processes (Playwright's builds only).
+function browserRSS() {
+  const rows = execSync('ps -axo rss=,command=').toString().split('\n').filter((l) => l.includes('ms-playwright'));
+  const kb = rows.map((l) => parseInt(l.trim(), 10) || 0);
+  return { totalMB: Math.round(kb.reduce((p, q) => p + q, 0) / 1024), largestMB: Math.round(Math.max(0, ...kb) / 1024), processes: kb.length };
+}
 const TOP_CELLS = 52480;
 const look = parseLook(a.look);
 
@@ -49,12 +61,23 @@ try {
   for (const name of browsers) {
     const browser = await launch(name, { headless: name === 'webkit' });
     for (const threads of threadCounts) {
-      for (const stress of scenes) {
-        const lab = await openLab(browser, url, { built: !!a.built, threads, stress, look });
+      for (const scene of scenes) {
+        const stress = scene === 'stress';
+        const t0 = Date.now();
+        const lab = await openLab(browser, url, { built: !!a.built, threads, scene, look, seed: a.seed });
+        const readyMs = Date.now() - t0;
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));
         const ncams = await page.evaluate(() => window.lab.cameras.length);
         const world = await page.evaluate(() => ({ buildMs: window.lab.world.buildMs, sweepMs: window.lab.world.sweepMs }));
+        if (scene === 'world') {
+          await page.evaluate(() => window.lab.whenIdle());
+          const mem = await page.evaluate(() => window.lab.memory().catch((e) => ({ error: String(e) })));
+          const rss = browserRSS();
+          const st = await page.evaluate(() => ({ shared: window.lab.shared, threads: window.lab.threads, times: window.lab.world.times }));
+          Object.assign(world, { readyMs, rss, mem: mem && mem.bytes ? Math.round(mem.bytes / 1e6) : (mem && mem.error) || null, shared: st.shared, genTimes: st.times });
+          console.log(`${name}: world built in ${Math.round(world.buildMs)} ms, first frame after ${readyMs} ms (page load included), shared ${st.shared}, memory reported ${world.mem} MB, browser processes ${rss.totalMB} MB in ${rss.processes} (largest ${rss.largestMB} MB)`);
+        }
         for (const d of densities) {
           for (let cam = 0; cam < ncams; cam++) {
             // keep the window in front: macOS throttles a covered window's frames
@@ -70,14 +93,14 @@ try {
             if (d === 4 && st.cells !== TOP_CELLS) console.log(`warning: top density gave ${st.cells} cells, not ${TOP_CELLS} (device pixel ratio ${st.dpr})`);
             const iv = t.map((x) => x.interval).filter((x) => x > 0);
             const row = {
-              browser: name, threads, scene: stress ? 'stress' : 'lab', density: d, cells: st.cells, grid: `${st.cols}x${st.rows}`,
+              browser: name, threads, scene, density: d, cells: st.cells, grid: `${st.cols}x${st.rows}`,
               cam, camName: st.camName,
               fps: +(1000 / med(iv)).toFixed(1), p95ms: r2(pct(iv, 0.95)),
               march: r2(med(t.map((x) => x.march))), resolve: r2(med(t.map((x) => x.resolve))),
               worker: r2(med(t.map((x) => x.worker))), draw: r2(med(t.map((x) => x.draw))),
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
               isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
-              ...(stress ? world : {}),
+              ...(stress || scene === 'world' ? world : {}),
             };
             rows.push(row);
             console.log(JSON.stringify(row));
