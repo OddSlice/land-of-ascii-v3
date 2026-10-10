@@ -40,9 +40,11 @@ export class ObjectPass {
     const { trees, bushes, torches } = world.objects;
     // a conifer's ragged tiers can reach past its radius (by up to 18%)
     const reach = (t) => { let r = t.R; for (let k = 2; k < t.tiers.length; k += 4) r = Math.max(r, t.tiers[k] * 1.18); return r; };
-    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: reach(t), y0: t.base - 0.4, y1: t.top + 0.2 }));
-    bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6 }));
-    torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i }));
+    // `grow`: how many cell widths (at the object's distance) its floors can
+    // add to its size; a flame's floor is two rows, about four widths
+    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: reach(t), y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
+    bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6, grow: 1, up: 0 }));
+    torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i, grow: 2.3, up: 1 }));
     this.list = list;
     // buckets
     const nb = Math.ceil(world.N / BUCKET);
@@ -53,10 +55,13 @@ export class ObjectPass {
       lists[bz * nb + bx].push(i);
     });
     this.buckets = lists.map((items, b) => {
-      let y0 = Infinity, y1 = -Infinity, R = 0;
-      for (const i of items) { y0 = Math.min(y0, list[i].y0); y1 = Math.max(y1, list[i].y1); R = Math.max(R, list[i].R); }
+      let y0 = Infinity, y1 = -Infinity, R = 0, grow = 1, up = 0;
+      for (const i of items) {
+        const it = list[i];
+        y0 = Math.min(y0, it.y0); y1 = Math.max(y1, it.y1); R = Math.max(R, it.R); grow = Math.max(grow, it.grow); up = Math.max(up, it.up);
+      }
       const bx = b % nb, bz = Math.floor(b / nb);
-      return { items: Int32Array.from(items), x0: bx * BUCKET - R - 2, x1: (bx + 1) * BUCKET + R + 2, z0: bz * BUCKET - R - 2, z1: (bz + 1) * BUCKET + R + 2, y0, y1 };
+      return { items: Int32Array.from(items), x0: bx * BUCKET - R - 2, x1: (bx + 1) * BUCKET + R + 2, z0: bz * BUCKET - R - 2, z1: (bz + 1) * BUCKET + R + 2, y0, y1, grow, up };
     }).filter((bk) => bk.items.length);
     // per-frame scratch
     this.cand = new Int32Array(list.length);
@@ -202,17 +207,18 @@ export class ObjectPass {
       const cx = (bk.x0 + bk.x1) / 2, cz = (bk.z0 + bk.z1) / 2, half = (bk.x1 - bk.x0) * 0.7072;
       const bd = Math.hypot(cx - v.ex, cz - v.ez);
       if (bd - half > view) continue;
-      // grow the bucket by the widest floor any object in it can get
-      const g = v.colAngle * Math.max(bd + half, 0.5);
-      const y0 = mirror ? 2 * wlo - bk.y1 : bk.y0, y1 = mirror ? 2 * whi - bk.y0 : bk.y1;
+      // grow the bucket by the widest floor any object in it can get (and
+      // up and down too, for a flame)
+      const g = bk.grow * v.colAngle * Math.max(bd + half, 0.5), gy = bk.up * g;
+      const y0 = mirror ? 2 * wlo - bk.y1 - gy : bk.y0 - gy, y1 = mirror ? 2 * whi - bk.y0 + gy : bk.y1 + gy;
       if (!this.screenBox(bk.x0 - g, bk.x1 + g, y0, y1, bk.z0 - g, bk.z1 + g)) continue;
       if (!mirror) st.buckets++;
       for (let k = 0; k < bk.items.length; k++) {
         const i = bk.items[k], it = list[i];
         const dist = Math.hypot(it.x - v.ex, it.z - v.ez);
         if (dist - it.R > view) continue;
-        const RR = it.R + v.colAngle * Math.max(dist, 0.5);
-        const oy0 = mirror ? 2 * wlo - it.y1 : it.y0, oy1 = mirror ? 2 * whi - it.y0 : it.y1;
+        const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = it.R + gr, gy = it.up * gr;
+        const oy0 = mirror ? 2 * wlo - it.y1 - gy : it.y0 - gy, oy1 = mirror ? 2 * whi - it.y0 + gy : it.y1 + gy;
         if (!this.screenBox(it.x - RR, it.x + RR, oy0, oy1, it.z - RR, it.z + RR)) continue;
         cand[nc++] = i; cdist[i] = dist;
         const bb = this.bb;
@@ -228,7 +234,7 @@ export class ObjectPass {
     const bb = [0, 0, 0, 0];
     for (let k = 0; k < nc; k++) {
       const i = order[k], it = list[i], dist = cdist[i];
-      const RR = it.R + v.colAngle * Math.max(dist, 0.5);
+      const RR = it.R + it.grow * v.colAngle * Math.max(dist, 0.5);
       bb[0] = box[i * 4]; bb[1] = box[i * 4 + 1]; bb[2] = box[i * 4 + 2]; bb[3] = box[i * 4 + 3];
       if (this.covered(bb, dist - RR)) { if (!mirror) st.culled++; continue; }
       if (!mirror) st.tested++;
@@ -246,7 +252,7 @@ export class ObjectPass {
     const tierRows = 2.3 / (Math.max(dist, 1) * v.rowAngle);
     const far = smooth(5, 2.2, tierRows);
     // nothing of the object is nearer than this (horizontally)
-    const near = dist - (it.R + minR);
+    const near = dist - (it.R + it.grow * minR);
     const sw = rays.sw, jlo = rays.jlo, c0 = rays.c0;
     const depth = mirror ? rays.rdepth : rays.depth;
     const o = it.o, tree = it.kind === TREE;
@@ -451,8 +457,8 @@ export class ObjectPass {
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;
     let best = Infinity;
-    // flame
-    const fr = Math.max(0.17, minR) * (1 + 0.1 * Math.sin(this.t * 11.3));
+    // flame: at least two rows tall, so it cannot fall between them
+    const fr = Math.max(0.17, 2 * minR) * (1 + 0.1 * Math.sin(this.t * 11.3));
     {
       const fy = T.flameY;
       const oy = ey - fy;
