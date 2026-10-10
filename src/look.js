@@ -159,10 +159,10 @@ export const LOOK = {
   // Meadow mottling, by strength (0 = none, as in phase 0b): soft patches
   // several metres across (`patch`: how far they move the grass's tone;
   // `hue`: how far tone moves its colour between each keyframe's
-  // `grassDry` and `grassLush`), and sparse tufts near the eye (`tufts`: the
-  // share of 1.6 m squares that hold one). Both fade out as a cell's
+  // `grassDry` and `grassLush`), and sparse dark tufts near the eye (`tufts`:
+  // the share of 1.2 m squares that hold one). Both fade out as a cell's
   // footprint grows past them.
-  meadow: { patch: [0, 0.45, 0.85], hue: [0, 0.45, 0.8], tufts: [0, 0.16, 0.28] },
+  meadow: { patch: [0, 0.45, 0.85], hue: [0, 0.45, 0.8], tufts: [0, 0.2, 0.34] },
 
   // A flame held at its minimum size (two rows) is faded toward what is
   // behind it by how much of it is really flame (its core stays bright, its

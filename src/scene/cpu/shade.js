@@ -159,14 +159,16 @@ const methods = {
     let t = 0;
     const fPatch = fadeOf(7, fp);
     if (fPatch > 0) t += MEADOW.patch[k] * fPatch * ((vnoise(x / 9.5, z / 7.3, SEED + 121) * 0.7 + vnoise(x / 4.1 + 13, z / 3.6, SEED + 122) * 0.3) * 2 - 1);
-    const fTuft = fadeOf(0.7, fp);
+    // tufts: small dark clumps with an uneven outline, one in some of the
+    // 1.2 m squares
+    const fTuft = fadeOf(0.5, fp);
     if (fTuft > 0) {
-      const gx = Math.floor(x / 1.6), gz = Math.floor(z / 1.6);
+      const gx = Math.floor(x / 1.2), gz = Math.floor(z / 1.2);
       if (hash2(gx, gz, SEED + 123) < MEADOW.tufts[k]) {
-        const cx = (gx + 0.2 + 0.6 * hash2(gx, gz, SEED + 124)) * 1.6, cz = (gz + 0.2 + 0.6 * hash2(gx, gz, SEED + 125)) * 1.6;
-        const r = 0.28 + 0.2 * hash2(gx, gz, SEED + 126);
-        const d = Math.hypot(x - cx, z - cz);
-        if (d < r) t += fTuft * (hash2(gx, gz, SEED + 127) < 0.75 ? -1.4 : 0.9) * Math.min(1, 1.6 * (1 - (d / r) * (d / r)));
+        const cx = (gx + 0.25 + 0.5 * hash2(gx, gz, SEED + 124)) * 1.2, cz = (gz + 0.25 + 0.5 * hash2(gx, gz, SEED + 125)) * 1.2;
+        const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz);
+        const r = (0.13 + 0.12 * hash2(gx, gz, SEED + 126)) * (1 + 0.35 * (vnoise(Math.atan2(dz, dx) * 1.3 + gx * 7.1, gz * 3.3, SEED + 127) - 0.5));
+        if (d < r) t -= fTuft * 1.5 * Math.min(1, 2 * (1 - d / r));
       }
     }
     return t;
