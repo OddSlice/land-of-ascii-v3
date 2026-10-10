@@ -175,8 +175,11 @@ function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worke
   timing.draw += (drawMs - timing.draw) * 0.2;
   state.presented = seq;
   for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker });
+  // (with the clock running the light keeps moving, so shadows are always
+  // catching up a little: then a frame is enough)
+  const caughtUp = settled || state.running;
   for (let i = waiters.length - 1; i >= 0; i--) {
-    if (seq >= waiters[i].seq && settled) { const w = waiters.splice(i, 1)[0]; requestAnimationFrame(() => requestAnimationFrame(w.resolve)); }
+    if (seq >= waiters[i].seq && caughtUp) { const w = waiters.splice(i, 1)[0]; requestAnimationFrame(() => requestAnimationFrame(w.resolve)); }
   }
 }
 
@@ -296,7 +299,7 @@ Object.assign(lab, {
     };
   },
   // Resolves once a frame made after this call is on screen, with cast
-  // shadows caught up.
+  // shadows caught up (unless the clock is running).
   whenIdle() {
     return ready.then(() => new Promise((resolve) => waiters.push({ seq: state.seq + 1, resolve })));
   },
