@@ -10,9 +10,9 @@
 // It is a generator: each yield reports progress (0..1), so a worker can post
 // it and the page can paint a progress line between steps.
 import { fbm, ridged, vnoise, hash2, smoothstep } from './noise.js';
-import { makeLevels } from './terrain.js';
+import { makeLevels, materialCode } from './terrain.js';
 import { buildSpans } from './spans.js';
-import { conifer, groundAt } from './objects.js';
+import { conifer, groundAt, floorField } from './objects.js';
 import { buildClouds } from './sky.js';
 
 export const S_SEED = 20261010;
@@ -21,7 +21,7 @@ const BASE = 40;
 const LAKE = { x: 720, z: 860, rx: 330, rz: 215, angle: 0.3, level: 34, depth: 7 };
 const WALL_G = { x0: 1180, x1: 1420, z0: 1240, z1: 1243 };
 const VIEW = 1500;
-const FOREST = { cell: 5, edge: 0.45, bushes: 0.355 };
+const FOREST = { cell: 5, edge: 0.45, bushes: 0.355, narrow: 0.3 };
 
 function lakeDist(x, z) {
   const dx = x - LAKE.x, dz = z - LAKE.z;
@@ -203,9 +203,12 @@ export function* buildStressWorld({ render = true } = {}) {
       const sl = Math.abs(ground[j + 1] - ground[j - 1]) + Math.abs(ground[j + NN] - ground[j - NN]);
       if (sl > 1.6) continue;
       if (x > WALL_G.x0 - 12 && x < WALL_G.x1 + 12 && z > WALL_G.z0 - 12 && z < WALL_G.z1 + 12) continue;
-      trees.push(conifer(x, z, groundAt(terrain, x, z) - 0.3, trees.length + 77, 1 + 0.15 * hash2(gx, gz, S_SEED + 34)));
+      // deep in a stand, crowns grow narrower (so a closed canopy keeps gaps)
+      const narrow = 1 - FOREST.narrow * smoothstep(FOREST.edge, FOREST.edge + 0.15, f);
+      trees.push(conifer(x, z, groundAt(terrain, x, z) - 0.3, trees.length + 77, 1 + 0.15 * hash2(gx, gz, S_SEED + 34), narrow));
     }
   }
+  if (render) { terrain.wFloor = floorField(terrain, trees); terrain.code = materialCode(terrain); }
   // bushes at the stands' edges
   const bushes = [];
   for (let gz = 1; gz < N / 28 - 1; gz++) {

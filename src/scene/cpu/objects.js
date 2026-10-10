@@ -20,6 +20,8 @@
 import { MAT } from '../../contract.js';
 import { hash2 } from '../../world/noise.js';
 import { MAX_RIPPLE } from './water.js';
+import { TIER } from '../../world/objects.js';
+import { LOOK } from '../../look.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const P = [0, 0, 0];
@@ -27,22 +29,36 @@ const CS = new Float64Array(24);          // a box's corners in view space
 const NEAR = 0.01;
 const BUCKET = 64;
 const TREE = 0, BUSH = 1, TORCH = 2;
+const TA = LOOK.trees.A, TB = LOOK.trees.B, TF = LOOK.trees.trunkFade, TL = LOOK.trees.tierLight;
+
+// How far a treatment's tiers can reach from the trunk: the lean, the shift
+// off the axis and the ragged edge at its widest.
+function treeReach(t, tiers, jag) {
+  let r = t.R;
+  for (let k = 0; k < tiers.length; k += TIER) {
+    const ym = (tiers[k] + tiers[k + 1]) / 2 - t.base;
+    const offx = t.leanX * ym + tiers[k + 4], offz = t.leanZ * ym + tiers[k + 5];
+    r = Math.max(r, Math.hypot(offx, offz) + Math.max(tiers[k + 2], tiers[k + 3]) * (1 + jag / 2));
+  }
+  return r + 0.05;
+}
 
 export class ObjectPass {
   constructor(world, light) {
     this.world = world;
     this.light = light;
-    this.hit = { D: 0, nx: 0, ny: 0, nz: 0, mat: 0, f: 0, power: 0 };
+    this.hit = { D: 0, nx: 0, ny: 0, nz: 0, mat: 0, f: 0, power: 0, cover: 1, tone: 0, lamK: 1, tree: null, tier: 0, hx: 0, hz: 0 };
     // a conifer's sizes along the current vertical plane (see coniferPlane)
-    this.cp = { miss: true, ox: 0, oz: 0, dx: 0, dz: 0, D0: 0, b2: 0, Rmax: 0, Ra: new Float64Array(16), Rb: new Float64Array(16), g: new Float64Array(16) };
+    const f16 = () => new Float64Array(16);
+    this.cp = { miss: true, ox: 0, oz: 0, dx: 0, dz: 0, D0: 0, b2: 0, Rmax: 0, Ra: f16(), Rb: f16(), g: f16(), yb: f16(), kx: f16(), kz: f16(), kD0: f16(), kb2: f16() };
     // every object as one list, with its bounds
     const list = [];
     const { trees, bushes, torches } = world.objects;
-    // a conifer's ragged tiers can reach past its radius (by up to 18%)
-    const reach = (t) => { let r = t.R; for (let k = 2; k < t.tiers.length; k += 4) r = Math.max(r, t.tiers[k] * 1.18); return r; };
+    // a conifer's reach under either treatment (culling allows for both)
+    for (const t of trees) { t.reachA = treeReach(t, t.tiers, TA.jag); t.reachB = treeReach(t, t.tiersB, TB.jag); }
     // `grow`: how many cell widths (at the object's distance) its floors can
     // add to its size; a flame's floor is two rows, about four widths
-    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: reach(t), y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
+    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: Math.max(t.reachA, t.reachB), y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
     bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6, grow: 1, up: 0 }));
     torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i, grow: 2.3, up: 1 }));
     this.list = list;
@@ -75,6 +91,7 @@ export class ObjectPass {
 
   run(v, rays, m, frame, torches) {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
+    this.treat = frame.look && frame.look.tree === 'B' ? 'B' : 'A';
     this.pass(false);
     // reflections, if this stripe sees any water
     // and, per column, the first and last row with water
@@ -99,6 +116,9 @@ export class ObjectPass {
     }
     this.margin = 0;
   }
+
+  // How far an object reaches from its axis (a conifer, under the treatment in use).
+  reachOf(it) { return it.kind === TREE ? (this.treat === 'B' ? it.o.reachB : it.o.reachA) : it.R; }
 
   // Screen box of a box of world space, clipped to this stripe; false if
   // none of it shows. Fills this.bb = [cxa, cxb, cya, cyb]. A box reaching
@@ -217,7 +237,7 @@ export class ObjectPass {
         const i = bk.items[k], it = list[i];
         const dist = Math.hypot(it.x - v.ex, it.z - v.ez);
         if (dist - it.R > view) continue;
-        const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = it.R + gr, gy = it.up * gr;
+        const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = this.reachOf(it) + gr, gy = it.up * gr;
         const oy0 = mirror ? 2 * wlo - it.y1 - gy : it.y0 - gy, oy1 = mirror ? 2 * whi - it.y0 + gy : it.y1 + gy;
         if (!this.screenBox(it.x - RR, it.x + RR, oy0, oy1, it.z - RR, it.z + RR)) continue;
         cand[nc++] = i; cdist[i] = dist;
@@ -234,7 +254,7 @@ export class ObjectPass {
     const bb = [0, 0, 0, 0];
     for (let k = 0; k < nc; k++) {
       const i = order[k], it = list[i], dist = cdist[i];
-      const RR = it.R + it.grow * v.colAngle * Math.max(dist, 0.5);
+      const RR = this.reachOf(it) + it.grow * v.colAngle * Math.max(dist, 0.5);
       bb[0] = box[i * 4]; bb[1] = box[i * 4 + 1]; bb[2] = box[i * 4 + 2]; bb[3] = box[i * 4 + 3];
       if (this.covered(bb, dist - RR)) { if (!mirror) st.culled++; continue; }
       if (!mirror) st.tested++;
@@ -249,10 +269,11 @@ export class ObjectPass {
     const { v, rays, hit } = this;
     const minR = v.colAngle * Math.max(dist, 0.5);
     // how many rows a conifer tier covers; under ~3 the tiers melt into a cone
-    const tierRows = 2.3 / (Math.max(dist, 1) * v.rowAngle);
+    const rowH = Math.max(dist, 1) * v.rowAngle;
+    const tierRows = (it.kind === TREE ? it.o.tierH : 2.3) / rowH;
     const far = smooth(5, 2.2, tierRows);
     // nothing of the object is nearer than this (horizontally)
-    const near = dist - (it.R + it.grow * minR);
+    const near = dist - (this.reachOf(it) + it.grow * minR);
     const sw = rays.sw, jlo = rays.jlo, c0 = rays.c0;
     const depth = mirror ? rays.rdepth : rays.depth;
     const o = it.o, tree = it.kind === TREE;
@@ -270,15 +291,19 @@ export class ObjectPass {
         const ci = cy * sw + (cx - c0);
         const d = depth[ci];
         if (d <= near || (mirror && d < 0)) continue;
+        const p = rays.plane[ci] - jlo;
+        const dx = rays.pdx[p], dz = rays.pdz[p];
+        if (tree) {
+          if (p !== lastP) { this.coniferPlane(o, dx, dz, minR, far, rowH); lastP = p; }
+          // a plane that passes wide of the tree misses it in every row
+          if (this.cp.miss) continue;
+        }
         let ey, s, after;
         if (mirror) {
           ey = rays.rey[ci]; s = rays.rsig[ci]; after = rays.rdw[ci];
         } else { ey = v.ey; s = rays.sigma[ci]; after = 0; }
-        const p = rays.plane[ci] - jlo;
-        const dx = rays.pdx[p], dz = rays.pdz[p];
         let ok;
         if (tree) {
-          if (p !== lastP) { this.coniferPlane(o, dx, dz, minR, far); lastP = p; }
           ok = this.coniferRay(o, s, ey);
         } else if (it.kind === BUSH) ok = this.bush(o, dx, dz, s, minR, far, ey);
         else ok = this.torchHit(o, dx, dz, s, minR, this.torches[it.ti].power, ey);
@@ -298,79 +323,134 @@ export class ObjectPass {
     const len = Math.sqrt(1 + s * s);
     const leg = (D - after) * len;
     if (hit.mat === MAT.FLAME) {
-      m.write(ci, slot, MAT.FLAME, hit.power * 0.8, 0, 0, 1, 0, leg);
+      m.write(ci, slot, MAT.FLAME, hit.power * 0.8, 0, 0, 1, hit.cover * 2 - 1, leg);
       return;
     }
     const L = light.L;
     let lam = hit.nx * L[0] + hit.ny * L[1] + hit.nz * L[2];
     // needles and leaves scatter light a little round the side
     lam = hit.mat === MAT.CONIFER || hit.mat === MAT.BUSH ? Math.max(0, (lam + 0.3) / 1.3) : Math.max(0, lam);
-    if (hit.mat === MAT.CONIFER) lam *= 0.5 + 0.5 * hit.f;
+    if (hit.mat === MAT.CONIFER) lam *= (TL[0] + (TL[1] - TL[0]) * hit.f) * hit.lamK;
+    else if (hit.mat === MAT.TRUNK) lam *= hit.lamK;
     const shadow = light.shadowAt(x + hit.nx * 0.7, y + 0.15, z + hit.nz * 0.7);
     const cloud = light.cloudAt(x, z);
     const glow = m.glowAt(x, y, z, hit.nx, hit.ny, hit.nz);
-    m.write(ci, slot, hit.mat, lam, shadow, cloud, glow, hit.f * 2 - 1, leg);
+    const tone = hit.mat === MAT.CONIFER ? this.foliageTone() : hit.mat === MAT.TRUNK ? hit.tone : hit.f * 2 - 1;
+    m.write(ci, slot, hit.mat, lam, shadow, cloud, glow, tone, leg);
+  }
+
+  // Foliage tone: the tree's own and the height in its tier; B adds clumps
+  // (by tier and sector round it), which melt away with the ragged edge.
+  foliageTone() {
+    const { hit, cp } = this, t = hit.tree;
+    let tone = 0.3 * t.tone + 0.55 * (hit.f * 2 - 1);
+    if (cp.B) {
+      // smoothly joined between sectors, so a clump has no hard edge
+      const as = (Math.atan2(hit.hz, hit.hx) / (Math.PI * 2) + 0.5) * TB.sectors, s0 = Math.floor(as), sf = as - s0;
+      const clump = (hash2(hit.tier * 31 + s0, t.seed, 13) * (1 - sf) + hash2(hit.tier * 31 + s0 + 1, t.seed, 13) * sf) * 2 - 1;
+      tone = 0.25 * t.tone + 0.45 * (hit.f * 2 - 1) + TB.clump * clump * cp.jagK;
+    }
+    return tone < -1 ? -1 : tone > 1 ? 1 : tone;
   }
 
   // A conifer: a bare trunk under a stack of overlapping cone tiers, each
   // wide at its foot and narrow at its top (a sawtooth outline), with a
-  // ragged edge that turns with the angle round the trunk.
+  // ragged edge that turns with the angle round the trunk. Treatment B also
+  // shifts tiers off the axis, cuts some short and notches some.
+  //
+  // Distance: no part may get thinner than about two cells, except a tip,
+  // which tapers to one cell, so a far treeline keeps a jagged top of single
+  // tips; under about two rows a tier melts into a smooth cone, and B's
+  // gaps, notches and shifts close up before they get under two cells.
   //
   // Everything that depends only on the vertical plane of the ray (how near
-  // it passes the trunk, the ragged radii) is worked out once per plane;
+  // it passes each tier, the ragged radii) is worked out once per plane;
   // coniferRay then intersects one ray of that plane.
-  coniferPlane(t, dx, dz, minR, far) {
+  coniferPlane(t, dx, dz, minR, far, rowH) {
     const { v, cp } = this;
+    const B = this.treat === 'B', P = B ? TB : TA;
+    const tiers = B ? t.tiersB : t.tiers, T = tiers.length / TIER;
     const ox = v.ex - t.x, oz = v.ez - t.z;
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;
-    const Rmax = t.R + minR;
+    const Rmax = (B ? t.reachB : t.reachA) + minR;
     cp.ox = ox; cp.oz = oz; cp.dx = dx; cp.dz = dz; cp.D0 = D0; cp.b2 = b2; cp.Rmax = Rmax; cp.minR = minR;
+    cp.tiers = tiers; cp.T = T; cp.far = far; cp.B = B;
     cp.miss = b2 > Rmax * Rmax || D0 + Rmax < 0;
     if (cp.miss) return;
-    const jagK = 1 - far;
-    // far off the edge is smooth, the same from every side: once per tree
+    // the ragged edge fades once a sector round the trunk is under ~3 cells across
+    const jagK = smooth(1.5, 3.5, (Math.PI * 2 * (t.R - 0.4) / P.sectors) / Math.max(minR, 1e-6));
+    cp.jagK = jagK;
+    // where each tier's axis is: the lean, and B's shift (which closes up with distance)
+    const shiftK = 1 - 0.7 * far;
+    for (let k = 0; k < T; k++) {
+      const q = k * TIER, ym = (tiers[q] + tiers[q + 1]) / 2 - t.base;
+      const kx = ox - (t.leanX * ym + tiers[q + 4] * shiftK), kz = oz - (t.leanZ * ym + tiers[q + 5] * shiftK);
+      const kD0 = -(kx * dx + kz * dz);
+      cp.kx[k] = kx; cp.kz[k] = kz; cp.kD0[k] = kD0; cp.kb2[k] = kx * kx + kz * kz - kD0 * kD0;
+    }
+    // far off the edge is smooth, the same from every side: radii once per tree
     if (jagK === 0 && cp.tiersOf === t) return;
     cp.tiersOf = jagK === 0 ? t : null;
-    // ragged edge: 9 sectors round the trunk, smoothly joined
-    let a0 = 0, af = 0;
+    // the ragged edge: sectors round the trunk, smoothly joined
+    const S = P.sectors;
+    let a0 = 0, af = 0, ang = 0;
     if (jagK !== 0) {
       const ax = ox + dx * D0, az = oz + dz * D0;
-      const ang = (Math.atan2(az, ax) / (Math.PI * 2) + 0.5) * 9;
+      ang = (Math.atan2(az, ax) / (Math.PI * 2) + 0.5) * S;
       a0 = Math.floor(ang); af = ang - a0;
     }
-    const tiers = t.tiers, T = tiers.length / 4;
+    // a notch closes up once it is under about two cells across
+    const notchK = B ? smooth(2, 4, 2.2 * Math.PI * 2 * t.R / S / Math.max(minR, 1e-6)) : 0;
+    const top = t.top;
     for (let k = 0; k < T; k++) {
-      const ya = tiers[k * 4], yb = tiers[k * 4 + 1];
-      const jag = jagK === 0 ? 1
-        : 1 + ((hash2(a0 + k * 13, t.seed, 7) * (1 - af) + hash2(a0 + 1 + k * 13, t.seed, 7) * af) - 0.5) * 0.36 * jagK;
-      let Ra = tiers[k * 4 + 2] * jag, Rb = tiers[k * 4 + 3];
-      if (k + 1 < T) Rb += (tiers[k * 4 + 6] * 0.92 - Rb) * far;
+      const q = k * TIER;
+      const ya = tiers[q], ybFull = tiers[q + 1];
+      // a tier cut short: the gap above it closes once it is under ~2.5 rows
+      const yb = tiers[q + 8] + (ybFull - tiers[q + 8]) * (1 - smooth(2, 3.5, (ybFull - tiers[q + 8]) / rowH));
+      let jag = 1;
+      if (jagK !== 0) {
+        const jg = hash2(a0 + k * 13, t.seed, 7) * (1 - af) + hash2(a0 + 1 + k * 13, t.seed, 7) * af;
+        jag = 1 + (jg - 0.5) * P.jag * jagK;
+        if (notchK > 0 && tiers[q + 6] >= 0) {
+          let da = Math.abs(ang - tiers[q + 6]);
+          if (da > S / 2) da = S - da;
+          jag *= 1 - tiers[q + 7] * notchK * (1 - smooth(0.6, 1.6, da));
+        }
+      }
+      let Ra = tiers[q + 2] * jag, Rb = tiers[q + 3];
+      if (k + 1 < T) Rb += (tiers[q + TIER + 2] * 0.92 - Rb) * far;
       Rb *= jag;
-      if (Ra < minR) Ra = minR;
-      if (Rb < minR * 0.6) Rb = minR * 0.6;
-      cp.Ra[k] = Ra; cp.Rb[k] = Rb; cp.g[k] = (Rb - Ra) / (yb - ya);
+      // floors: two cells wide, tapering to one at the tip; below the tip the
+      // crown also swells by up to a cell, so a gap between two crowns
+      // closes before it is thin enough to blink
+      const ta = Math.min(1, Math.max(0, (top - ya) / (8 * minR) - 1)), tb = Math.min(1, Math.max(0, (top - yb) / (8 * minR) - 1));
+      Ra += minR * ta; Rb += minR * tb;
+      const fa = minR * Math.min(1, 0.5 + (top - ya) / (8 * minR)), fb = minR * Math.min(1, 0.5 + (top - yb) / (8 * minR));
+      if (Ra < fa) Ra = fa;
+      if (Rb < fb) Rb = fb;
+      cp.Ra[k] = Ra; cp.Rb[k] = Rb; cp.yb[k] = yb; cp.g[k] = (Rb - Ra) / (yb - ya);
     }
   }
 
   coniferRay(t, s, ey) {
     const { hit, cp } = this;
     if (cp.miss) return false;
-    const { ox, oz, dx, dz, D0, b2, Rmax } = cp;
-    let best = Infinity, bnx = 0, bny = 0, bnz = 0, bf = 0, bmat = 0;
-    const tiers = t.tiers, T = tiers.length / 4;
+    const { dx, dz, D0, b2, Rmax, tiers, T } = cp;
+    let best = Infinity, bnx = 0, bny = 0, bnz = 0, bf = 0, bmat = 0, bk = -1, bhx = 0, bhz = 0;
     // quick height test: the ray's height near the trunk
     const yNear = ey + s * (D0 - Rmax), yFar = ey + s * (D0 + Rmax);
     const yMax = Math.max(yNear, yFar), yMin = Math.min(yNear, yFar);
     for (let k = 0; k < T; k++) {
-      const ya = tiers[k * 4], yb = tiers[k * 4 + 1];
+      const ya = tiers[k * TIER], yb = cp.yb[k];
       // tiers go up the tree: once the ray is under one it is under the rest
       if (yMax < ya) break;
       if (yMin > yb) continue;
       const Ra = cp.Ra[k], g = cp.g[k];
+      const kx = cp.kx[k], kz = cp.kz[k], kD0 = cp.kD0[k], kb2 = cp.kb2[k];
       // R(D) = r0 + r1 D along the ray
       const r0 = Ra + g * (ey - ya), r1 = g * s;
-      const A = 1 - r1 * r1, B = D0 + r0 * r1, C = D0 * D0 + b2 - r0 * r0;
+      const A = 1 - r1 * r1, B = kD0 + r0 * r1, C = kD0 * kD0 + kb2 - r0 * r0;
       const disc = B * B - A * C;
       if (disc >= 0 && Math.abs(A) > 1e-6) {
         const q = Math.sqrt(disc);
@@ -383,12 +463,12 @@ export class ObjectPass {
           if (y < ya || y > yb) continue;
           if (r0 + r1 * D < 0) continue;
           best = D;
-          const hx = ox + dx * D, hz = oz + dz * D;
+          const hx = kx + dx * D, hz = kz + dz * D;
           const rho = Math.sqrt(hx * hx + hz * hz) || 1;
           const nl = Math.sqrt(1 + g * g);
           bnx = hx / rho / nl; bnz = hz / rho / nl; bny = -g / nl;
           bf = (y - ya) / (yb - ya);
-          bmat = MAT.CONIFER;
+          bmat = MAT.CONIFER; bk = k; bhx = hx; bhz = hz;
           break;
         }
       }
@@ -396,23 +476,36 @@ export class ObjectPass {
       if (s > 0) {
         const D = (ya - ey) / s;
         if (D > 0.05 && D < best) {
-          const hx = ox + dx * D, hz = oz + dz * D;
-          if (hx * hx + hz * hz <= Ra * Ra) { best = D; bnx = 0; bny = -1; bnz = 0; bf = 0; bmat = MAT.CONIFER; }
+          const hx = kx + dx * D, hz = kz + dz * D;
+          // darker toward the trunk, so crowns seen from below have depth
+          const h2 = hx * hx + hz * hz;
+          if (h2 <= Ra * Ra) { best = D; bnx = 0; bny = -1; bnz = 0; bf = 0.3 * Math.sqrt(h2) / Ra; bmat = MAT.CONIFER; bk = k; bhx = hx; bhz = hz; }
         }
       }
     }
     // trunk
-    const rt = Math.max(0.24, cp.minR);
+    const rt = Math.max(t.trunkR, cp.minR);
+    const ox = cp.ox, oz = cp.oz;
     if (b2 < rt * rt) {
       const D = D0 - Math.sqrt(rt * rt - b2);
       const y = ey + s * D;
       if (D > 0.05 && D < best && y >= t.base - 0.4 && y <= t.trunkTop) {
         best = D;
         const hx = ox + dx * D, hz = oz + dz * D, rho = Math.sqrt(hx * hx + hz * hz) || 1;
-        bnx = hx / rho; bny = 0; bnz = hz / rho; bf = 0.5; bmat = MAT.TRUNK;
+        bnx = hx / rho; bny = 0; bnz = hz / rho; bmat = MAT.TRUNK;
+        // bark: the tree's own tone, a little darker toward the foot; a far
+        // trunk held wider than it is darkens (hit.lamK)
+        bf = 0.5;
+        hit.lamK = TF + (1 - TF) * Math.min(1, t.trunkR / rt);
+        hit.tone = 0.7 * t.bark + 0.3 * (2 * Math.min(1, (y - t.base) / (t.trunkTop - t.base)) - 1);
       }
     }
     if (best === Infinity) return false;
+    if (bmat === MAT.CONIFER) {
+      // where on the tree, for its tone (worked out in shade, only if drawn)
+      hit.tree = t; hit.tier = bk; hit.hx = bhx; hit.hz = bhz;
+      hit.lamK = cp.B ? TB.darken : TA.darken;
+    }
     hit.D = best; hit.nx = bnx; hit.ny = bny; hit.nz = bnz; hit.f = bf; hit.mat = bmat;
     return true;
   }
@@ -457,8 +550,12 @@ export class ObjectPass {
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;
     let best = Infinity;
-    // flame: at least two rows tall, so it cannot fall between them
-    const fr = Math.max(0.17, 2 * minR) * (1 + 0.1 * Math.sin(this.t * 11.3));
+    // flame: at least two rows tall, so it cannot fall between them; when
+    // that is bigger than the flame really is, `cover` says how much of it is
+    // flame, and resolve fades it toward what is behind
+    const fl = 1 + 0.1 * Math.sin(this.t * 11.3);
+    const fr = Math.max(0.17, 2 * minR) * fl;
+    const size = 0.17 * fl / fr;
     {
       const fy = T.flameY;
       const oy = ey - fy;
@@ -467,7 +564,13 @@ export class ObjectPass {
       const disc = B * B - A * C;
       if (disc >= 0) {
         const D = (-B - Math.sqrt(disc)) / A;
-        if (D > 0.05) { best = D; hit.mat = MAT.FLAME; hit.nx = 0; hit.ny = 1; hit.nz = 0; hit.f = 1; }
+        if (D > 0.05) {
+          best = D; hit.mat = MAT.FLAME; hit.nx = 0; hit.ny = 1; hit.nz = 0; hit.f = 1;
+          // the core stays bright and the rim fades: by how near the ray
+          // passes to the flame's centre (0 at the centre, 1 at the rim)
+          const b = Math.sqrt(Math.max(0, 1 - disc / (A * fr * fr)));
+          hit.cover = size + (1 - size) * (1 - b) * (1 - b);
+        }
       }
     }
     const rp = Math.max(0.065, minR);

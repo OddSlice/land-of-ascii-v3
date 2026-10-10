@@ -9,6 +9,7 @@ import { clusterAt } from '../../world/sky.js';
 import { hash2, vnoise } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { project } from './view.js';
+import { makePalette } from '../../resolve.js';
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((b) => (b + 0.5) / 16);
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -33,14 +34,28 @@ export class SkyPass {
     this.cl = [];
   }
 
-  // Cloud positions for this frame (the same in every stripe).
-  prepare(t) {
+  // Cloud positions and shapes for this frame (the same in every stripe):
+  // the treatment's puffs, and for banks the time of day's flattening.
+  prepare(frame) {
+    const t = frame.t, B = !!(frame.look && frame.look.cloud === 'B');
+    const k = makePalette(frame.hour).k;
+    this.treat = B ? LOOK.clouds.B : LOOK.clouds.A;
+    this.flat = B ? k.cloudFlat : 1; this.stretch = B ? k.cloudStretch : 1;
+    this.streaky = B;
     this.cl = [];
     for (const c of this.world.clouds.clusters) {
       const [x, z, fade] = clusterAt(c, t, this.world.center[0]);
       if (fade <= 0.01) continue;
       const main = c.puffs[0][3];
-      this.cl.push({ x, z, fade, base: c.base, main, cy: c.base + main * 0.3, reach: c.reach * fade + 40, puffs: c.puffs, seed: c.seed });
+      // each puff's centre, radii (scaled by the fade and the time of day)
+      // and turn, worked out once per frame: 9 numbers a puff
+      const src = B ? c.puffsB : c.puffs;
+      const pp = new Float64Array(src.length * 9);
+      src.forEach((pf, k) => {
+        const a = pf[3] * fade * this.stretch, b = pf[4] * fade * this.flat, w = pf[5] * fade;
+        pp.set([x + pf[0], c.base + pf[2] * this.flat, z + pf[1], a, b, w, Math.cos(pf[6]), Math.sin(pf[6]), a === b && b === w ? 1 : 0], k * 9);
+      });
+      this.cl.push({ x, z, fade, base: c.base, main, cy: c.base + main * 0.3, reach: (B ? c.reachB : c.reach) * fade + 40, pp, n: src.length, seed: c.seed });
     }
   }
 
@@ -116,59 +131,93 @@ export class SkyPass {
     hits[o + 6] = 255; hits[o + 7] = 255;
   }
 
+  // The nearest cloud along a ray, if any. Puffs are ellipsoids (spheres for
+  // cumulus), cut flat at the cloud's base; the edge is a lumpy band a few
+  // cells wide that dissolves into the sky behind, with streaks along a bank.
   cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot) {
-    const ex = v.ex, ez = v.ez;
+    const ex = v.ex, ez = v.ez, P = this.treat, F = this.flat, streak = P.streak;
     const jitter = hash2(cx, cy, SEED + 83) - 0.5;
     let best = Infinity, bl = 0, bdist = 0, bcover = 0;
     for (const c of this.cl) {
+      // this cloud's nearest puff, and how solid its other puffs are behind it
+      let cBest = Infinity, cBl = 0, cCover = 0, behind = 0;
       // bounding sphere of the cluster
       const ox = c.x - ex, oy = c.cy - ey, oz = c.z - ez;
       const tca = ox * dx + oy * dy + oz * dz;
       if (tca < 0) continue;
       const d2 = ox * ox + oy * oy + oz * oz - tca * tca;
       if (d2 > c.reach * c.reach) continue;
-      for (let k = 0; k < c.puffs.length; k++) {
-        const pf = c.puffs[k];
-        const r = pf[3] * c.fade;
-        const px = c.x + pf[0], py = c.base + pf[2], pz = c.z + pf[1];
-        const qx = px - ex, qy = py - ey, qz = pz - ez;
-        const t = qx * dx + qy * dy + qz * dz;
-        if (t <= 0) continue;
-        const b2 = qx * qx + qy * qy + qz * qz - t * t;
-        if (b2 >= r * r) continue;
-        let t0 = t - Math.sqrt(r * r - b2);
+      const pp = c.pp;
+      for (let k = 0; k < c.n; k++) {
+        const q9 = k * 9;
+        const px = pp[q9], py = pp[q9 + 1], pz = pp[q9 + 2], a = pp[q9 + 3], b = pp[q9 + 4], w = pp[q9 + 5];
+        const ca = pp[q9 + 6], sa = pp[q9 + 7];
+        // the ray in the puff's own frame, where it is a unit sphere (a
+        // sphere needs no turning)
+        const rx = ex - px, ry = ey - py, rz = ez - pz;
+        // quick miss: the ray passes wide of the puff's largest radius
+        const tq = rx * dx + ry * dy + rz * dz, big = a > w ? (a > b ? a : b) : (w > b ? w : b);
+        if (rx * rx + ry * ry + rz * rz - tq * tq > big * big || tq > 0) continue;
+        let lox, loy, loz, ldx, ldy, ldz;
+        if (pp[q9 + 8]) { lox = rx / a; loy = ry / a; loz = rz / a; ldx = dx / a; ldy = dy / a; ldz = dz / a; } else {
+          lox = (ca * rx + sa * rz) / a; loy = ry / b; loz = (-sa * rx + ca * rz) / w;
+          ldx = (ca * dx + sa * dz) / a; ldy = dy / b; ldz = (-sa * dx + ca * dz) / w;
+        }
+        const A = ldx * ldx + ldy * ldy + ldz * ldz;
+        const Bq = lox * ldx + loy * ldy + loz * ldz;
+        const C = lox * lox + loy * loy + loz * loz - 1;
+        const disc = Bq * Bq - A * C;
+        if (disc <= 0) continue;
+        let t0 = (-Bq - Math.sqrt(disc)) / A;
+        if (t0 <= 0) continue;
         let underside = false;
-        let eps = 1 - b2 / (r * r);
+        let eps = disc / A;                      // 1 at the middle of the puff, 0 at its rim
         // cut flat at the cluster's base
         if (ey + t0 * dy < c.base) {
           const tb = (c.base - ey) / dy;
-          const hx = ex + dx * tb - px, hz = ez + dz * tb - pz, hy = c.base - py;
-          const q2 = hx * hx + hy * hy + hz * hz;
-          if (q2 >= r * r) continue;
+          const qx = lox + ldx * tb, qy = loy + ldy * tb, qz = loz + ldz * tb;
+          const q2 = qx * qx + qy * qy + qz * qz;
+          if (q2 >= 1) continue;
           t0 = tb; underside = true;
-          eps = 1 - q2 / (r * r);
+          eps = 1 - q2;
         }
-        if (t0 >= best) continue;
-        // a lumpy edge a couple of cells wide, dissolving into the sky
-        const edgeW = Math.min(0.6, Math.max(0.08, 9 * v.colAngle * t0 / r));
-        const hx = (ex + dx * t0 - px) / r, hy = (ey + dy * t0 - py) / r, hz = (ez + dz * t0 - pz) / r;
-        const lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
+        // a lumpy edge a few cells wide, dissolving into the sky
+        const rad = Math.cbrt(a * b * w);
+        const edgeW = Math.min(0.6, Math.max(0.08, P.edge * v.colAngle * t0 / rad));
+        const hx = lox + ldx * t0, hy = loy + ldy * t0, hz = loz + ldz * t0;
+        let lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
           + vnoise(hx * 6.1 - hz * 2.9, hy * 6.1 + hz * 4.3 + k * 3, SEED + 82) * 0.2;
+        // a bank's edge breaks into streaks along it: noise slow along the
+        // band and quick across it, fixed to the cloud
+        if (streak > 0) lumps += streak * (vnoise(hx * 1.1 + c.seed * 3.1 + k, hy * 4.2 + hz * 3.4, SEED + 84) - 0.15);
         const cover = (eps + lumps * Math.min(0.45, 2.2 * edgeW)) / edgeW + jitter * 0.35;
         if (cover < 0.15) continue;
-        best = t0;
-        bdist = t0;
-        bcover = cover > 1 ? 1 : cover;
-        // bright tops, grey undersides, the sunny side lit
+        // a puff's dissolving edge in front of another puff's body is not a
+        // hole: remember how solid the cloud behind is
+        if (t0 >= cBest) { if (cover > behind) behind = cover; continue; }
+        if (cCover > behind) behind = cCover;
+        cBest = t0;
+        cCover = cover > 1 ? 1 : cover;
+        // bright tops, grey undersides, the sunny side lit: the normal is
+        // the puff's, turned back out of its frame
         let nx, ny, nz;
-        if (underside) { nx = 0; ny = -1; nz = 0; } else { nx = hx; ny = hy; nz = hz; }
+        if (underside) { nx = 0; ny = -1; nz = 0; } else {
+          const gx = hx / a, gy = hy / b, gz = hz / w;
+          nx = ca * gx - sa * gz; ny = gy; nz = sa * gx + ca * gz;
+          const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+          nx /= nl; ny /= nl; nz /= nl;
+        }
         const up = ny * 0.5 + 0.5;
         const sunny = Math.max(0, nx * Lc[0] + ny * Lc[1] + nz * Lc[2]);
-        const height = Math.min(1, Math.max(0, (ey + dy * t0 - c.base) / (c.main * 1.1)));
-        // a fairly sharp turn from the lit body to the grey underside
-        const body = smooth(0.18, 0.62, up);
-        bl = Math.min(1, Math.max(0, (0.18 + 0.62 * body + 0.3 * sunny) * (0.7 + 0.3 * height) - (underside ? 0.25 : 0)));
+        const height = Math.min(1, Math.max(0, (ey + dy * t0 - c.base) / (c.main * 1.1 * F)));
+        // a soft turn from the lit body to the grey underside, which is
+        // lighter at its rim than in its middle
+        const body = smooth(P.body[0], P.body[1], up);
+        const under = underside ? P.under[0] + (P.under[1] - P.under[0]) * eps : 0;
+        cBl = Math.min(1, Math.max(0, (0.18 + 0.62 * body + 0.3 * sunny) * (0.7 + 0.3 * height) - under));
       }
+      // a puff's dissolving edge in front of the cloud's own body is not a hole
+      if (cBest < best) { best = cBest; bdist = cBest; bl = cBl; bcover = Math.min(1, Math.max(cCover, behind)); }
     }
     if (best === Infinity) return false;
     // the sky behind the cloud, for its dissolving edge

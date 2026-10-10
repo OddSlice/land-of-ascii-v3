@@ -1,8 +1,8 @@
 // Builds the whole Look Lab scene from the constant seed. Every thread calls
 // this and gets the same world, so nothing large is sent between threads.
-import { buildTerrain } from './terrain.js';
+import { buildTerrain, materialCode } from './terrain.js';
 import { buildSpans } from './spans.js';
-import { buildObjects } from './objects.js';
+import { buildObjects, floorField } from './objects.js';
 import { buildClouds } from './sky.js';
 
 export function buildWorld() {
@@ -10,6 +10,8 @@ export function buildWorld() {
   const terrain = buildTerrain();
   const spans = buildSpans();
   const objects = buildObjects(terrain);
+  terrain.wFloor = floorField(terrain, objects.trees);
+  terrain.code = materialCode(terrain);
   const clouds = buildClouds();
   return {
     kind: 'default', N: terrain.N, NN: terrain.NN,

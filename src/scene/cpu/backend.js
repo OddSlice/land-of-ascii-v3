@@ -34,7 +34,7 @@ export function createCpuBackend(world) {
       const torches = world.objects.torches.map((T) => ({ x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t + T.phase) }));
       marcher.run(v, rays, hits, frame, torches);
       objects.run(v, rays, marcher, frame, torches);
-      sky.prepare(frame.t);
+      sky.prepare(frame);
       sky.run(v, rays, marcher, frame);
     },
   };

@@ -7,6 +7,11 @@ import { MAT, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
 import { rippleSlope, waterRays } from './water.js';
 import { bil2, bil1, bilU8 } from './sample.js';
+import { vnoise, hash2 } from '../../world/noise.js';
+import { SEED } from '../../world/layout.js';
+import { LOOK } from '../../look.js';
+
+const MEADOW = LOOK.meadow;
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 // detail of a given size fades as the cell's footprint grows past it
@@ -107,11 +112,20 @@ const methods = {
     const fine = bil1(T.fine, x, z, N, NN);
     const jitter = fine * fadeOf(1.5, fp);
     let mat;
-    if (bilU8(T.wWater, x, z, N, NN) > 0.5) mat = MAT.WATER;
+    // a square of nothing but grass (or forest floor) needs no weighing
+    let code = 0;
+    if (T.code) {
+      const u = x < 0 ? 0 : x > N - 1e-6 ? N - 1e-6 : x, w = z < 0 ? 0 : z > N - 1e-6 ? N - 1e-6 : z;
+      code = T.code[(w | 0) * N + (u | 0)];
+    }
+    if (code === 1) mat = MAT.GRASS;
+    else if (code === 2) mat = MAT.FLOOR;
+    else if (bilU8(T.wWater, x, z, N, NN) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && bilU8(T.wRoad, x, z, N, NN) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
     else if (bilU8(T.wSand, x, z, N, NN) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
     else if (bilU8(T.wSnow, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
     else if (bilU8(T.wRock, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
+    else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
     else mat = MAT.GRASS;
     const Ld = light.L;
     const shadow = bil2(lv[L], light.S[L], x, z) * (1 - beta) + (beta > 0 ? bil2(lv[L + 1], light.S[L + 1], x, z) * beta : 0);
@@ -130,9 +144,32 @@ const methods = {
       const patch = bil1(T.tone, x, z, N, NN);
       if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fadeOf(3, fp) + 0.6 * patch + 0.3 * fine * fadeOf(2, fp);
       else tone = 0.75 * patch * fadeOf(5, fp) + 0.45 * fine * fadeOf(1.8, fp);
+      // (judged by the cell's footprint along the view, where rows are tall)
+      if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
     }
     const glow = this.glowAt(x, y, z, nx, ny, nz);
     this.write(ci, rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
+  },
+
+  // Meadow mottling (LOOK.meadow): soft patches several metres across and,
+  // near the eye, sparse tufts, both fixed to the land and faded out as the
+  // cell's footprint grows past them.
+  mottle(x, z, fp) {
+    const k = this.meadow;
+    let t = 0;
+    const fPatch = fadeOf(7, fp);
+    if (fPatch > 0) t += MEADOW.patch[k] * fPatch * ((vnoise(x / 9.5, z / 7.3, SEED + 121) * 0.7 + vnoise(x / 4.1 + 13, z / 3.6, SEED + 122) * 0.3) * 2 - 1);
+    const fTuft = fadeOf(0.7, fp);
+    if (fTuft > 0) {
+      const gx = Math.floor(x / 1.6), gz = Math.floor(z / 1.6);
+      if (hash2(gx, gz, SEED + 123) < MEADOW.tufts[k]) {
+        const cx = (gx + 0.2 + 0.6 * hash2(gx, gz, SEED + 124)) * 1.6, cz = (gz + 0.2 + 0.6 * hash2(gx, gz, SEED + 125)) * 1.6;
+        const r = 0.28 + 0.2 * hash2(gx, gz, SEED + 126);
+        const d = Math.hypot(x - cx, z - cz);
+        if (d < r) t += fTuft * (hash2(gx, gz, SEED + 127) < 0.75 ? -1.4 : 0.9) * Math.min(1, 1.6 * (1 - (d / r) * (d / r)));
+      }
+    }
+    return t;
   },
 
   // A direct ray meets water at (x, W, z): the surface (R0), the bed through

@@ -20,6 +20,18 @@ export const LOOK = {
   // Camera: vertical field of view in degrees. The eye is 1.7 m up (world/layout.js).
   fovY: 60,
 
+  // The look candidates (phase 0c), chosen live in the look panel (L), by URL
+  // (?tree=B&cloud=B&meadow=2&shallows=blue) or with lab.setLook(). Each has
+  // its options with a short name for the panel, the default, and the key
+  // that cycles it. Every candidate varies only with world position or an
+  // object's own identity, never with the screen or the clock.
+  choices: {
+    tree:     { label: 'conifers', key: '7', default: 'A', options: { A: 'tidy tiers', B: 'rough and dark' } },
+    cloud:    { label: 'clouds',   key: '8', default: 'A', options: { A: 'cumulus', B: 'banks' } },
+    meadow:   { label: 'meadow',   key: '9', default: 0,   options: { 0: 'plain', 1: 'soft patches', 2: 'strong patches' } },
+    shallows: { label: 'shallows', key: '0', default: 'warm', options: { warm: 'warm bed', blue: 'even blue' } },
+  },
+
   // Hours the 1, 2, 3 keys jump to.
   hours: { day: 14.0, dusk: 17.85, night: 23.0 },
 
@@ -71,11 +83,12 @@ export const LOOK = {
     water:   { glyphs: '.:-=',       ink: { lit: 0.12, dark: 0.34 }, tone: 0.0 },
     stone:   { glyphs: ':=#▒▓█',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.18 },
     conifer: { glyphs: ':^*%#&▒',    ink: { lit: -0.28, dark: 0.50 }, tone: 0.12 },
-    trunk:   { glyphs: ':|!I#',      ink: { lit: -0.28, dark: 0.46 } },
+    trunk:   { glyphs: ':|!I#',      ink: { lit: -0.28, dark: 0.46 }, tone: 0.22 },
     bush:    { glyphs: ':o%&@',      ink: { lit: -0.28, dark: 0.50 }, tone: 0.10 },
     wood:    { glyphs: ':|!I',       ink: { lit: -0.15, dark: 0.30 } },
     flame:   { glyphs: '*^&@',       ink: { lit: 0.25, dark: 0.25 }, emissive: true },
     bed:     { glyphs: '.,:;',       ink: { lit: -0.20, dark: 0.40 }, tone: 0.10 },
+    floor:   { glyphs: '.,:;+%',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.16 },
   },
 
   // Water. Each water cell mixes what its ray sees reflected off the surface
@@ -88,6 +101,7 @@ export const LOOK = {
     warm: 0.2,                       // how far the bed is tinted toward the shallow colour
     tint: 0.4,                       // the least share of deep-water colour, even in the shallows
     torchSurface: 0.5,               // torchlight on the surface itself
+    blueDepth: 0.5,                  // shallows 'blue': metres of water over which the bed still shows
     // the sun or moon caught by ripples: a broken path, narrow across, long
     // toward the viewer (degrees), sparkling at `rate` changes a second
     glitter: { width: 2.4, length: 20, density: 0.85, rate: 4 },
@@ -104,6 +118,56 @@ export const LOOK = {
     },
   },
 
+  // Conifers. Each tree's shape comes from its own identity: its height,
+  // crown width, how much of it is bare trunk, trunk width and bark tone,
+  // lean (metres per metre of height), tier count and foliage tone.
+  // Treatment A keeps the tidy tiers. Treatment B is rough and dark: tiers
+  // shifted off the axis (`asym`, of the crown radius), some cut short so a
+  // gap shows above them (`gaps`, the share of tiers), some broken by a notch
+  // (`notches`), a deeper ragged outline (`jag` over `sectors` round the
+  // trunk), clumped foliage tone (`clump`) and less light (`darken`). All of
+  // it melts away as it gets smaller than about two cells.
+  trees: {
+    height: [11, 24], crown: [1.3, 2.5], bare: [0.18, 0.42], trunk: [0.15, 0.32], lean: 0.035, tiers: [6, 10],
+    // a share of trees stand this much taller, so a far stand has a jagged top
+    emergent: [0.14, 1.32],
+    // a trunk held at its two-cell minimum darkens toward this share of its
+    // light as it really gets thinner, so a far stand's trunks do not read as a fence
+    trunkFade: 0.25,
+    // light across a tier, from its foot to its top (the sawtooth's step)
+    tierLight: [0.62, 1],
+    A: { jag: 0.36, sectors: 9, darken: 1, clump: 0, asym: 0, gaps: 0, notches: 0 },
+    B: { jag: 0.62, sectors: 13, darken: 0.72, clump: 0.7, asym: 0.24, gaps: 0.35, notches: 0.3 },
+  },
+
+  // Clouds. A: rounded cumulus, sizes varied, undersides soft. B: banks and
+  // broken bands of stretched puffs with streaky, dissolving edges, flatter
+  // and longer at dusk (each keyframe's `cloudFlat` and `cloudStretch`).
+  // `body`: the light's turn from the grey underside to the lit top (in the
+  // up component of the surface); `under`: how much darker the flat
+  // underside is at its rim and at its middle; `edge`: how many cells wide the
+  // dissolving edge is; `streak`: how much the edge breaks into streaks.
+  clouds: {
+    A: { body: [0.14, 0.66], under: [0.16, 0.16], edge: 9, streak: 0 },
+    B: { body: [0.05, 0.75], under: [0.1, 0.24], edge: 10, streak: 0.45 },
+  },
+
+  // Meadow mottling, by strength (0 = none, as in phase 0b): soft patches
+  // several metres across (`patch`: how far they move the grass's tone;
+  // `hue`: how far tone moves its colour between each keyframe's
+  // `grassDry` and `grassLush`), and sparse tufts near the eye (`tufts`: the
+  // share of 1.6 m squares that hold one). Both fade out as a cell's
+  // footprint grows past them.
+  meadow: { patch: [0, 0.45, 0.85], hue: [0, 0.45, 0.8], tufts: [0, 0.16, 0.28] },
+
+  // A flame held at its minimum size (two rows) is faded toward what is
+  // behind it by how much of it is really flame (its core stays bright, its
+  // rim fades), to this power (less keeps a far light brighter), and
+  // by each keyframe's `flameStrength`, so by day a torch is a small pale
+  // light, not a beacon. Under `flameMark` the cell keeps what is behind's glyph.
+  flameFade: 1,
+  flameMark: 0.35,
+
   // Ink floor: on near-black cells the glyph is lightened by at least this
   // colour times the ink amount, so night glyphs still carry light.
   inkFloor: '#2a2c34',
@@ -115,6 +179,7 @@ export const LOOK = {
     day: {
       sky:    { high: '#5266a4', horizon: '#6c7e9b', glow: '#9aa7bd', glowSize: 0.12 },
       cloud:  { lit: '#dfe1e8', shade: '#4c5070' },
+      cloudFlat: 1, cloudStretch: 1,
       light:  { ambient: 0.28, direct: 0.80, cloudShadow: 0.78, castShadow: 0.92 },
       haze:   { colour: '#72839e', dist: 700, max: 0.72 },
       torch:  { colour: '#ffb060', strength: 0.04 },
@@ -126,18 +191,22 @@ export const LOOK = {
       sand:   { lit: '#93805e', shade: '#4a4036' },
       rock:   { lit: '#8a7e6d', shade: '#383842' },
       snow:   { lit: '#d6cfc6', shade: '#737586' },
-      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', deep: '#2e3c4a', shallow: '#5f5c49' },
+      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', deep: '#2e3c4a', shallow: '#5f5c49', blue: '#44597a' },
+      grassDry: '#859447', grassLush: '#4a6b3c',
       stone:  { lit: '#9a958d', shade: '#4d4b50' },
       conifer:{ lit: '#3b4c3a', shade: '#1e271f' },
-      trunk:  { lit: '#5e4b3a', shade: '#2e2620' },
+      trunk:  { lit: '#4c3e33', shade: '#241e1a' },
       bush:   { lit: '#55703a', shade: '#28331f' },
       wood:   { lit: '#6a5340', shade: '#342a22' },
-      flame:  '#ffc070',
+      flame:  '#f0dfba',
+      flameStrength: 0.6,
       bed:    { lit: '#6b6148', shade: '#353026' },
+      floor:  { lit: '#4c4a33', shade: '#22231b' },
     },
     dusk: {
       sky:    { high: '#4b3d5d', horizon: '#7a5a64', glow: '#c48a6e', glowSize: 0.30 },
-      cloud:  { lit: '#b48c78', shade: '#463a52' },
+      cloud:  { lit: '#b48c78', shade: '#3a3049' },
+      cloudFlat: 0.72, cloudStretch: 1.3,
       light:  { ambient: 0.30, direct: 0.55, cloudShadow: 0.25, castShadow: 0.80 },
       haze:   { colour: '#5e4d5c', dist: 420, max: 0.85 },
       torch:  { colour: '#ff9f50', strength: 0.30 },
@@ -149,18 +218,22 @@ export const LOOK = {
       sand:   { lit: '#6e5c50', shade: '#30292a' },
       rock:   { lit: '#625560', shade: '#2f2a33' },
       snow:   { lit: '#a8949a', shade: '#4f4859' },
-      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', deep: '#211f2b', shallow: '#655248' },
+      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', deep: '#211f2b', shallow: '#655248', blue: '#383852' },
+      grassDry: '#4a4f38', grassLush: '#2e3a33',
       stone:  { lit: '#6e6064', shade: '#3a353c' },
       conifer:{ lit: '#2c3430', shade: '#1a1f1e' },
-      trunk:  { lit: '#3e3230', shade: '#221c1c' },
+      trunk:  { lit: '#352c2a', shade: '#1d1919' },
       bush:   { lit: '#36402e', shade: '#1d221c' },
       wood:   { lit: '#4c3a32', shade: '#261e1b' },
       flame:  '#ffb060',
+      flameStrength: 0.85,
       bed:    { lit: '#544a42', shade: '#2a2526' },
+      floor:  { lit: '#34312d', shade: '#1b1a1b' },
     },
     night: {
       sky:    { high: '#161927', horizon: '#252438', glow: '#2c3046', glowSize: 0.10 },
       cloud:  { lit: '#3b3b47', shade: '#1a1b23' },
+      cloudFlat: 0.85, cloudStretch: 1.12,
       light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70 },
       haze:   { colour: '#1e1f2c', dist: 330, max: 0.80 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
@@ -172,14 +245,17 @@ export const LOOK = {
       sand:   { lit: '#27262a', shade: '#141417' },
       rock:   { lit: '#252429', shade: '#131316' },
       snow:   { lit: '#3c3f4c', shade: '#1d1f28' },
-      water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a', deep: '#0d0f14', shallow: '#28261f' },
+      water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a', deep: '#0d0f14', shallow: '#28261f', blue: '#141924' },
+      grassDry: '#262b24', grassLush: '#1a221f',
       stone:  { lit: '#29282e', shade: '#141418' },
       conifer:{ lit: '#17191c', shade: '#0e0f12' },
       trunk:  { lit: '#1c1a1a', shade: '#0f0e0f' },
       bush:   { lit: '#191c1c', shade: '#0f1011' },
       wood:   { lit: '#221d1a', shade: '#110f0e' },
       flame:  '#ffb468',
+      flameStrength: 1,
       bed:    { lit: '#24231f', shade: '#121210' },
+      floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
     },
   },
 };

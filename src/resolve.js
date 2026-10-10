@@ -7,7 +7,8 @@
 // - the glyph comes from the material's family, its rung picked by that light
 //   (brighter surface, lighter mark), never from the finished colour;
 // - the glyph is inked a little darker or lighter than the background.
-// It reads nothing but its own cell, so stripes never touch each other.
+// It reads nothing but its own cell, except that a faint flame is blended
+// with the next cell up (or down) its own column; stripes never touch.
 import { LOOK } from './look.js';
 import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
 import { FAMILY, SHADE_STEPS } from './glyphs.js';
@@ -122,6 +123,8 @@ const sky3 = [0, 0, 0];
 // record's edge is returned as its coverage in `rec.cover` with the sky
 // behind it in `rec.sky*`, so each caller can draw the edge its own way.
 const rec = { r: 0, g: 0, b: 0, bright: 0, h: 0, cover: 1, skyR: 0, skyG: 0, skyB: 0 };
+// the look candidates of the stripe being resolved (set by resolveStripe)
+let grassHue = 0, blueShallows = false;
 function recordColour(pal, hits, o) {
   const { lit, shade, k } = pal;
   const haze = k.haze, torch = k.torch;
@@ -167,8 +170,14 @@ function recordColour(pal, hits, o) {
       const ws = k.water.sky;
       r += (ws[0] - r) * fr; g += (ws[1] - g) * fr; b += (ws[2] - b) * fr;
     } else {
-      const tk = 1 + pal.toneAmp[m] * ((toneB - 128) / 127);
+      const tn = (toneB - 128) / 127;
+      const tk = 1 + pal.toneAmp[m] * tn;
       r *= tk; g *= tk; b *= tk;
+      if (m === MAT.GRASS && grassHue > 0) {
+        // meadow mottling: tone also turns the green drier or lusher, more so in the light
+        const to = tn > 0 ? k.grassDry : k.grassLush, f = (tn > 0 ? tn : -tn) * grassHue * t, j0 = m * 3;
+        r += (to[0] - lit[j0]) * f; g += (to[1] - lit[j0 + 1]) * f; b += (to[2] - lit[j0 + 2]) * f;
+      }
     }
     const tg = gl * torch.strength;
     r += torch.colour[0] * tg; g += torch.colour[1] * tg; b += torch.colour[2] * tg;
@@ -200,15 +209,17 @@ function waterColour(pal, hits, o) {
   if (hits[o + 2 * REC] !== MAT_NONE) {
     recordColour(pal, hits, o + 2 * REC);
     const path = (hits[o + 2 * REC + 6] | (hits[o + 2 * REC + 7] << 8)) / 10;
-    const a = Math.max(W.tint, 1 - Math.exp(-path / W.absorb));
+    // warm: the bed shows through the shallows, tinted toward the deep
+    // colour with depth; blue: an even blue, the bed only in the last half metre
+    const a = blueShallows ? smooth(0, W.blueDepth, path) : Math.max(W.tint, 1 - Math.exp(-path / W.absorb));
     const sh = 1 - pal.castK * (hits[o + 2] / 255) * 0.5;
-    const deep = k.water.deep, shal = k.water.shallow;
+    const deep = blueShallows ? k.water.blue : k.water.deep, shal = k.water.shallow;
     // shallow water warms the bed a little, deeper water takes it to the deep colour
     br = (rec.r + (shal[0] - rec.r) * W.warm) * sh; bg = (rec.g + (shal[1] - rec.g) * W.warm) * sh; bb = (rec.b + (shal[2] - rec.b) * W.warm) * sh;
     br += (deep[0] - br) * a; bg += (deep[1] - bg) * a; bb += (deep[2] - bb) * a;
     bBright = rec.bright * (1 - a);
   } else {
-    const deep = k.water.deep;
+    const deep = blueShallows ? k.water.blue : k.water.deep;
     br = deep[0]; bg = deep[1]; bb = deep[2]; bBright = 0.2;
   }
   let r = br + (mr - br) * F, g = bg + (mg - bg) * F, b = bb + (mb - bb) * F;
@@ -224,17 +235,33 @@ function waterColour(pal, hits, o) {
   rec.r = r; rec.g = g; rec.b = b; rec.bright = bright; rec.h = h; rec.cover = 1;
 }
 
+let faint = new Int32Array(256), faintW = new Float32Array(256);
+
 // Resolve a stripe. `hits` and `cells` cover columns c0..c0+sw-1, all rows.
-export function resolveStripe(pal, hits, cells, sw, rows, c0) {
+export function resolveStripe(pal, hits, cells, sw, rows, c0, look) {
   const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade;
   const [ifr, ifg, ifb] = pal.inkFloor;
+  const flameK = pal.k.flameStrength, flameP = LOOK.flameFade;
+  grassHue = look ? LOOK.meadow.hue[look.meadow] || 0 : 0;
+  blueShallows = !!(look && look.shallows === 'blue');
+  let nf = 0;
   for (let cy = 0; cy < rows; cy++) {
     for (let q = 0; q < sw; q++) {
       const i = cy * sw + q, o = i * HIT_STRIDE, oc = i * CELL_STRIDE;
       const cx = c0 + q;
       const m = hits[o];
+      const mirrorFlame = m === MAT.WATER && hits[o + REC] === MAT.FLAME;
       if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) waterColour(pal, hits, o);
       else recordColour(pal, hits, o);
+      if (m === MAT.FLAME || mirrorFlame) {
+        // a flame held at its minimum size, or any flame by day: blended
+        // with what is behind it once every other cell is done
+        const w = Math.pow(hits[o + (mirrorFlame ? REC : 0) + 5] / 255, flameP) * flameK;
+        if (w < 0.999) {
+          if (nf >= faint.length) { const a = new Int32Array(nf * 2); a.set(faint); faint = a; const b = new Float32Array(nf * 2); b.set(faintW); faintW = b; }
+          faint[nf] = mirrorFlame ? -1 - i : i; faintW[nf] = w; nf++;
+        }
+      }
       if (m === MAT.CLOUD && rec.cover < 0.92) {
         // the edge: sky behind, the cloud in a shade block over it
         const cover = rec.cover;
@@ -265,5 +292,26 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0) {
       const fc = clampColour(fr, fg, fb);
       cells[oc + 4] = fc[0]; cells[oc + 5] = fc[1]; cells[oc + 6] = fc[2]; cells[oc + 7] = 0;
     }
+  }
+  // Faint flames: what is behind a flame is the next cell up its column that
+  // is not flame (down, for a flame seen in the water, which hangs upside
+  // down). The column is in this stripe, so stripes still never touch.
+  for (let k = 0; k < nf; k++) {
+    const mirror = faint[k] < 0, i = mirror ? -1 - faint[k] : faint[k], w = faintW[k];
+    const q = i % sw, cy = (i - q) / sw;
+    let j = -1;
+    for (let d = 1; d <= 8; d++) {
+      const y = mirror ? cy + d : cy - d;
+      if (y < 0 || y >= rows) break;
+      const jj = y * sw + q, oj = jj * HIT_STRIDE;
+      const isFlame = hits[oj] === MAT.FLAME || (hits[oj] === MAT.WATER && hits[oj + REC] === MAT.FLAME);
+      if (!isFlame) { j = jj; break; }
+    }
+    const oc = i * CELL_STRIDE;
+    let nb;
+    if (j >= 0) nb = cells.subarray(j * CELL_STRIDE, j * CELL_STRIDE + 8);
+    else { const hc = clampColour(pal.k.haze.colour[0], pal.k.haze.colour[1], pal.k.haze.colour[2]); nb = [hc[0], hc[1], hc[2], 0, hc[0], hc[1], hc[2], 0]; }
+    for (const c of [0, 1, 2, 4, 5, 6]) cells[oc + c] = Math.round(nb[c] + (cells[oc + c] - nb[c]) * w);
+    if (w < LOOK.flameMark) cells[oc + 3] = nb[3];
   }
 }

@@ -1,5 +1,5 @@
 // The sky's world data: where the sun and moon are at a given hour, and the
-// cumulus clouds (clusters of flattened puffs) drifting on the wind.
+// clouds (clusters of puffs) drifting on the wind.
 import { hash2 } from './noise.js';
 import { SEED } from './layout.js';
 
@@ -39,25 +39,42 @@ const CLUSTERS = [
   [-2600, 900, 950, 1.6], [-2400, 2400, 980, 1.6]
 ];
 
-// `shift` moves every cluster, for maps centred elsewhere than the lab's valley.
+// Each cloud carries both treatments' puffs, as ellipsoids
+// [dx, dz, dy, along, up, across, angle]: A, rounded cumulus (spheres of
+// varied sizes); B, a bank (a long, broken band of stretched puffs turned to
+// the band's angle). `shift` moves every cluster, for maps centred elsewhere
+// than the lab's valley.
 export function buildClouds(shift = 0) {
   const clusters = CLUSTERS.map(([x0, z0, base, scale], c) => {
     const x = x0 + shift, z = z0 + shift;
     const r = (n) => hash2(c, n, SEED + 61);
-    const main = (210 + 70 * r(1)) * scale;
-    // flat-bottomed domes: puff centres sit a little above the base, so the
-    // cut underneath is wide
-    const puffs = [[0, 0, main * 0.3, main]];
+    const main = (150 + 170 * r(1)) * scale;
+    // A: flat-bottomed domes; puff centres sit a little above the base, so
+    // the cut underneath is wide
+    const puffs = [[0, 0, main * 0.3, main, main, main, 0]];
     const n = 4 + Math.floor(3 * r(2));
     for (let p = 0; p < n; p++) {
       const a = r(10 + p) * Math.PI * 2;
       const d = main * (0.55 + 0.5 * r(20 + p));
       const pr = main * (0.5 + 0.3 * r(30 + p));
-      puffs.push([Math.cos(a) * d * 1.7, Math.sin(a) * d * 0.6, pr * 0.2, pr]);
+      puffs.push([Math.cos(a) * d * 1.7, Math.sin(a) * d * 0.6, pr * 0.2, pr, pr, pr, 0]);
     }
-    let reach = 0;
-    for (const [dx, dz, , pr] of puffs) reach = Math.max(reach, Math.hypot(dx, dz) + pr);
-    return { x, z, base, puffs, reach, seed: c };
+    // B: a bank, with the odd break
+    const ang = (r(3) - 0.5) * 0.9, ca = Math.cos(ang), sa = Math.sin(ang);
+    const len = main * (1.6 + 1.0 * r(4));
+    const nb = 7 + Math.floor(7 * r(5));
+    const puffsB = [];
+    for (let q = 0; q < nb; q++) {
+      if (q > 0 && r(45 + q) < 0.18) continue;
+      const u = (q / (nb - 1) - 0.5) * len + main * 0.3 * (r(40 + q) - 0.5);
+      const v = main * 0.9 * (r(50 + q) - 0.5);
+      const pr = main * (0.35 + 0.35 * r(55 + q));
+      const up = pr * (0.5 + 0.3 * r(65 + q));
+      puffsB.push([ca * u - sa * v, sa * u + ca * v, up * 0.3, pr * (1.5 + 0.9 * r(60 + q)), up, pr * (0.8 + 0.5 * r(70 + q)), ang]);
+    }
+    // how far a puff can reach (B's are stretched up to 1.4 times at dusk)
+    const reachOf = (list, k) => list.reduce((m, [dx, dz, , a, , cc]) => Math.max(m, Math.hypot(dx, dz) + Math.max(a * k, cc)), 0);
+    return { x, z, base, puffs, puffsB, reach: reachOf(puffs, 1), reachB: reachOf(puffsB, 1.4), seed: c };
   });
   return { clusters };
 }
