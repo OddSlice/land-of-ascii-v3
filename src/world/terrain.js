@@ -64,7 +64,7 @@ function shapedHeight(x, z) {
   if (dn < 1.45) {
     const target = dn >= 0.97
       ? WATER + 1.3 * (dn - 0.97) / 0.48
-      : WATER - LAKE.depth * smoothstep(0.97, 0.4, dn);
+      : WATER - LAKE.depth * smoothstep(0.97, 0.72, dn);
     const w = smoothstep(1.45, 1.15, dn);
     h += (target - h) * w;
   }

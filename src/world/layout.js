@@ -50,7 +50,7 @@ export const TORCH = { x: 252.3, z: 155.7, height: 2.1 };
 
 export const STANDS = [
   { x: 198, z: 262, rx: 40, rz: 32, count: 20, gap: 4.4 },   // west of the meadow
-  { x: 366, z: 312, rx: 50, rz: 12, count: 20, gap: 3.2, tall: 1.2 },   // along the lake's far shore
+  { x: 364, z: 316, rx: 58, rz: 17, count: 70, gap: 2.7, tall: 1.2 },   // a thick stand along the lake's far shore
 ];
 
 export const BUSHES = [

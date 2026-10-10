@@ -200,7 +200,7 @@ function waterColour(pal, hits, o) {
   if (hits[o + 2 * REC] !== MAT_NONE) {
     recordColour(pal, hits, o + 2 * REC);
     const path = (hits[o + 2 * REC + 6] | (hits[o + 2 * REC + 7] << 8)) / 10;
-    const a = 1 - Math.exp(-path / W.absorb);
+    const a = Math.max(W.tint, 1 - Math.exp(-path / W.absorb));
     const sh = 1 - pal.castK * (hits[o + 2] / 255) * 0.5;
     const deep = k.water.deep, shal = k.water.shallow;
     // shallow water warms the bed a little, deeper water takes it to the deep colour

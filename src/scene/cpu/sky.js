@@ -3,7 +3,8 @@
 // their edges are stippled with a scattered threshold so they break up into cells
 // the way the reference footage does. Stars are projected from fixed
 // directions onto the cell they fall in, so they never blink as you turn.
-import { MAT, HIT_STRIDE } from '../../contract.js';
+import { MAT, HIT_STRIDE, REC } from '../../contract.js';
+import { LOOK } from '../../look.js';
 import { clusterAt } from '../../world/sky.js';
 import { hash2, vnoise } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
@@ -61,25 +62,47 @@ export class SkyPass {
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE;
       // clouds
-      if (dy > 0.01 && this.cloud(v, dx, dy, dz, cx, cy, Lc, m, ci)) continue;
-      const ds = dx * sun[0] + dy * sun[1] + dz * sun[2];
-      const dm = dx * moon[0] + dy * moon[1] + dz * moon[2];
-      let mat = MAT.SKY, lit = dy > 0 ? dy : 0;
-      if (ds > cosSun && sun[1] > -0.02) { mat = MAT.SUN; lit = 1; }
-      else if (dm > cosMoon && moon[1] > -0.02) { mat = MAT.MOON; lit = 1; }
-      hits[o] = mat;
-      hits[o + 1] = (lit * 255 + 0.5) | 0;
-      hits[o + 2] = 0; hits[o + 3] = 0; hits[o + 4] = 0;
-      // closeness to the sun, as an angle: 255 at the sun, 0 opposite
-      const ang = Math.acos(Math.max(-1, Math.min(1, ds)));
-      hits[o + 5] = (255 * (1 - ang / Math.PI) + 0.5) | 0;
-      hits[o + 6] = 255; hits[o + 7] = 255;
+      if (dy > 0.01 && this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0)) continue;
+      this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
     }
     this.stars(v, rays, hits);
+    // what mirrored rays that met nothing see: the sky above the water, with
+    // the sun or moon caught over a wider patch by the ripples (the glitter)
+    const gl = Math.max(LOOK.water.glitter * Math.PI / 180, sunR);
+    const cosGlitter = Math.cos(gl), cosGlitterMoon = Math.cos(Math.max(gl * 0.8, moonR));
+    for (let ci = 0; ci < rays.cells; ci++) {
+      if (rays.rdepth[ci] !== Infinity) continue;
+      const p = rays.plane[ci] - jlo;
+      const s = rays.rsig[ci];
+      const inv = 1 / Math.sqrt(1 + s * s);
+      const dx = rays.pdx[p] * inv, dy = s * inv, dz = rays.pdz[p] * inv;
+      const cx = c0 + ci % sw, cy = (ci / sw) | 0;
+      const o = ci * HIT_STRIDE + REC;
+      if (dy > 0.01 && this.cloud(v, rays.rey[ci], dx, dy, dz, cx, cy, Lc, m, ci, 1)) continue;
+      this.skyRecord(hits, o, dx, dy, dz, cosGlitter, cosGlitterMoon);
+    }
+    this.mirroredStars(v, rays, hits);
   }
 
-  cloud(v, dx, dy, dz, cx, cy, Lc, m, ci) {
-    const ex = v.ex, ey = v.ey, ez = v.ez;
+  // A sky record: the gradient, or the sun or moon if the ray meets its disc.
+  skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon) {
+    const sun = this.light.sun, moon = this.light.moon;
+    const ds = dx * sun[0] + dy * sun[1] + dz * sun[2];
+    const dm = dx * moon[0] + dy * moon[1] + dz * moon[2];
+    let mat = MAT.SKY, lit = dy > 0 ? dy : 0;
+    if (ds > cosSun && sun[1] > -0.02) { mat = MAT.SUN; lit = 1; }
+    else if (dm > cosMoon && moon[1] > -0.02) { mat = MAT.MOON; lit = 1; }
+    hits[o] = mat;
+    hits[o + 1] = (lit * 255 + 0.5) | 0;
+    hits[o + 2] = 0; hits[o + 3] = 0; hits[o + 4] = 0;
+    // closeness to the sun, as an angle: 255 at the sun, 0 opposite
+    const ang = Math.acos(Math.max(-1, Math.min(1, ds)));
+    hits[o + 5] = (255 * (1 - ang / Math.PI) + 0.5) | 0;
+    hits[o + 6] = 255; hits[o + 7] = 255;
+  }
+
+  cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot) {
+    const ex = v.ex, ez = v.ez;
     const jitter = hash2(cx, cy, SEED + 83) - 0.5;
     let best = Infinity, bl = 0, bdist = 0, bcover = 0;
     for (const c of this.cl) {
@@ -136,7 +159,7 @@ export class SkyPass {
     // the sky behind the cloud, for its dissolving edge
     const sun = this.light.sun;
     const ang = Math.acos(Math.max(-1, Math.min(1, dx * sun[0] + dy * sun[1] + dz * sun[2])));
-    m.write(ci, MAT.CLOUD, bl, dy, 1 - ang / Math.PI, 0, bcover * 2 - 1, Math.min(6500, bdist));
+    m.write(ci, slot, MAT.CLOUD, bl, dy, 1 - ang / Math.PI, 0, bcover * 2 - 1, Math.min(6500, bdist));
     return true;
   }
 
@@ -152,6 +175,23 @@ export class SkyPass {
       if (hits[o] !== MAT.SKY) continue;
       hits[o] = MAT.STAR;
       hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) + 0.5) | 0;
+    }
+  }
+
+  // Stars in the water: each star's mirror image lands where a ray would look
+  // down at it; it shows if that cell's mirrored ray sees open sky.
+  mirroredStars(v, rays, hits) {
+    const P = [0, 0, 0];
+    const W = v.W, R = v.R, c0 = rays.c0, c1 = rays.c1, sw = rays.sw;
+    for (const [x, y, z, b] of STARS) {
+      project(v, v.ex + x * 1000, v.ey - y * 1000, v.ez + z * 1000, P);
+      if (P[2] <= 0) continue;
+      const cx = Math.floor((P[0] + 1) / 2 * W), cy = Math.floor((1 - P[1]) / 2 * R);
+      if (cx < c0 || cx >= c1 || cy < 0 || cy >= R) continue;
+      const o = (cy * sw + (cx - c0)) * HIT_STRIDE + REC;
+      if (hits[o] !== MAT.SKY) continue;
+      hits[o] = MAT.STAR;
+      hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) * 0.8 + 0.5) | 0;
     }
   }
 }

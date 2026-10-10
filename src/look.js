@@ -68,7 +68,7 @@ export const LOOK = {
     sand:    { glyphs: '.,:;=+',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.08 },
     rock:    { glyphs: ':=%#▒▓',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.14, curve: 2.1 },
     snow:    { glyphs: '.-=+*',      ink: { lit: -0.14, dark: 0.36 }, tone: 0.06 },
-    water:   { glyphs: '-~=≈',       ink: { lit: 0.16, dark: 0.40 }, tone: 0.0 },
+    water:   { glyphs: '.:-=',       ink: { lit: 0.12, dark: 0.34 }, tone: 0.0 },
     stone:   { glyphs: ':=#▒▓█',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.18 },
     conifer: { glyphs: ':^*%#&▒',    ink: { lit: -0.28, dark: 0.50 }, tone: 0.12 },
     trunk:   { glyphs: ':|!I#',      ink: { lit: -0.28, dark: 0.46 } },
@@ -76,6 +76,26 @@ export const LOOK = {
     wood:    { glyphs: ':|!I',       ink: { lit: -0.15, dark: 0.30 } },
     flame:   { glyphs: '*^&@',       ink: { lit: 0.25, dark: 0.25 }, emissive: true },
     bed:     { glyphs: '.,:;',       ink: { lit: -0.20, dark: 0.40 }, tone: 0.10 },
+  },
+
+  // Water. Each water cell mixes what its ray sees reflected off the surface
+  // with the bed seen through the water, by the Fresnel share. Ripples tilt
+  // both rays; they never draw wave glyphs.
+  water: {
+    ior: 1.33,                       // bends the ray toward the bed
+    fresnel: { r0: 0.1, power: 4, max: 0.9 },    // Schlick, with a stylised floor and cap
+    absorb: 1.1,                     // metres of water that take the bed most of the way to deep water
+    warm: 0.2,                       // how far the bed is tinted toward the shallow colour
+    tint: 0.4,                       // the least share of deep-water colour, even in the shallows
+    torchSurface: 0.5,               // torchlight on the surface itself
+    glitter: 2.6,                    // degrees: the sun or moon as a rippled surface catches it
+    reflectCap: 1200,                // metres a reflected ray marches at most
+    ripple: {
+      strength: 0.1,                 // scales every wave's slope
+      irregular: 2.2,                // how much noise bends the wave fronts
+      // [length m, direction deg, speed m/s, height m]
+      waves: [[3.3, 18, 1.2, 0.022], [1.9, 74, 0.9, 0.012], [5.7, -32, 1.7, 0.03], [1.1, 128, 0.7, 0.006]],
+    },
   },
 
   // Ink floor: on near-black cells the glyph is lightened by at least this
@@ -100,7 +120,7 @@ export const LOOK = {
       sand:   { lit: '#93805e', shade: '#4a4036' },
       rock:   { lit: '#8a7e6d', shade: '#383842' },
       snow:   { lit: '#d6cfc6', shade: '#737586' },
-      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86' },
+      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', deep: '#2e3c4a', shallow: '#5f5c49' },
       stone:  { lit: '#9a958d', shade: '#4d4b50' },
       conifer:{ lit: '#3b4c3a', shade: '#1e271f' },
       trunk:  { lit: '#5e4b3a', shade: '#2e2620' },
@@ -123,7 +143,7 @@ export const LOOK = {
       sand:   { lit: '#6e5c50', shade: '#30292a' },
       rock:   { lit: '#625560', shade: '#2f2a33' },
       snow:   { lit: '#a8949a', shade: '#4f4859' },
-      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568' },
+      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', deep: '#211f2b', shallow: '#655248' },
       stone:  { lit: '#6e6064', shade: '#3a353c' },
       conifer:{ lit: '#2c3430', shade: '#1a1f1e' },
       trunk:  { lit: '#3e3230', shade: '#221c1c' },
@@ -146,7 +166,7 @@ export const LOOK = {
       sand:   { lit: '#27262a', shade: '#141417' },
       rock:   { lit: '#252429', shade: '#131316' },
       snow:   { lit: '#3c3f4c', shade: '#1d1f28' },
-      water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a' },
+      water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a', deep: '#0d0f14', shallow: '#28261f' },
       stone:  { lit: '#29282e', shade: '#141418' },
       conifer:{ lit: '#17191c', shade: '#0e0f12' },
       trunk:  { lit: '#1c1a1a', shade: '#0f0e0f' },

@@ -68,6 +68,12 @@ export class StripeRays {
       this.plane = new Int32Array(cells);
       this.sigma = new Float32Array(cells);
       this.depth = new Float32Array(cells);
+      // mirrored rays of water cells: slope, distance to the water, the
+      // mirrored eye's height, and what they hit (-1: no water in this cell)
+      this.rsig = new Float32Array(cells);
+      this.rdw = new Float32Array(cells);
+      this.rey = new Float32Array(cells);
+      this.rdepth = new Float32Array(cells);
       this.order = new Int32Array(cells);      // cell indices grouped by plane
       this.osig = new Float32Array(cells);     // their slopes
     }
@@ -138,5 +144,6 @@ export class StripeRays {
     this.sw = sw;
     this.cells = cells;
     this.depth.fill(Infinity, 0, cells);
+    this.rdepth.fill(-1, 0, cells);
   }
 }

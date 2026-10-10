@@ -13,6 +13,9 @@ const views = [
   { free: { x: 255, z: 150, yaw: 10, pitch: 35 }, t: 'day' },        // looking up at the wall
   { free: { x: 250, z: 120, yaw: -30, pitch: -40 }, t: 'day' },      // looking down
   { free: { x: 210, z: 240, yaw: 80, pitch: 12 }, t: 'dusk' },       // among the trees
+  { cam: 5, t: 'day' },                                               // low over the lake
+  { cam: 5, t: 'night' },
+  { free: { x: 318, z: 240, yaw: 60, pitch: -20 }, t: 'dusk' },      // looking down into the shallows
 ];
 const table = {};
 let bad = 0;
