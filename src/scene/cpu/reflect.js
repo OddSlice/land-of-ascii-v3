@@ -93,7 +93,7 @@ const methods = {
     this.hn = 0;
     let next = 0;                  // next row to join, by activation
     let left = n;                  // rows not yet hit
-    const ey = ms.ey, maxTop = this.maxTop, cap = this.reflectCap, ev = this.ev;
+    const ey = ms.ey, cap = this.reflectCap, ev = this.ev;
     // start at the crossing before the first water
     const first = ms.act[0];
     let i = 0;
@@ -120,9 +120,8 @@ const methods = {
       left -= this.mirrorRamp(d0, h0, d1, h1, L, beta);
       d0 = d1; h0 = h1;
       // stop once nothing left can reach any height there is
-      const bound = (maxTop - ey) / d1;
       const lowest = Math.min(this.hn ? ms.sig[this.heap[0]] : Infinity, this.minAfter[next]);
-      if (lowest > bound || d1 > cap || i === this.lastOut) break;
+      if (this.clearAhead(lowest, ey, d1) || d1 > cap || i === this.lastOut) break;
     }
   },
 

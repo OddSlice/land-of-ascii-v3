@@ -61,11 +61,69 @@ export class Marcher {
     this.maxTop = Math.max(t.maxH, world.spans.box.top) + 0.5;
     this.N = world.N; this.NN = world.NN;
     this.openEdge = !!world.openEdge;
+    this.buildAhead();
     this.direct = new RowSet();
     // the crossing cache of the current plane
     this.cd = new Float32Array(2048); this.ch = new Float32Array(2048);
     this.cl = new Int8Array(2048); this.cb = new Float32Array(2048);
     this.initReflection();
+  }
+
+  // The tallest thing in each 16 m square of the map (the ground or lake
+  // surface, the wall's top), taken with its eight neighbours so a line
+  // sampled every 8 m cannot slip past one, and so the coarser levels'
+  // filtered heights stay under it too. A plane's march can stop once no
+  // unfilled row can rise above what is still ahead on its line (aheadAt),
+  // which is exact: it only stops where nothing more could be hit.
+  buildAhead() {
+    const { N, NN } = this, MC = 16, gn = Math.ceil(N / MC) + 1;
+    const H = this.world.terrain.levels[0].H, raw = new Float32Array(gn * gn).fill(-Infinity);
+    for (let k = 0; k <= N; k++) {
+      const row = Math.floor(k / MC) * gn;
+      for (let i = 0; i <= N; i++) {
+        const g = row + Math.floor(i / MC), h = H[k * NN + i];
+        if (h > raw[g]) raw[g] = h;
+      }
+    }
+    const b = this.world.spans.box;
+    for (let gz = Math.floor(b.z0 / MC); gz <= Math.floor(b.z1 / MC); gz++) for (let gx = Math.floor(b.x0 / MC); gx <= Math.floor(b.x1 / MC); gx++) {
+      if (gx >= 0 && gz >= 0 && gx < gn && gz < gn && raw[gz * gn + gx] < b.top) raw[gz * gn + gx] = b.top;
+    }
+    const mx = new Float32Array(gn * gn);
+    for (let gz = 0; gz < gn; gz++) for (let gx = 0; gx < gn; gx++) {
+      let m = -Infinity;
+      for (let a = Math.max(0, gz - 1); a <= Math.min(gn - 1, gz + 1); a++) for (let c = Math.max(0, gx - 1); c <= Math.min(gn - 1, gx + 1); c++) if (raw[a * gn + c] > m) m = raw[a * gn + c];
+      mx[gz * gn + gx] = m + 0.5;
+    }
+    this.mg = { MC, gn, mx };
+    this.ahead = new Float32Array(1024);
+  }
+
+  // The tallest height on the current plane's line from 8 m steps on.
+  planeAhead() {
+    const { v, N } = this, { MC, gn, mx } = this.mg, dx = this.dx, dz = this.dz;
+    const far = this.openEdge ? this.world.viewDist : 2 * N;
+    const n = Math.ceil(far / 8) + 2;
+    if (this.ahead.length < n + 1) this.ahead = new Float32Array(n + 64);
+    const A = this.ahead;
+    A[n] = -Infinity;
+    for (let k = n - 1; k >= 0; k--) {
+      let x = v.ex + dx * k * 8, z = v.ez + dz * k * 8;
+      x = x < 0 ? 0 : x > N ? N : x; z = z < 0 ? 0 : z > N ? N : z;
+      const h = mx[Math.floor(z / MC) * gn + Math.floor(x / MC)];
+      A[k] = h > A[k + 1] ? h : A[k + 1];
+    }
+    this.aheadN = n;
+  }
+
+  aheadAt(d) { const k = Math.floor(d / 8); return this.ahead[k < this.aheadN ? k : this.aheadN - 1]; }
+
+  // Can no row of slope `s` or steeper, seen from height `ey`, meet anything
+  // past distance d? A row that rises is lowest at d; one that falls is
+  // lowest at the far end of the line.
+  clearAhead(s, ey, d) {
+    const top = this.aheadAt(d);
+    return s >= 0 ? ey + s * d > top : ey + s * this.aheadN * 8 > top;
   }
 
   // March every plane of a stripe. `hits` is the stripe's HitBuffer.
@@ -103,6 +161,7 @@ export class Marcher {
     this.lastOut = -1;
     this.initDDA(0.02);
     this.h0start = this.height(0, v.ex + dx * 0.02, v.ez + dz * 0.02, 0);
+    this.planeAhead();
   }
 
   initDDA(d) {
@@ -168,7 +227,7 @@ export class Marcher {
     this.beginReflections();
     const ev = this.ev, sig = rs.sig, off = rs.off, n = rs.n;
     let e = 0, d0 = 0.02, h0 = this.h0start;
-    const maxTop = this.maxTop, ey = rs.ey;
+    const ey = rs.ey;
     for (let i = 0; this.crossing(i); i++) {
       const d1 = this.cd[i], h1 = this.ch[i], L = this.cl[i], beta = this.cb[i];
       // span cells entered before this crossing come first, splitting the ramp
@@ -186,7 +245,7 @@ export class Marcher {
       d0 = d1; h0 = h1;
       const low = rs.find(0);
       if (low >= n) break;
-      if (sig[off + low] > (maxTop - ey) / d1) break;
+      if (this.clearAhead(sig[off + low], ey, d1)) break;
       if (i === this.lastOut) {
         // past the edge of the map: nothing more to hit
         while (e < ev.n) { this.spanCell(rs, e); e++; }

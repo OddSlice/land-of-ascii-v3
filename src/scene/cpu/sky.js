@@ -88,6 +88,35 @@ export class SkyPass {
     const cosSun = Math.cos(sunR), cosMoon = Math.cos(moonR);
     const sw = rays.sw, jlo = rays.jlo, c0 = rays.c0;
     const Lc = light.isSun ? sun : moon;
+    // for each plane, the clouds it can meet at all, and of each the puffs:
+    // those whose bounding sphere (a puff's: its largest radius) comes within
+    // reach of the plane's line, a metre to spare, so nothing a ray's own
+    // test would keep is dropped
+    const np = rays.np, cl = this.cl, ncl = cl.length;
+    let npf = 0;
+    for (const c of cl) npf += c.n;
+    if (!this.plS || this.plS.length < np + 1) this.plS = new Int32Array(np + 64);
+    if (!this.plI || this.plI.length < np * ncl) { this.plI = new Int16Array(Math.max(64, (np + 64) * ncl)); this.plPS = new Int32Array(this.plI.length); this.plPN = new Int16Array(this.plI.length); }
+    if (!this.plP || this.plP.length < np * npf) this.plP = new Int16Array(Math.max(64, (np + 64) * npf));
+    let at = 0, ap = 0;
+    for (let p = 0; p < np; p++) {
+      this.plS[p] = at;
+      const pdx = rays.pdx[p], pdz = rays.pdz[p];
+      for (let k = 0; k < ncl; k++) {
+        const c = cl[k], lat = (c.x - v.ex) * pdz - (c.z - v.ez) * pdx;
+        if (lat > c.reach + 1 || lat < -c.reach - 1) continue;
+        const p0 = ap, pp = c.pp;
+        for (let u = 0; u < c.n; u++) {
+          const q9 = u * 9, a = pp[q9 + 3], b = pp[q9 + 4], w = pp[q9 + 5];
+          const big = a > w ? (a > b ? a : b) : (w > b ? w : b);
+          const pl = (pp[q9] - v.ex) * pdz - (pp[q9 + 2] - v.ez) * pdx;
+          if (pl <= big + 1 && pl >= -big - 1) this.plP[ap++] = u;
+        }
+        if (ap === p0) continue;
+        this.plI[at] = k; this.plPS[at] = p0; this.plPN[at] = ap - p0; at++;
+      }
+    }
+    this.plS[np] = at;
     for (let ci = 0; ci < rays.cells; ci++) {
       if (rays.depth[ci] !== Infinity) continue;
       const p = rays.plane[ci] - jlo;
@@ -99,7 +128,7 @@ export class SkyPass {
       // the open sea, beyond the view distance (generated world only)
       if (dy < 0 && this.seaLevel !== null && this.farSea(v, rays, m, ci, p, s)) continue;
       // clouds
-      if (dy > 0.01 && this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0)) continue;
+      if (dy > 0.01 && this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0, p)) continue;
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
     }
     this.stars(v, rays, hits);
@@ -115,7 +144,7 @@ export class SkyPass {
       const dx = rays.pdx[p] * inv, dy = s * inv, dz = rays.pdz[p] * inv;
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE + REC;
-      if (dy > 0.01 && this.cloud(v, rays.rey[ci], dx, dy, dz, cx, cy, Lc, m, ci, 1)) continue;
+      if (dy > 0.01 && this.cloud(v, rays.rey[ci], dx, dy, dz, cx, cy, Lc, m, ci, 1, p)) continue;
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
       if (hits[o] !== MAT.SKY) continue;
       // the glitter: near the light's direction, narrow across and long in
@@ -156,11 +185,13 @@ export class SkyPass {
   // The nearest cloud along a ray, if any. Puffs are ellipsoids (spheres for
   // cumulus), cut flat at the cloud's base; the edge is a lumpy band a few
   // cells wide that dissolves into the sky behind, with streaks along a bank.
-  cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot) {
+  cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot, p) {
     const ex = v.ex, ez = v.ez, P = this.treat, F = this.flat, streak = P.streak;
     const jitter = hash2(cx, cy, SEED + 83) - 0.5;
     let best = Infinity, bl = 0, bdist = 0, bcover = 0;
-    for (const c of this.cl) {
+    const plI = this.plI, plP = this.plP, cl = this.cl;
+    for (let q = this.plS[p], qe = this.plS[p + 1]; q < qe; q++) {
+      const c = cl[plI[q]];
       // this cloud's nearest puff, and how solid its other puffs are behind it
       let cBest = Infinity, cBl = 0, cCover = 0, behind = 0;
       // bounding sphere of the cluster
@@ -170,8 +201,8 @@ export class SkyPass {
       const d2 = ox * ox + oy * oy + oz * oz - tca * tca;
       if (d2 > c.reach * c.reach) continue;
       const pp = c.pp;
-      for (let k = 0; k < c.n; k++) {
-        const q9 = k * 9;
+      for (let u = this.plPS[q], ue = u + this.plPN[q]; u < ue; u++) {
+        const k = plP[u], q9 = k * 9;
         const px = pp[q9], py = pp[q9 + 1], pz = pp[q9 + 2], a = pp[q9 + 3], b = pp[q9 + 4], w = pp[q9 + 5];
         const ca = pp[q9 + 6], sa = pp[q9 + 7];
         // the ray in the puff's own frame, where it is a unit sphere (a
@@ -252,7 +283,8 @@ export class SkyPass {
   stars(v, rays, hits) {
     const P = [0, 0, 0];
     const W = v.W, R = v.R, c0 = rays.c0, c1 = rays.c1, sw = rays.sw;
-    for (const [x, y, z, b] of STARS) {
+    for (let si = 0; si < STARS.length; si++) {
+      const st = STARS[si], x = st[0], y = st[1], z = st[2], b = st[3];
       project(v, v.ex + x * 1000, v.ey + y * 1000, v.ez + z * 1000, P);
       if (P[2] <= 0) continue;
       const cx = Math.floor((P[0] + 1) / 2 * W), cy = Math.floor((1 - P[1]) / 2 * R);
@@ -269,7 +301,8 @@ export class SkyPass {
   mirroredStars(v, rays, hits) {
     const P = [0, 0, 0];
     const W = v.W, R = v.R, c0 = rays.c0, c1 = rays.c1, sw = rays.sw;
-    for (const [x, y, z, b] of STARS) {
+    for (let si = 0; si < STARS.length; si++) {
+      const st = STARS[si], x = st[0], y = st[1], z = st[2], b = st[3];
       project(v, v.ex + x * 1000, v.ey - y * 1000, v.ez + z * 1000, P);
       if (P[2] <= 0) continue;
       const cx = Math.floor((P[0] + 1) / 2 * W), cy = Math.floor((1 - P[1]) / 2 * R);

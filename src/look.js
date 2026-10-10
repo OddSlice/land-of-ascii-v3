@@ -111,6 +111,12 @@ export const LOOK = {
     // toward the viewer (degrees), sparkling at `rate` changes a second
     glitter: { width: 2.4, length: 20, density: 0.85, rate: 4 },
     reflectCap: 1200,                // metres a reflected ray marches at most
+    // in the generated world, trees and bushes are mirrored only in water
+    // nearer than objectsCap, and only when they stand nearer than
+    // objectsFar (beyond either, a reflection is under a cell, and the swell
+    // breaks it up)
+    objectsCap: 700,
+    objectsFar: 1000,
     ripple: {
       strength: 0.1,                 // scales every wave's slope
       irregular: 2.2,                // how much noise bends the wave fronts

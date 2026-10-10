@@ -86,6 +86,9 @@ export class ObjectPass {
     this.tiles = new Float32Array(64);
     this.bb = [0, 0, 0, 0];
     this.margin = 0;
+    // (the generated world only: the lab and the stress scene keep every reflection)
+    this.objCap = world.openEdge ? LOOK.water.objectsCap : Infinity;
+    this.objFar = world.openEdge ? LOOK.water.objectsFar : world.viewDist;
     this.stats = { buckets: 0, candidates: 0, tested: 0, culled: 0 };
   }
 
@@ -93,26 +96,48 @@ export class ObjectPass {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
     this.treat = frame.look && frame.look.tree === 'B' ? 'B' : 'A';
     this.pass(false);
-    // reflections, if this stripe sees any water
-    // and, per column, the first and last row with water
-    let wlo = Infinity, whi = -Infinity;
-    const sw = rays.sw;
+    // reflections, if this stripe sees water within reach of them (objects
+    // are mirrored only in water nearer than LOOK.water.objectsCap): one pass
+    // for each group of water levels (a lake and a far mountain tarn would
+    // otherwise stretch every mirrored box between them), at most three,
+    // each over only its own cells, and per column only the rows that hold them
+    const sw = rays.sw, cap = this.objCap;
     if (!this.colLo || this.colLo.length < sw) { this.colLo = new Int32Array(sw * 2); this.colHi = new Int32Array(sw * 2); }
-    const colLo = this.colLo, colHi = this.colHi;
-    colLo.fill(v.R, 0, sw); colHi.fill(-1, 0, sw);
-    for (let ci = 0; ci < rays.cells; ci++) {
-      if (rays.rdepth[ci] < 0) continue;
-      const W = (rays.rey[ci] + v.ey) / 2;
-      if (W < wlo) wlo = W; if (W > whi) whi = W;
-      const q = ci % sw, cy = (ci - q) / sw;
-      if (cy < colLo[q]) colLo[q] = cy;
-      if (cy > colHi[q]) colHi[q] = cy;
-    }
-    if (wlo <= whi) {
-      this.wlo = wlo; this.whi = whi;
+    if (!this.wl || this.wl.length < rays.cells) this.wl = new Float64Array(rays.cells * 2);
+    let nw = 0;
+    for (let ci = 0; ci < rays.cells; ci++) if (rays.rdepth[ci] >= 0 && rays.rdw[ci] < cap) this.wl[nw++] = (rays.rey[ci] + v.ey) / 2;
+    if (nw) {
+      const lv = this.wl.subarray(0, nw).sort();
       // a ripple can tilt a mirrored ray by up to twice the surface's slope
       this.margin = Math.ceil(2.2 * MAX_RIPPLE / v.rowAngle) + 1;
-      this.pass(true);
+      // groups: levels within 3 m of the next; then the closest neighbours
+      // merged until there are at most three
+      const groups = [];
+      for (let a = 0; a < nw;) {
+        let b = a;
+        while (b + 1 < nw && lv[b + 1] - lv[b] < 3) b++;
+        groups.push([lv[a], lv[b]]);
+        a = b + 1;
+      }
+      while (groups.length > 3) {
+        let k = 0;
+        for (let g = 1; g + 1 < groups.length; g++) if (groups[g + 1][0] - groups[g][1] < groups[k + 1][0] - groups[k][1]) k = g;
+        groups.splice(k, 2, [groups[k][0], groups[k + 1][1]]);
+      }
+      for (const [lo, hi] of groups) {
+        const colLo = this.colLo, colHi = this.colHi;
+        colLo.fill(v.R, 0, sw); colHi.fill(-1, 0, sw);
+        for (let ci = 0; ci < rays.cells; ci++) {
+          if (rays.rdepth[ci] < 0 || rays.rdw[ci] >= cap) continue;
+          const W = (rays.rey[ci] + v.ey) / 2;
+          if (W < lo || W > hi) continue;
+          const q = ci % sw, cy = (ci - q) / sw;
+          if (cy < colLo[q]) colLo[q] = cy;
+          if (cy > colHi[q]) colHi[q] = cy;
+        }
+        this.wlo = lo; this.whi = hi;
+        this.pass(true);
+      }
     }
     this.margin = 0;
   }
@@ -236,7 +261,7 @@ export class ObjectPass {
       for (let k = 0; k < bk.items.length; k++) {
         const i = bk.items[k], it = list[i];
         const dist = Math.hypot(it.x - v.ex, it.z - v.ez);
-        if (dist - it.R > view) continue;
+        if (dist - it.R > (mirror ? this.objFar : view)) continue;
         const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = this.reachOf(it) + gr, gy = it.up * gr;
         const oy0 = mirror ? 2 * wlo - it.y1 - gy : it.y0 - gy, oy1 = mirror ? 2 * whi - it.y0 + gy : it.y1 + gy;
         if (!this.screenBox(it.x - RR, it.x + RR, oy0, oy1, it.z - RR, it.z + RR)) continue;
@@ -291,6 +316,8 @@ export class ObjectPass {
         const ci = cy * sw + (cx - c0);
         const d = depth[ci];
         if (d <= near || (mirror && d < 0)) continue;
+        // (a mirrored cell is drawn in the pass of its own water level only)
+        if (mirror) { const W = (rays.rey[ci] + v.ey) / 2; if (W < this.wlo || W > this.whi || rays.rdw[ci] >= this.objCap) continue; }
         const p = rays.plane[ci] - jlo;
         const dx = rays.pdx[p], dz = rays.pdz[p];
         if (tree) {

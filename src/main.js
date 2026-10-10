@@ -235,7 +235,7 @@ let collectors = [];
 
 // march and resolve are each the slowest stripe's; worker is the slowest
 // stripe's march + resolve together
-function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worker, yaw, trip = 0) {
+function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worker, yaw, trip = 0, total = worker) {
   light.settled = settled;
   if (sweepMs > light.sweepMs) light.sweepMs = sweepMs;
   const now = performance.now();
@@ -247,7 +247,7 @@ function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worke
   timing.draw += (drawMs - timing.draw) * 0.2;
   state.presented = seq;
   // `at`: when it was shown; `yaw`: the camera it was drawn from
-  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker, at: refreshAt, yaw, trip, every: pacer.every, lag: pacer.lag, dropped: pacer.dropped || 0, tag: shownTag, tick: pacer.tick });
+  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker, total, at: refreshAt, yaw, trip, every: pacer.every, lag: pacer.lag, dropped: pacer.dropped || 0, tag: shownTag, tick: pacer.tick });
   // (with the clock running the light keeps moving, so shadows are always
   // catching up a little: then a frame is enough)
   const caughtUp = settled || state.running;
@@ -272,13 +272,14 @@ function renderLocal() {
 function presentPool(res) {
   if (res.frame.cols !== grid.cols || res.frame.rows !== grid.rows) return;   // stale size
   const t0 = performance.now();
-  let march = 0, resolve = 0, worker = 0, settled = true, sweepMs = 0;
+  let march = 0, resolve = 0, worker = 0, total = 0, settled = true, sweepMs = 0;
   const rows = grid.rows;
   for (const p of res.parts) {
     presenter.upload(p.c0, p.c1, p.cells);
     march = Math.max(march, p.march);
     resolve = Math.max(resolve, p.resolve);
     worker = Math.max(worker, p.march + p.resolve);
+    total += p.march + p.resolve;
     settled = settled && p.settled;
     sweepMs = Math.max(sweepMs, p.sweepMs);
     // keep a whole copy for lab.cellHash()
@@ -286,7 +287,7 @@ function presentPool(res) {
     for (let y = 0; y < rows; y++) full.set(p.cells.subarray(y * sw * CELL_STRIDE, (y + 1) * sw * CELL_STRIDE), (y * grid.cols + p.c0) * CELL_STRIDE);
   }
   presenter.draw();
-  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent, settled, sweepMs, worker, res.frame.cam.yaw, res.ready - res.sent);
+  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent, settled, sweepMs, worker, res.frame.cam.yaw, res.ready - res.sent, total);
 }
 
 let last = performance.now();

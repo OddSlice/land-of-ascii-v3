@@ -18,11 +18,14 @@ import { SEED } from '../../world/layout.js';
 const W = LOOK.water;
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
-// Waves as [k x-component, k z-component, angular speed, slope amplitude, length].
+// Waves as [k x-component, k z-component, angular speed, slope amplitude,
+// length, |k|], also flat in WV (6 numbers a wave) for the hot loop.
 const WAVES = W.ripple.waves.map(([len, deg, speed, height]) => {
   const k = 2 * Math.PI / len, a = deg * Math.PI / 180;
-  return [k * Math.cos(a), k * Math.sin(a), k * speed, height * k * W.ripple.strength, len];
+  const kx = k * Math.cos(a), kz = k * Math.sin(a);
+  return [kx, kz, k * speed, height * k * W.ripple.strength, len, Math.hypot(kx, kz)];
 });
+const WV = Float64Array.from(WAVES.flat()), NW = WAVES.length;
 
 // The steepest the ripples can tilt the surface, for culling margins.
 export const MAX_RIPPLE = WAVES.reduce((a, w) => a + Math.abs(w[3]), 0);
@@ -36,12 +39,12 @@ export function rippleSlope(x, z, t, dx, dz, footprint) {
   if (footprint >= LONGEST * FADE1) return 0;    // every wave faded: calm
   const bend = W.ripple.irregular * (vnoise(x / 4.3, z / 3.7, SEED + 97) + 0.6 * vnoise(x / 1.7, z / 1.9, SEED + 98));
   let s = 0;
-  for (let i = 0; i < WAVES.length; i++) {
-    const [kx, kz, w, amp, len] = WAVES[i];
+  for (let i = 0, q = 0; i < NW; i++, q += 6) {
+    const kx = WV[q], kz = WV[q + 1], w = WV[q + 2], amp = WV[q + 3], len = WV[q + 4];
     const fade = 1 - smooth(len * FADE0, len * FADE1, footprint);
     if (fade <= 0) continue;
     const ph = kx * x + kz * z - w * t + bend * (1 + i);
-    s += amp * fade * Math.cos(ph) * (kx * dx + kz * dz) / Math.hypot(kx, kz);
+    s += amp * fade * Math.cos(ph) * (kx * dx + kz * dz) / WV[q + 5];
   }
   return s;
 }

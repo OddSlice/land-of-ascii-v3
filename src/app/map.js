@@ -10,7 +10,7 @@ import { MAT, HIT_STRIDE, REC, CELL_STRIDE, MAT_NONE } from '../contract.js';
 import { makePalette, resolveStripe } from '../resolve.js';
 import { MAP_GLYPH } from '../glyphs.js';
 import { sunDir } from '../world/sky.js';
-import { bil1, bilU8 } from '../scene/cpu/sample.js';
+import { bil1, bilU8, bilD } from '../scene/cpu/sample.js';
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const M = LOOK.map;
@@ -92,7 +92,7 @@ export class MapView {
         const sz = (bil1(T.ground, x, z + e, N, NN) - bil1(T.ground, x, z - e, N, NN)) / (2 * e);
         const nl = Math.hypot(sx, sz, 1);
         const lam = Math.max(0, (-sx * sun[0] + sun[1] - sz * sun[2]) / nl);
-        const tone = 0.5 * bil1(T.tone, x, z, N, NN) * (T.toneK || 1);
+        const tone = 0.5 * bilD(T.tone, x, z, N, NN) * (T.toneK || 1);
         // what lies under it: water first, then forest, roads, then the ground
         // (narrow rivers are looked for across the cell, so they stay whole)
         let wx = x, wz = z, wet = bilU8(T.wWater, x, z, N, NN) > 0.5;
