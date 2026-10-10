@@ -3,7 +3,7 @@
 // tools/shoot.mjs first.
 //   node tools/lookbook.mjs [--built]              docs/phase0a.md: one sheet per camera, and
 //                                                  what the glyphs add over flat colour (shots/phase0a/)
-//   node tools/lookbook.mjs --phase 0b [--built]   docs/phase0b.md: the lake at day, dusk and night,
+//   node tools/lookbook.mjs --phase 0b [--built] [--density 4]   docs/phase0b.md: the lake at day, dusk and night,
 //                                                  and the stress scene's cameras (shots/phase0b/)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +21,7 @@ const times = ['day', 'dusk', 'night'];
 const { server, url } = await serve();
 const browser = await launch('chromium');
 try {
-  const lab = await openLab(browser, url, { built: !!a.built });
+  const lab = await openLab(browser, url, { built: !!a.built, density: a.density });
   const { page } = lab;
   await page.evaluate(() => window.lab.setHud(false));
   const cams = await page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, time: c.time })));
@@ -62,7 +62,7 @@ try {
   if (PHASE === '0b') {
     // the stress scene: the lake large, then its three cameras by day
     await lab.ctx.close();
-    const st = await openLab(browser, url, { built: !!a.built, stress: true });
+    const st = await openLab(browser, url, { built: !!a.built, stress: true, density: a.density });
     await st.page.evaluate(() => window.lab.setHud(false));
     const names = await st.page.evaluate(() => window.lab.cameras.map((c) => c.name));
     const grab = async (cam, t) => {

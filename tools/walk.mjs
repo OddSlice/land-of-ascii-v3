@@ -2,7 +2,7 @@
 // and the animation clock), for the lab's lake shore and each stress camera.
 // The videos go to shots/walks/, which is kept out of git.
 //
-//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge] [--threads 8] [--headed]
+//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge] [--threads 8] [--density 4] [--headed]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to turn.
 import fs from 'node:fs';
@@ -36,6 +36,7 @@ try {
     page.on('pageerror', (e) => errors.push(String(e)));
     const q = new URLSearchParams();
     if (a.threads) q.set('threads', String(a.threads));
+    if (a.density) q.set('density', String(a.density));
     if (w.stress) q.set('stress', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
