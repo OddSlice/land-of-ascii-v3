@@ -186,7 +186,7 @@ function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worke
   timing.draw += (drawMs - timing.draw) * 0.2;
   state.presented = seq;
   // `at`: when it was shown; `yaw`: the camera it was drawn from
-  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker, at: now, yaw, trip, every: pacer.every, lag: pacer.lag, dropped: pacer.dropped || 0 });
+  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker, at: refreshAt, yaw, trip, every: pacer.every, lag: pacer.lag, dropped: pacer.dropped || 0, tag: shownTag, tick: pacer.tick });
   // (with the clock running the light keeps moving, so shadows are always
   // catching up a little: then a frame is enough)
   const caughtUp = settled || state.running;
@@ -230,11 +230,19 @@ function presentPool(res) {
 
 let last = performance.now();
 let started = false;
+let refreshAt = 0;            // requestAnimationFrame's time for this refresh (lab.timings' `at`)
+let shownTag = 0;             // the refresh the frame being shown was asked for in (lab.timings' `tag`)
 const pacer = new Pacer();
 function tick(now) {
   if (state.failed) return;
+  refreshAt = now;
   pacer.onRefresh(now);
-  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
+  // Time moves in whole display refreshes. requestAnimationFrame's times
+  // wobble by a few milliseconds (6.7, 10.3, 7.5 ms on a steady 8.3 ms
+  // display); moving the camera by them made turning speed wobble too. A
+  // refresh that was really missed still counts as two.
+  const R = pacer.refresh / 1000, raw = Math.max(0, (now - last) / 1000);
+  const dt = Math.min(0.1, raw > 0 ? R * Math.max(1, Math.round(raw / R)) : 0);
   last = now;
   const look = input.takeLook(dt);
   if (look.yaw || look.pitch) {
@@ -255,13 +263,19 @@ function tick(now) {
       // show the newest finished frame whose refresh has come (an older one
       // still waiting has been overtaken, and is dropped), then ask for the
       // next if it is time (see app/pace.js)
-      let res = null, dropped = -1;
-      while (pool.finished.length && pacer.due(pool.finished[0].tag)) { res = pool.finished.shift(); dropped++; }
-      pacer.dropped = dropped;
-      if (res) {
-        presentPool(res);
-        pacer.shown(res.tag, res.ready - res.sent, Math.max(...res.parts.map((p) => p.march + p.resolve)));
+      // Frames whose refresh has passed are dropped (shown late, the view
+      // would fall a refresh behind and then jump), unless nothing has been
+      // shown for a while; the pacer learns from every frame.
+      let res = null, dropped = 0;
+      while (pool.finished.length && pacer.due(pool.finished[0].tag)) {
+        const f = pool.finished.shift();
+        pacer.shown(f.tag, f.ready - f.sent, Math.max(...f.parts.map((p) => p.march + p.resolve)));
+        if (res) dropped++;
+        res = f;
       }
+      if (res && pacer.late(res.tag) && pacer.sinceShown < 2 * pacer.lag + 2) { dropped++; res = null; }
+      pacer.dropped = dropped;
+      if (res) { shownTag = res.tag; presentPool(res); pacer.sinceShown = 0; }
       if (pacer.shouldSend(pool.inFlight + pool.finished.length)) { pool.submit(makeFrame(), pacer.tick); pacer.sent(); }
     }
   } catch (err) {

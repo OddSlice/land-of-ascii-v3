@@ -281,7 +281,7 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 15. **Never give the canvas a fractional CSS size** (WebKit drops to 3 fps), and never use the font's own shade blocks at small sizes.
 16. **Never decide the look late, or from concept art.** Compare candidates rendered by the real engine in the real world: that is what the look panel is for.
 17. **Never let an object's cost scale with its whole screen box.** Cull exactly and work per plane, as the conifer pass does. The first build's market stalls cost 2 ms because they did not.
-18. **Never show frames at uneven delays.** A frame shows the camera as it was when it was asked for. If some frames reach the screen one refresh later and others two, turning stalls and then jumps. Every frame is shown the same number of refreshes after it was asked for, at a steady rate (`src/app/pace.js`); `tools/smooth.mjs` measures it.
+18. **Never show frames at uneven delays, or move the camera by a wobbling clock.** A frame shows the camera as it was when it was asked for. If some frames reach the screen a refresh later than others, turning stalls and then jumps. So every frame is shown the same number of refreshes after it was asked for, at a steady rate, a late frame is dropped rather than shown late, and time moves in whole display refreshes (`src/app/pace.js`). `tools/smooth.mjs` measures it.
 
 ---
 
