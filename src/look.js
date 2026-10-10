@@ -95,8 +95,12 @@ export const LOOK = {
     ripple: {
       strength: 0.1,                 // scales every wave's slope
       irregular: 2.2,                // how much noise bends the wave fronts
-      // [length m, direction deg, speed m/s, height m]
-      waves: [[3.3, 18, 1.2, 0.022], [1.9, 74, 0.9, 0.012], [5.7, -32, 1.7, 0.03], [1.1, 128, 0.7, 0.006]],
+      // a wave fades out as a cell's footprint on the water grows from
+      // fade[0] to fade[1] of its length, so distant water lies calm
+      fade: [0.15, 0.6],
+      // [length m, direction deg, speed m/s, height m]; the long swell
+      // outlasts the fade and breaks up distant reflections by a row or so
+      waves: [[3.3, 18, 1.2, 0.022], [1.9, 74, 0.9, 0.012], [5.7, -32, 1.7, 0.03], [1.1, 128, 0.7, 0.006], [36, 50, 2.5, 0.3]],
     },
   },
 

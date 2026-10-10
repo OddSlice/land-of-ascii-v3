@@ -27,17 +27,18 @@ const WAVES = W.ripple.waves.map(([len, deg, speed, height]) => {
 // The steepest the ripples can tilt the surface, for culling margins.
 export const MAX_RIPPLE = WAVES.reduce((a, w) => a + Math.abs(w[3]), 0);
 const LONGEST = WAVES.reduce((a, w) => Math.max(a, w[4]), 0);
+const [FADE0, FADE1] = W.ripple.fade;
 
 // The slope of the ripples along a horizontal direction (dx, dz) at (x, z),
 // time t, with waves shorter than the cell's footprint faded out so distant
 // water lies calm instead of sparkling.
 export function rippleSlope(x, z, t, dx, dz, footprint) {
-  if (footprint >= LONGEST * 0.6) return 0;      // every wave faded: calm
+  if (footprint >= LONGEST * FADE1) return 0;    // every wave faded: calm
   const bend = W.ripple.irregular * (vnoise(x / 4.3, z / 3.7, SEED + 97) + 0.6 * vnoise(x / 1.7, z / 1.9, SEED + 98));
   let s = 0;
   for (let i = 0; i < WAVES.length; i++) {
     const [kx, kz, w, amp, len] = WAVES[i];
-    const fade = 1 - smooth(len * 0.15, len * 0.6, footprint);
+    const fade = 1 - smooth(len * FADE0, len * FADE1, footprint);
     if (fade <= 0) continue;
     const ph = kx * x + kz * z - w * t + bend * (1 + i);
     s += amp * fade * Math.cos(ph) * (kx * dx + kz * dz) / Math.hypot(kx, kz);
