@@ -70,6 +70,7 @@ export class Marcher {
   // March every plane of a stripe. `hits` is the stripe's HitBuffer.
   run(v, rays, hits, frame, torches) {
     this.v = v; this.rays = rays; this.hits = hits; this.torches = torches; this.t = frame.t;
+    if (!this.tg) this.buildTorchGrid(torches);
     this.dEnd = [];
     for (let L = 0; L < LEVELS; L++) this.dEnd.push((1 << L) / (LOD_Q * v.colAngle));
     // merlons sink into the walkway before they get thinner than about two

@@ -18,12 +18,13 @@
 // the conifers' tiered outline melts into a smooth cone once a tier is only a
 // couple of rows tall. Reflections use the same floors.
 import { MAT } from '../../contract.js';
-import { project } from './view.js';
 import { hash2 } from '../../world/noise.js';
 import { MAX_RIPPLE } from './water.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const P = [0, 0, 0];
+const CS = new Float64Array(24);          // a box's corners in view space
+const NEAR = 0.01;
 const BUCKET = 64;
 const TREE = 0, BUSH = 1, TORCH = 2;
 
@@ -32,10 +33,14 @@ export class ObjectPass {
     this.world = world;
     this.light = light;
     this.hit = { D: 0, nx: 0, ny: 0, nz: 0, mat: 0, f: 0, power: 0 };
+    // a conifer's sizes along the current vertical plane (see coniferPlane)
+    this.cp = { miss: true, ox: 0, oz: 0, dx: 0, dz: 0, D0: 0, b2: 0, Rmax: 0, Ra: new Float64Array(16), Rb: new Float64Array(16), g: new Float64Array(16) };
     // every object as one list, with its bounds
     const list = [];
     const { trees, bushes, torches } = world.objects;
-    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: t.R, y0: t.base - 0.4, y1: t.top + 0.2 }));
+    // a conifer's ragged tiers can reach past its radius (by up to 18%)
+    const reach = (t) => { let r = t.R; for (let k = 2; k < t.tiers.length; k += 4) r = Math.max(r, t.tiers[k] * 1.18); return r; };
+    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: reach(t), y0: t.base - 0.4, y1: t.top + 0.2 }));
     bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6 }));
     torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i }));
     this.list = list;
@@ -67,11 +72,19 @@ export class ObjectPass {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
     this.pass(false);
     // reflections, if this stripe sees any water
+    // and, per column, the first and last row with water
     let wlo = Infinity, whi = -Infinity;
+    const sw = rays.sw;
+    if (!this.colLo || this.colLo.length < sw) { this.colLo = new Int32Array(sw * 2); this.colHi = new Int32Array(sw * 2); }
+    const colLo = this.colLo, colHi = this.colHi;
+    colLo.fill(v.R, 0, sw); colHi.fill(-1, 0, sw);
     for (let ci = 0; ci < rays.cells; ci++) {
       if (rays.rdepth[ci] < 0) continue;
       const W = (rays.rey[ci] + v.ey) / 2;
       if (W < wlo) wlo = W; if (W > whi) whi = W;
+      const q = ci % sw, cy = (ci - q) / sw;
+      if (cy < colLo[q]) colLo[q] = cy;
+      if (cy > colHi[q]) colHi[q] = cy;
     }
     if (wlo <= whi) {
       this.wlo = wlo; this.whi = whi;
@@ -83,20 +96,39 @@ export class ObjectPass {
   }
 
   // Screen box of a box of world space, clipped to this stripe; false if
-  // none of it shows. Fills this.bb = [cxa, cxb, cya, cyb].
+  // none of it shows. Fills this.bb = [cxa, cxb, cya, cyb]. A box reaching
+  // behind the eye is cut at a plane just in front of it: the corners in
+  // front, and where the edges cross that plane, bound what can show.
   screenBox(x0, x1, y0, y1, z0, z1) {
     const { v, rays } = this;
     let xlo = 1e9, xhi = -1e9, ylo = 1e9, yhi = -1e9, behind = 0;
     for (let c = 0; c < 8; c++) {
-      project(v, c & 1 ? x1 : x0, c & 2 ? y1 : y0, c & 4 ? z1 : z0, P);
-      if (P[2] < 0.05) { behind++; continue; }
-      if (P[0] < xlo) xlo = P[0]; if (P[0] > xhi) xhi = P[0];
-      if (P[1] < ylo) ylo = P[1]; if (P[1] > yhi) yhi = P[1];
+      const rx = (c & 1 ? x1 : x0) - v.ex, ry = (c & 2 ? y1 : y0) - v.ey, rz = (c & 4 ? z1 : z0) - v.ez;
+      const b = rx * v.syaw + rz * v.cyaw;
+      const a = rx * v.cyaw - rz * v.syaw, cz = b * v.cp + ry * v.sp, cy = ry * v.cp - b * v.sp;
+      CS[c * 3] = a; CS[c * 3 + 1] = cy; CS[c * 3 + 2] = cz;
+      if (cz < NEAR) { behind++; continue; }
+      const px = a / cz / v.tx, py = cy / cz / v.ty;
+      if (px < xlo) xlo = px; if (px > xhi) xhi = px;
+      if (py < ylo) ylo = py; if (py > yhi) yhi = py;
     }
     if (behind === 8) return false;
+    if (behind) {
+      for (let c = 0; c < 8; c++) {
+        for (let bit = 1; bit < 8; bit <<= 1) {
+          if (c & bit) continue;
+          const d = c | bit, za = CS[c * 3 + 2], zb = CS[d * 3 + 2];
+          if ((za < NEAR) === (zb < NEAR)) continue;
+          const f = (NEAR - za) / (zb - za);
+          const a = CS[c * 3] + (CS[d * 3] - CS[c * 3]) * f, cy = CS[c * 3 + 1] + (CS[d * 3 + 1] - CS[c * 3 + 1]) * f;
+          const px = a / NEAR / v.tx, py = cy / NEAR / v.ty;
+          if (px < xlo) xlo = px; if (px > xhi) xhi = px;
+          if (py < ylo) ylo = py; if (py > yhi) yhi = py;
+        }
+      }
+    }
     const W = v.W, Rr = v.R, c0 = rays.c0, c1 = rays.c1;
     const bb = this.bb;
-    if (behind) { bb[0] = c0; bb[1] = c1 - 1; bb[2] = 0; bb[3] = Rr - 1; return true; }
     bb[0] = Math.max(c0, Math.floor((xlo + 1) / 2 * W - 1.5));
     bb[1] = Math.min(c1 - 1, Math.ceil((xhi + 1) / 2 * W + 0.5));
     const mg = this.margin;
@@ -205,29 +237,44 @@ export class ObjectPass {
   }
 
   // Test every cell of the box against the object; true if any was drawn.
+  // Column by column, so a conifer's sizes along a plane are worked out once
+  // for all the rows that share it.
   draw(it, dist, bb, mirror) {
     const { v, rays, hit } = this;
     const minR = v.colAngle * Math.max(dist, 0.5);
     // how many rows a conifer tier covers; under ~3 the tiers melt into a cone
     const tierRows = 2.3 / (Math.max(dist, 1) * v.rowAngle);
     const far = smooth(5, 2.2, tierRows);
+    // nothing of the object is nearer than this (horizontally)
+    const near = dist - (it.R + minR);
     const sw = rays.sw, jlo = rays.jlo, c0 = rays.c0;
     const depth = mirror ? rays.rdepth : rays.depth;
-    const o = it.o;
+    const o = it.o, tree = it.kind === TREE;
+    this.cp.tiersOf = null;
     let drew = false;
-    for (let cy = bb[2]; cy <= bb[3]; cy++) {
-      for (let cx = bb[0]; cx <= bb[1]; cx++) {
+    for (let cx = bb[0]; cx <= bb[1]; cx++) {
+      let lastP = -1, ya = bb[2], yb = bb[3];
+      if (mirror) {
+        // only the rows of this column that hold water
+        const q = cx - c0;
+        if (this.colLo[q] > ya) ya = this.colLo[q];
+        if (this.colHi[q] < yb) yb = this.colHi[q];
+      }
+      for (let cy = ya; cy <= yb; cy++) {
         const ci = cy * sw + (cx - c0);
+        const d = depth[ci];
+        if (d <= near || (mirror && d < 0)) continue;
         let ey, s, after;
         if (mirror) {
-          if (depth[ci] < 0) continue;
           ey = rays.rey[ci]; s = rays.rsig[ci]; after = rays.rdw[ci];
         } else { ey = v.ey; s = rays.sigma[ci]; after = 0; }
         const p = rays.plane[ci] - jlo;
         const dx = rays.pdx[p], dz = rays.pdz[p];
         let ok;
-        if (it.kind === TREE) ok = this.conifer(o, dx, dz, s, minR, far, ey);
-        else if (it.kind === BUSH) ok = this.bush(o, dx, dz, s, minR, far, ey);
+        if (tree) {
+          if (p !== lastP) { this.coniferPlane(o, dx, dz, minR, far); lastP = p; }
+          ok = this.coniferRay(o, s, ey);
+        } else if (it.kind === BUSH) ok = this.bush(o, dx, dz, s, minR, far, ey);
         else ok = this.torchHit(o, dx, dz, s, minR, this.torches[it.ti].power, ey);
         if (!ok || hit.D <= after) continue;
         if (hit.D >= depth[ci]) continue;
@@ -262,33 +309,59 @@ export class ObjectPass {
   // A conifer: a bare trunk under a stack of overlapping cone tiers, each
   // wide at its foot and narrow at its top (a sawtooth outline), with a
   // ragged edge that turns with the angle round the trunk.
-  conifer(t, dx, dz, s, minR, far, ey) {
-    const { v, hit } = this;
+  //
+  // Everything that depends only on the vertical plane of the ray (how near
+  // it passes the trunk, the ragged radii) is worked out once per plane;
+  // coniferRay then intersects one ray of that plane.
+  coniferPlane(t, dx, dz, minR, far) {
+    const { v, cp } = this;
     const ox = v.ex - t.x, oz = v.ez - t.z;
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;
     const Rmax = t.R + minR;
-    if (b2 > Rmax * Rmax || D0 + Rmax < 0) return false;
-    // ragged edge: 9 sectors round the trunk, smoothly joined
-    const ax = ox + dx * D0, az = oz + dz * D0;
-    const ang = (Math.atan2(az, ax) / (Math.PI * 2) + 0.5) * 9;
-    const a0 = Math.floor(ang), af = ang - a0;
-    let best = Infinity, bnx = 0, bny = 0, bnz = 0, bf = 0, bmat = 0;
-    const tiers = t.tiers, T = tiers.length / 4;
+    cp.ox = ox; cp.oz = oz; cp.dx = dx; cp.dz = dz; cp.D0 = D0; cp.b2 = b2; cp.Rmax = Rmax; cp.minR = minR;
+    cp.miss = b2 > Rmax * Rmax || D0 + Rmax < 0;
+    if (cp.miss) return;
     const jagK = 1 - far;
+    // far off the edge is smooth, the same from every side: once per tree
+    if (jagK === 0 && cp.tiersOf === t) return;
+    cp.tiersOf = jagK === 0 ? t : null;
+    // ragged edge: 9 sectors round the trunk, smoothly joined
+    let a0 = 0, af = 0;
+    if (jagK !== 0) {
+      const ax = ox + dx * D0, az = oz + dz * D0;
+      const ang = (Math.atan2(az, ax) / (Math.PI * 2) + 0.5) * 9;
+      a0 = Math.floor(ang); af = ang - a0;
+    }
+    const tiers = t.tiers, T = tiers.length / 4;
     for (let k = 0; k < T; k++) {
       const ya = tiers[k * 4], yb = tiers[k * 4 + 1];
-      // quick height test: the ray's height near the trunk
-      const yNear = ey + s * (D0 - Rmax), yFar = ey + s * (D0 + Rmax);
-      if (Math.max(yNear, yFar) < ya || Math.min(yNear, yFar) > yb) continue;
-      const jg = hash2(a0 + k * 13, t.seed, 7) * (1 - af) + hash2(a0 + 1 + k * 13, t.seed, 7) * af;
-      const jag = 1 + (jg - 0.5) * 0.36 * jagK;
+      const jag = jagK === 0 ? 1
+        : 1 + ((hash2(a0 + k * 13, t.seed, 7) * (1 - af) + hash2(a0 + 1 + k * 13, t.seed, 7) * af) - 0.5) * 0.36 * jagK;
       let Ra = tiers[k * 4 + 2] * jag, Rb = tiers[k * 4 + 3];
       if (k + 1 < T) Rb += (tiers[k * 4 + 6] * 0.92 - Rb) * far;
       Rb *= jag;
       if (Ra < minR) Ra = minR;
       if (Rb < minR * 0.6) Rb = minR * 0.6;
-      const g = (Rb - Ra) / (yb - ya);
+      cp.Ra[k] = Ra; cp.Rb[k] = Rb; cp.g[k] = (Rb - Ra) / (yb - ya);
+    }
+  }
+
+  coniferRay(t, s, ey) {
+    const { hit, cp } = this;
+    if (cp.miss) return false;
+    const { ox, oz, dx, dz, D0, b2, Rmax } = cp;
+    let best = Infinity, bnx = 0, bny = 0, bnz = 0, bf = 0, bmat = 0;
+    const tiers = t.tiers, T = tiers.length / 4;
+    // quick height test: the ray's height near the trunk
+    const yNear = ey + s * (D0 - Rmax), yFar = ey + s * (D0 + Rmax);
+    const yMax = Math.max(yNear, yFar), yMin = Math.min(yNear, yFar);
+    for (let k = 0; k < T; k++) {
+      const ya = tiers[k * 4], yb = tiers[k * 4 + 1];
+      // tiers go up the tree: once the ray is under one it is under the rest
+      if (yMax < ya) break;
+      if (yMin > yb) continue;
+      const Ra = cp.Ra[k], g = cp.g[k];
       // R(D) = r0 + r1 D along the ray
       const r0 = Ra + g * (ey - ya), r1 = g * s;
       const A = 1 - r1 * r1, B = D0 + r0 * r1, C = D0 * D0 + b2 - r0 * r0;
@@ -323,7 +396,7 @@ export class ObjectPass {
       }
     }
     // trunk
-    const rt = Math.max(0.24, minR);
+    const rt = Math.max(0.24, cp.minR);
     if (b2 < rt * rt) {
       const D = D0 - Math.sqrt(rt * rt - b2);
       const y = ey + s * D;
@@ -342,6 +415,9 @@ export class ObjectPass {
   bush(b, dx, dz, s, minR, far, ey) {
     const { v, hit } = this;
     const rx = Math.max(b.rx, minR), ry = Math.max(b.ry, minR);
+    // the lumps reach out to 1.15 rx
+    const hx = v.ex - b.x, hz = v.ez - b.z, hd = hx * dx + hz * dz, wide = 1.151 * rx;
+    if (hx * hx + hz * hz - hd * hd > wide * wide) return false;
     const cy = b.base + ry * 0.55;
     const ox = (v.ex - b.x) / rx, oy = (ey - cy) / ry, oz = (v.ez - b.z) / rx;
     const ddx = dx / rx, ddy = s / ry, ddz = dz / rx;

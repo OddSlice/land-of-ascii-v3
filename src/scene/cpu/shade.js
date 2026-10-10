@@ -38,11 +38,32 @@ const methods = {
     h[o + 6] = du & 255; h[o + 7] = du >> 8;
   },
 
+  // Which torches can light each 16 m square of the map (a point off the map
+  // uses the nearest square: no torch nearer the point is missed that way).
+  buildTorchGrid(ts) {
+    const G = 16, n = Math.ceil(this.world.N / G), R = TORCH_RANGE;
+    const cells = Array.from({ length: n * n }, () => []);
+    for (let gz = 0; gz < n; gz++) {
+      for (let gx = 0; gx < n; gx++) {
+        for (let i = 0; i < ts.length; i++) {
+          const ddx = Math.max(gx * G - ts[i].x, 0, ts[i].x - (gx + 1) * G);
+          const ddz = Math.max(gz * G - ts[i].z, 0, ts[i].z - (gz + 1) * G);
+          if (ddx * ddx + ddz * ddz <= R * R) cells[gz * n + gx].push(i);
+        }
+      }
+    }
+    this.tg = { G, n, cells: cells.map((c) => Int16Array.from(c)) };
+  },
+
   glowAt(x, y, z, nx, ny, nz) {
-    const ts = this.torches;
+    const ts = this.torches, tg = this.tg;
+    let gx = Math.floor(x / tg.G), gz = Math.floor(z / tg.G);
+    gx = gx < 0 ? 0 : gx >= tg.n ? tg.n - 1 : gx;
+    gz = gz < 0 ? 0 : gz >= tg.n ? tg.n - 1 : gz;
+    const list = tg.cells[gz * tg.n + gx];
     let sum = 0;
-    for (let i = 0; i < ts.length; i++) {
-      const t = ts[i];
+    for (let k = 0; k < list.length; k++) {
+      const t = ts[list[k]];
       const lx = t.x - x, ly = t.y - y, lz = t.z - z;
       const d2 = lx * lx + ly * ly + lz * lz;
       if (d2 >= TORCH_RANGE * TORCH_RANGE) continue;
