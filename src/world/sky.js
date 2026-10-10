@@ -39,13 +39,28 @@ const CLUSTERS = [
   [-2600, 900, 950, 1.6], [-2400, 2400, 980, 1.6]
 ];
 
+// The generated world's clouds: spread over its whole sky from the seed (a
+// jittered grid about a kilometre apart, some cells left clear), so there is
+// weather in every direction, not only where the lab's valley looked.
+export function worldCloudList(seed, N) {
+  const out = [], G = 950, x0 = N / 2 - CLOUD_SPAN / 2, z0 = N / 2 - 3600;
+  for (let gz = 0; gz < 8; gz++) {
+    for (let gx = 0; gx < 8; gx++) {
+      const r = (n) => hash2(gx * 13 + gz, n, (seed | 0) + 641);
+      if (r(1) > 0.62) continue;
+      out.push([x0 + (gx + 0.15 + 0.7 * r(2)) * G, z0 + (gz + 0.15 + 0.7 * r(3)) * G, 860 + 140 * r(4), 0.8 + 0.6 * r(5)]);
+    }
+  }
+  return out;
+}
+
 // Each cloud carries both treatments' puffs, as ellipsoids
 // [dx, dz, dy, along, up, across, angle]: A, rounded cumulus (spheres of
 // varied sizes); B, a bank (a long, broken band of stretched puffs turned to
 // the band's angle). `shift` moves every cluster, for maps centred elsewhere
-// than the lab's valley.
-export function buildClouds(shift = 0) {
-  const clusters = CLUSTERS.map(([x0, z0, base, scale], c) => {
+// than the lab's valley; `list` replaces the lab's hand-placed clusters.
+export function buildClouds(shift = 0, list = CLUSTERS) {
+  const clusters = list.map(([x0, z0, base, scale], c) => {
     const x = x0 + shift, z = z0 + shift;
     const r = (n) => hash2(c, n, SEED + 61);
     const main = (150 + 170 * r(1)) * scale;

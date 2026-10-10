@@ -190,8 +190,8 @@ const methods = {
   mirrorSpan(e) {
     const { v, world } = this;
     const ev = this.ev, ms = this.ms;
-    const din = Math.max(ev.d[e], 0.01), dout = ev.o[e], cell = ev.c[e], axis = ev.a[e];
-    const sp = world.spans, s = sp.idx[cell];
+    const din = Math.max(ev.d[e], 0.01), dout = ev.o[e], s = ev.c[e], axis = ev.a[e];
+    const sp = world.spans;
     const flags = sp.flags[s];
     const ey = ms.ey, dx = this.dx, dz = this.dz;
     let y1 = sp.y1[s];

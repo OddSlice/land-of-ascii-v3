@@ -8,8 +8,8 @@ import { ObjectPass } from './objects.js';
 import { SkyPass } from './sky.js';
 import { HIT_STRIDE, REC, MAT_NONE } from '../../contract.js';
 
-export function createCpuBackend(world) {
-  const light = new Light(world);
+export function createCpuBackend(world, opts = {}) {
+  const light = new Light(world, opts);
   const rays = new StripeRays();
   const marcher = new Marcher(world, light);
   const objects = new ObjectPass(world, light);
@@ -26,7 +26,7 @@ export function createCpuBackend(world) {
     // for one frame.
     render(frame, c0, c1, hits) {
       const v = makeView(frame);
-      light.update(frame.hour, frame.t);
+      light.update(frame.hour, frame.t, frame.shadow);
       rays.build(v, c0, c1);
       if (hits.length < rays.cells * HIT_STRIDE) throw new Error('hit buffer too small');
       // no reflected or refracted hit until a water cell fills them

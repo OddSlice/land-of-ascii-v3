@@ -22,7 +22,7 @@
 // the plane gives one mirrored row set, whose rows only start at their water.
 import { LOOK } from '../../look.js';
 import { LEVELS } from '../../world/terrain.js';
-import { SPAN_MERLON, SPAN_ARCH, archY } from '../../world/spans.js';
+import { SPAN_MERLON, SPAN_ARCH, archY, spanAt } from '../../world/spans.js';
 import { installShading } from './shade.js';
 import { installReflection } from './reflect.js';
 import { bil } from './sample.js';
@@ -60,6 +60,7 @@ export class Marcher {
     const t = world.terrain;
     this.maxTop = Math.max(t.maxH, world.spans.box.top) + 0.5;
     this.N = world.N; this.NN = world.NN;
+    this.openEdge = !!world.openEdge;
     this.direct = new RowSet();
     // the crossing cache of the current plane
     this.cd = new Float32Array(2048); this.ch = new Float32Array(2048);
@@ -132,7 +133,11 @@ export class Marcher {
       if (this.nc >= this.cd.length) this.growCache();
       const k = this.nc++;
       this.cd[k] = d1; this.ch[k] = this.height(L, px, pz, beta); this.cl[k] = L; this.cb[k] = beta;
-      if (px < 0 || pz < 0 || px > N || pz > N || d1 > this.world.viewDist) { this.cEnded = true; this.lastOut = k; }
+      // the generated world has no wrapping and no wall at its edge: past it
+      // the edge's own heights run on (the sea to the south and west, high
+      // ground to the north and east) as far as the view distance
+      const out = this.openEdge ? d1 > this.world.viewDist : px < 0 || pz < 0 || px > N || pz > N || d1 > this.world.viewDist;
+      if (out) { this.cEnded = true; this.lastOut = k; }
       else if (L + 1 < LEVELS && d1 >= this.dEnd[L]) { this.cL = L + 1; this.initDDA(d1); }
     }
     return true;
@@ -241,7 +246,7 @@ export class Marcher {
       if (c < tmax) tmax = c;
     }
     if (tmin >= tmax) return;
-    const idx = world.spans.idx, N = this.N;
+    const sp = world.spans;
     let d = tmin;
     const px = ex + dx * (d + 1e-6), pz = ez + dz * (d + 1e-6);
     let ix = Math.floor(px), iz = Math.floor(pz);
@@ -251,12 +256,8 @@ export class Marcher {
     let tMaxZ = (dz > 0 ? iz + 1 - (ez + dz * d) : (ez + dz * d) - iz) / adz + d;
     while (d < tmax && ev.n < 1024) {
       const next = Math.min(tMaxX, tMaxZ, tmax);
-      if (ix >= 0 && iz >= 0 && ix < N && iz < N) {
-        const c = iz * N + ix;
-        if (idx[c] >= 0) {
-          ev.d[ev.n] = d; ev.o[ev.n] = next; ev.c[ev.n] = c; ev.a[ev.n] = axis; ev.n++;
-        }
-      }
+      const s = spanAt(sp, ix, iz);
+      if (s >= 0) { ev.d[ev.n] = d; ev.o[ev.n] = next; ev.c[ev.n] = s; ev.a[ev.n] = axis; ev.n++; }
       if (tMaxX < tMaxZ) { d = tMaxX; tMaxX += 1 / adx; ix += stepX; axis = 0; }
       else { d = tMaxZ; tMaxZ += 1 / adz; iz += stepZ; axis = 1; }
     }
@@ -265,8 +266,8 @@ export class Marcher {
   spanCell(rs, e) {
     const { v, world } = this;
     const ev = this.ev;
-    const din = Math.max(ev.d[e], 0.01), dout = ev.o[e], cell = ev.c[e], axis = ev.a[e];
-    const sp = world.spans, s = sp.idx[cell];
+    const din = Math.max(ev.d[e], 0.01), dout = ev.o[e], s = ev.c[e], axis = ev.a[e];
+    const sp = world.spans;
     const flags = sp.flags[s];
     const ey = rs.ey, dx = this.dx, dz = this.dz, act = rs.act;
     let y1 = sp.y1[s];

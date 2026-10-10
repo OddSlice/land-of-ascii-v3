@@ -4,6 +4,7 @@
 import { LEVELS } from '../../world/terrain.js';
 import { sunDir, moonDir, WIND } from '../../world/sky.js';
 import { fbm } from '../../world/noise.js';
+import { spanAt } from '../../world/spans.js';
 import { SEED } from '../../world/layout.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -13,10 +14,10 @@ const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ?
 export function buildOccluders(world) {
   const { terrain, spans, objects, N, NN } = world;
   const occ = Float32Array.from(terrain.levels[0].H);
-  const { idx, y1 } = spans;
-  for (let z = 0; z < N; z++) {
-    for (let x = 0; x < N; x++) {
-      const s = idx[z * N + x];
+  const { y1, box } = spans;
+  for (let z = box.z0; z < box.z1; z++) {
+    for (let x = box.x0; x < box.x1; x++) {
+      const s = spanAt(spans, x, z);
       if (s < 0) continue;
       const top = y1[s];
       for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
@@ -105,15 +106,49 @@ function downsampleRows(src, n, out, k0, k1) {
   }
 }
 
+// Cast shadows are recomputed when the light has moved by a step: 15 s of
+// game time on the lab's valley, 2 minutes on a big map. The key names the
+// step; every thread derives the same one from the hour.
+export function lightKey(hour, N) {
+  const kph = N <= 512 ? 240 : 30;
+  const isSun = sunDir(hour)[1] > -0.035;
+  const q = Math.round(hour * kph);
+  return { key: (isSun ? 's' : 'm') + q, keyHour: q / kph, isSun };
+}
+
+// The arrays shadows are kept in: V, the shadow volume's height over each
+// node, and S, the ground's shadow per level. The generated world keeps S as
+// bytes (0..255) to save memory; the lab and the stress scene as 0..1.
+export function shadowStore(world, Shared = ArrayBuffer) {
+  const NN = world.NN, bytes = world.kind === 'world';
+  const V = new Float32Array(new Shared(NN * NN * 4));
+  const S = [];
+  for (let L = 0, n = world.N; L < LEVELS; L++, n >>= 1) {
+    const m = (n + 1) * (n + 1);
+    S.push(bytes ? new Uint8ClampedArray(new Shared(m)) : new Float32Array(new Shared(m * 4)));
+  }
+  return { V, S };
+}
+
 export class Light {
-  constructor(world) {
+  // `shared`: shadows are swept by another worker into these stores
+  // ({ V: [V0, V1], S: [S0, S1] }); each frame says which one to read.
+  // `store`: sweep into these arrays instead of new ones.
+  constructor(world, { shared = null, store = null, occ = null } = {}) {
     this.world = world;
     this.N = world.N; this.NN = world.NN;
-    this.occ = buildOccluders(world);
-    this.V = new Float32Array(world.NN * world.NN);
-    // ground shadow per level, 0..1
-    this.S = [];
-    for (let L = 0, n = world.N; L < LEVELS; L++, n >>= 1) this.S.push(new Float32Array((n + 1) * (n + 1)));
+    this.sK = world.kind === 'world' ? 1 / 255 : 1;     // S as bytes: scale back to 0..1
+    this.shared = shared;
+    if (shared) {
+      this.occ = null;
+      this.V = shared.V[0]; this.S = shared.S[0];
+    } else {
+      this.occ = occ || buildOccluders(world);
+      const st = store || shadowStore(world);
+      this.V = st.V;
+      // ground shadow per level, 0..1 (or 0..255)
+      this.S = st.S;
+    }
     this.key = null;
     this.job = null;                   // a shadow sweep in progress
     // Every worker sweeps the whole grid, so the work is spread over frames,
@@ -132,8 +167,9 @@ export class Light {
     this.cloud = new Float32Array(this.G * this.G);
   }
 
-  // Called once per frame with the frame's hour and clock.
-  update(hour, t) {
+  // Called once per frame with the frame's hour and clock (and, with shared
+  // shadows, the frame's { buf, settled }).
+  update(hour, t, shadow) {
     const sun = sunDir(hour), moon = moonDir(hour);
     // the light that shades the ground: the sun while it is near or above
     // the horizon, else the moon
@@ -148,6 +184,13 @@ export class Light {
     // direct strength fades as the light reaches the horizon
     this.dirFade = smooth(-0.035, 0.06, L[1]);
 
+    if (this.shared) {
+      // swept by the shadow worker: read the store this frame was given
+      this.V = this.shared.V[shadow.buf]; this.S = this.shared.S[shadow.buf];
+      this.sharedSettled = !!shadow.settled;
+      this.updateClouds(t);
+      return;
+    }
     // cast shadows: recomputed when the light moves by a step (15 s of game
     // time, 2 minutes on a big map)
     const q = Math.round(hour * this.keysPerHour);
@@ -170,7 +213,15 @@ export class Light {
   }
 
   // True while cast shadows are still being brought up to date.
-  get pending() { return this.job !== null; }
+  get pending() { return this.shared ? !this.sharedSettled : this.job !== null; }
+
+  // One whole sweep, at once, for the light at `keyHour` (the shadow worker).
+  sweepNow(keyHour, isSun) {
+    this.keyHour = keyHour; this.isSun = isSun; this.job = null;
+    const t0 = performance.now();
+    this.startSweep(); this.runSweep(Infinity);
+    return performance.now() - t0;
+  }
 
   startSweep() {
     const Lq = this.isSun ? sunDir(this.keyHour) : moonDir(this.keyHour);
@@ -192,9 +243,9 @@ export class Light {
   // The ground shadow of one swept line.
   shadeLine(line) {
     const { V, N, NN } = this, job = this.job, S0 = this.S[0];
-    const H = this.world.terrain.levels[0].H;
-    if (job.xdom) for (let k = 0, j = line; k <= N; k++, j += NN) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]);
-    else for (let i = 0, j = line * NN; i <= N; i++, j++) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]);
+    const H = this.world.terrain.levels[0].H, k1 = 1 / this.sK;
+    if (job.xdom) for (let k = 0, j = line; k <= N; k++, j += NN) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]) * k1;
+    else for (let i = 0, j = line * NN; i <= N; i++, j++) S0[j] = smooth(-0.1, 0.45, V[j] - H[j]) * k1;
   }
 
   // Work through the sweep (then the coarser levels) until `budget` nodes are done.

@@ -109,7 +109,8 @@ const methods = {
     const graze = Math.abs(this.dx * nx + s * ny + this.dz * nz) / len;
     const fp = D * len * v.colAngle / Math.max(0.04, graze);
     const N = this.N, NN = this.NN;
-    const fine = bil1(T.fine, x, z, N, NN);
+    const tk = T.toneK || 1;          // the generated world keeps detail as small integers
+    const fine = bil1(T.fine, x, z, N, NN) * tk;
     const jitter = fine * fadeOf(1.5, fp);
     let mat;
     // a square of nothing but grass (or forest floor) needs no weighing
@@ -128,7 +129,7 @@ const methods = {
     else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
     else mat = MAT.GRASS;
     const Ld = light.L;
-    const shadow = bil2(lv[L], light.S[L], x, z) * (1 - beta) + (beta > 0 ? bil2(lv[L + 1], light.S[L + 1], x, z) * beta : 0);
+    const shadow = (bil2(lv[L], light.S[L], x, z) * (1 - beta) + (beta > 0 ? bil2(lv[L + 1], light.S[L + 1], x, z) * beta : 0)) * light.sK;
     const cloud = light.cloudAt(x, z);
     let lam, tone;
     if (mat === MAT.WATER) {
@@ -141,7 +142,7 @@ const methods = {
     } else {
       lam = nx * Ld[0] + ny * Ld[1] + nz * Ld[2];
       if (lam < 0) lam = 0;
-      const patch = bil1(T.tone, x, z, N, NN);
+      const patch = bil1(T.tone, x, z, N, NN) * tk;
       if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fadeOf(3, fp) + 0.6 * patch + 0.3 * fine * fadeOf(2, fp);
       else tone = 0.75 * patch * fadeOf(5, fp) + 0.45 * fine * fadeOf(1.8, fp);
       // (judged by the cell's footprint along the view, where rows are tall)
@@ -217,14 +218,15 @@ const methods = {
     const Ld = light.L;
     let lam = nx * Ld[0] + ny * Ld[1] + nz * Ld[2];
     if (lam < 0) lam = 0;
-    const fine = bil1(T.fine, bx, bz, N, NN);
+    const tk = T.toneK || 1;
+    const fine = bil1(T.fine, bx, bz, N, NN) * tk;
     const depth = W - by;
     const mat = depth < 1.2 && bilU8(T.wSand, bx, bz, N, NN) > 0.5 + 0.2 * fine ? MAT.SAND : MAT.BED;
     // shadows fall on the surface; the bed under it shares them
     const shadow = light.shadowAt(bx, W, bz);
     const cloud = light.cloudAt(bx, bz);
     const glow = this.glowAt(bx, by, bz, nx, ny, nz);
-    const tone = 0.25 * bil1(T.tone, bx, bz, N, NN) + 0.15 * fine;
+    const tone = 0.25 * bil1(T.tone, bx, bz, N, NN) * tk + 0.15 * fine;
     this.write(ci, 2, mat, lam, shadow, cloud, glow, tone, u * Math.sqrt(1 + st * st));
   },
 
@@ -255,7 +257,7 @@ const methods = {
       const kJoint = 1 - smooth(0.035, 0.09, fp), kBlock = 1 - smooth(0.06, 0.2, fp);
       tone = -0.9 * joint * kJoint + 0.35 * block * kBlock;
     } else {
-      tone = 0.4 * bil1(this.world.terrain.fine, x, z, this.N, this.NN);
+      tone = 0.4 * bil1(this.world.terrain.fine, x, z, this.N, this.NN) * (this.world.terrain.toneK || 1);
     }
     const cloud = light.cloudAt(x, z);
     const glow = this.glowAt(x, y, z, nx, ny, nz);

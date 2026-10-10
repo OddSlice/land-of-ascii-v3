@@ -9,6 +9,8 @@ import { clusterAt } from '../../world/sky.js';
 import { hash2, vnoise } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { project } from './view.js';
+import { waterRays } from './water.js';
+import { bil2, bilU8 } from './sample.js';
 import { makePalette } from '../../resolve.js';
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((b) => (b + 0.5) / 16);
@@ -32,6 +34,24 @@ export class SkyPass {
     this.world = world;
     this.light = light;
     this.cl = [];
+    // the generated world's sea runs on past the edge of the map and past the
+    // view distance, so it meets the sky at the horizon, not in a line
+    this.seaLevel = world.openEdge && world.sea !== undefined ? world.sea : null;
+  }
+
+  // A ray that met nothing within the view distance and comes down to sea
+  // level over open sea (past the map's edge, the edge's sea runs on): a
+  // calm water surface whose mirror is the sky, filled in by run() below.
+  farSea(v, rays, m, ci, p, s) {
+    const sea = this.seaLevel, T = this.world.terrain, N = this.world.N, NN = this.world.NN;
+    if (v.ey <= sea) return false;
+    const D = (v.ey - sea) / -s;
+    const x = v.ex + rays.pdx[p] * D, z = v.ez + rays.pdz[p] * D;
+    if (bilU8(T.wWater, x, z, N, NN) < 0.5 || Math.abs(bil2(T.levels[0], T.levels[0].H, x, z) - sea) > 0.05) return false;
+    const wr = waterRays(s, 0);
+    m.write(ci, 0, MAT.WATER, this.light.L[1], 0, this.light.cloudAt(x, z), 0, wr.F * 2 - 1, D * Math.sqrt(1 + s * s));
+    rays.rsig[ci] = wr.sr; rays.rdw[ci] = D; rays.rey[ci] = 2 * sea - v.ey; rays.rdepth[ci] = Infinity;
+    return true;
   }
 
   // Cloud positions and shapes for this frame (the same in every stripe):
@@ -76,6 +96,8 @@ export class SkyPass {
       const dx = rays.pdx[p] * inv, dy = s * inv, dz = rays.pdz[p] * inv;
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE;
+      // the open sea, beyond the view distance (generated world only)
+      if (dy < 0 && this.seaLevel !== null && this.farSea(v, rays, m, ci, p, s)) continue;
       // clouds
       if (dy > 0.01 && this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0)) continue;
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
