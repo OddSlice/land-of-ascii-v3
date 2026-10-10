@@ -33,6 +33,7 @@ const state = {
   hour: LOOK.hours.day, t: 0,
   running: false,            // T: time of day moves
   frozen: false,             // lab.freeze: every clock stands still
+  held: false,               // lab.setCamera with a height: no walking or falling
   preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 4) - 1)) : 3,
   cam: 0, camName: CAMERAS[0].name,
   seq: 0, presented: 0, failed: false,
@@ -115,6 +116,7 @@ function setTime(name) {
 }
 function useCamera(i) {
   const c = CAMS[i];
+  state.held = false;
   state.cam = i; state.camName = c.name;
   standAt(c.x, c.z, c.yaw, c.pitch);
   setTime(c.time);
@@ -227,7 +229,10 @@ function tick(now) {
     player.yaw += look.yaw;
     player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, player.pitch + look.pitch));
   }
-  player.update(dt, input.keys);
+  // an eye placed at a height by lab.setCamera stays there until a walk key
+  const k = input.keys;
+  if (state.held && (k.KeyW || k.KeyA || k.KeyS || k.KeyD)) state.held = false;
+  if (!state.held) player.update(dt, k);
   if (!state.frozen) {
     state.t += dt;
     if (state.running) state.hour = (state.hour + dt * CLOCK_RATE) % 24;
@@ -271,9 +276,11 @@ Object.assign(lab, {
   cameras: CAMS,
   // Stand at a fixed camera (0..5, or 0..2 in the stress scene); also sets its time of day.
   camera(i) { useCamera(i); },
-  // Place the eye. Angles in degrees; without y the feet stand on the ground.
+  // Place the eye. Angles in degrees; without y the feet stand on the ground,
+  // with y the eye stays at that height until a walk key is pressed.
   setCamera({ x, z, y, yaw = 0, pitch = 0 }) {
     player.place(x, z, yaw * DEG, pitch * DEG, y !== undefined ? y - EYE : undefined);
+    state.held = y !== undefined;
     state.camName = 'free';
   },
   // Freeze every clock (time of day and the animation clock).
