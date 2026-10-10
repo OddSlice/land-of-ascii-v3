@@ -62,24 +62,20 @@ const NEG = -1e9;
 function sweepLine(job, occ, V, n, NN) {
   const { xdom, s, frac, drop, line } = job;
   const prev = line + s;
-  const lerpAt = (arr, base, stride, pos) => {
-    if (pos <= 0) return arr[base];
-    if (pos >= n) return arr[base + n * stride];
-    const p0 = Math.floor(pos), f = pos - p0;
-    return arr[base + p0 * stride] * (1 - f) + arr[base + (p0 + 1) * stride] * f;
-  };
-  if (xdom) {
-    for (let k = 0; k <= n; k++) {
-      const pos = k + frac;
-      const o = lerpAt(occ, prev, NN, pos), v = lerpAt(V, prev, NN, pos);
-      V[k * NN + line] = (o > v ? o : v) - drop;
+  // each node reads the line before it at k + frac, between two nodes
+  // `step` apart (clamped at the ends)
+  const base = xdom ? prev : prev * NN, step = xdom ? NN : 1, out = xdom ? line : line * NN, ostep = xdom ? NN : 1;
+  for (let k = 0, w = out; k <= n; k++, w += ostep) {
+    const pos = k + frac;
+    let o, v;
+    if (pos <= 0) { o = occ[base]; v = V[base]; } else if (pos >= n) {
+      const j = base + n * step; o = occ[j]; v = V[j];
+    } else {
+      const p0 = Math.floor(pos), f = pos - p0, j = base + p0 * step;
+      o = occ[j] * (1 - f) + occ[j + step] * f;
+      v = V[j] * (1 - f) + V[j + step] * f;
     }
-  } else {
-    for (let i = 0; i <= n; i++) {
-      const pos = i + frac;
-      const o = lerpAt(occ, prev * NN, 1, pos), v = lerpAt(V, prev * NN, 1, pos);
-      V[line * NN + i] = (o > v ? o : v) - drop;
-    }
+    V[w] = (o > v ? o : v) - drop;
   }
 }
 
@@ -120,9 +116,13 @@ export class Light {
     for (let L = 0, n = world.N; L < LEVELS; L++, n >>= 1) this.S.push(new Float32Array((n + 1) * (n + 1)));
     this.key = null;
     this.job = null;                   // a shadow sweep in progress
-    // grid nodes worked per frame while a sweep is spread out, about 3 ms
-    // (the lab's valley is done in one go)
-    this.budget = world.N <= 512 ? Infinity : 256 * 1024;
+    // On a big map every worker sweeps the whole grid, so the work is spread
+    // thin: 64K grid nodes a frame (about 1.5 ms with eight workers at once),
+    // and a new sweep only every 2 game minutes (half a degree of sun),
+    // which takes about 1.5 s to come through. The lab's valley is swept in
+    // one go whenever the light moves by 15 game seconds.
+    this.budget = world.N <= 512 ? Infinity : 64 * 1024;
+    this.keysPerHour = world.N <= 512 ? 240 : 30;
     this.stale = false;                // the light moved during a sweep
     this.sweepMs = 0;
     // the cloud-shadow grid: 8 m apart on the lab's valley, 32 m on the big map
@@ -147,12 +147,13 @@ export class Light {
     // direct strength fades as the light reaches the horizon
     this.dirFade = smooth(-0.035, 0.06, L[1]);
 
-    // cast shadows: recomputed when the light moves by a step (15 s of game time)
-    const q = Math.round(hour * 240);
+    // cast shadows: recomputed when the light moves by a step (15 s of game
+    // time, 2 minutes on a big map)
+    const q = Math.round(hour * this.keysPerHour);
     const key = (this.isSun ? 's' : 'm') + q;
     if (key !== this.key) {
       const first = this.key === null;
-      this.key = key; this.keyHour = q / 240;
+      this.key = key; this.keyHour = q / this.keysPerHour;
       // a sweep under way finishes first, then the next starts from the light
       // as it is then, so shadows keep up while the clock runs
       if (this.job) this.stale = true;

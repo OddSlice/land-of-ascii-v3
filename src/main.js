@@ -34,7 +34,8 @@ const state = {
   running: false,            // T: time of day moves
   frozen: false,             // lab.freeze: every clock stands still
   held: false,               // lab.setCamera with a height: no walking or falling
-  preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 4) - 1)) : 3,
+  // density 3 by default (the phase 0b verdict); ?density=1..4 or −/+ for the others
+  preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1)) : 2,
   cam: 0, camName: CAMERAS[0].name,
   seq: 0, presented: 0, failed: false,
 };
