@@ -116,12 +116,13 @@ export class Light {
     for (let L = 0, n = world.N; L < LEVELS; L++, n >>= 1) this.S.push(new Float32Array((n + 1) * (n + 1)));
     this.key = null;
     this.job = null;                   // a shadow sweep in progress
-    // On a big map every worker sweeps the whole grid, so the work is spread
-    // thin: 64K grid nodes a frame (about 1.5 ms with eight workers at once),
-    // and a new sweep only every 2 game minutes (half a degree of sun),
-    // which takes about 1.5 s to come through. The lab's valley is swept in
-    // one go whenever the light moves by 15 game seconds.
-    this.budget = world.N <= 512 ? Infinity : 64 * 1024;
+    // Every worker sweeps the whole grid, so the work is spread over frames,
+    // or a frame that also sweeps would be shown late. On a big map: 64K grid
+    // nodes a frame (about 1.5 ms with eight workers at once), and a new sweep
+    // only every 2 game minutes (half a degree of sun), which takes about
+    // 1.5 s to come through. The lab's valley: 96K nodes a frame, a sweep
+    // every 15 game seconds that comes through in four frames.
+    this.budget = world.N <= 512 ? 96 * 1024 : 64 * 1024;
     this.keysPerHour = world.N <= 512 ? 240 : 30;
     this.stale = false;                // the light moved during a sweep
     this.sweepMs = 0;

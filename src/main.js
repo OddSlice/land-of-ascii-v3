@@ -16,6 +16,7 @@ import { Input } from './app/input.js';
 import { Hud } from './app/hud.js';
 import { RefView } from './app/refview.js';
 import { LookPanel, lookFrom, nextOption } from './app/lookpanel.js';
+import { Pacer } from './app/pace.js';
 import { CAMERAS } from './app/cameras.js';
 import { layout, cellWidth, TARGETS } from './app/grid.js';
 import { MAX_PITCH } from './scene/cpu/view.js';
@@ -173,7 +174,7 @@ let collectors = [];
 
 // march and resolve are each the slowest stripe's; worker is the slowest
 // stripe's march + resolve together
-function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worker) {
+function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worker, yaw, trip = 0) {
   light.settled = settled;
   if (sweepMs > light.sweepMs) light.sweepMs = sweepMs;
   const now = performance.now();
@@ -184,7 +185,8 @@ function presented(seq, march, resolve, drawMs, latency, settled, sweepMs, worke
   timing.resolve += (resolve - timing.resolve) * 0.2;
   timing.draw += (drawMs - timing.draw) * 0.2;
   state.presented = seq;
-  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker });
+  // `at`: when it was shown; `yaw`: the camera it was drawn from
+  for (const c of collectors) c.push({ interval, march, resolve, draw: drawMs, latency, worker, at: now, yaw, trip, every: pacer.every, lag: pacer.lag, dropped: pacer.dropped || 0 });
   // (with the clock running the light keeps moving, so shadows are always
   // catching up a little: then a frame is enough)
   const caughtUp = settled || state.running;
@@ -203,7 +205,7 @@ function renderLocal() {
   full = r.cells;
   presenter.upload(0, f.cols, r.cells);
   presenter.draw();
-  presented(f.seq, r.march, r.resolve, performance.now() - t0, 0, r.settled, r.sweepMs, r.march + r.resolve);
+  presented(f.seq, r.march, r.resolve, performance.now() - t0, 0, r.settled, r.sweepMs, r.march + r.resolve, f.cam.yaw);
 }
 
 function presentPool(res) {
@@ -223,13 +225,15 @@ function presentPool(res) {
     for (let y = 0; y < rows; y++) full.set(p.cells.subarray(y * sw * CELL_STRIDE, (y + 1) * sw * CELL_STRIDE), (y * grid.cols + p.c0) * CELL_STRIDE);
   }
   presenter.draw();
-  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent, settled, sweepMs, worker);
+  presented(res.seq, march, resolve, performance.now() - t0, performance.now() - res.sent, settled, sweepMs, worker, res.frame.cam.yaw, res.ready - res.sent);
 }
 
 let last = performance.now();
 let started = false;
+const pacer = new Pacer();
 function tick(now) {
   if (state.failed) return;
+  pacer.onRefresh(now);
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
   const look = input.takeLook(dt);
@@ -248,9 +252,17 @@ function tick(now) {
   try {
     if (local) renderLocal();
     else if (started) {
-      const res = pool.take();
-      if (res) presentPool(res);
-      if (!pool.busy) pool.submit(makeFrame());
+      // show the newest finished frame whose refresh has come (an older one
+      // still waiting has been overtaken, and is dropped), then ask for the
+      // next if it is time (see app/pace.js)
+      let res = null, dropped = -1;
+      while (pool.finished.length && pacer.due(pool.finished[0].tag)) { res = pool.finished.shift(); dropped++; }
+      pacer.dropped = dropped;
+      if (res) {
+        presentPool(res);
+        pacer.shown(res.tag, res.ready - res.sent, Math.max(...res.parts.map((p) => p.march + p.resolve)));
+      }
+      if (pacer.shouldSend(pool.inFlight + pool.finished.length)) { pool.submit(makeFrame(), pacer.tick); pacer.sent(); }
     }
   } catch (err) {
     fail(String(err && err.stack || err));
@@ -260,7 +272,7 @@ function tick(now) {
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
     threads: THREADS, hour: state.hour, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
-    stress: STRESS, buildMs: buildMs(), sweepMs: light.sweepMs, settled: light.settled,
+    stress: STRESS, buildMs: buildMs(), sweepMs: light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
   });
   lookPanel.update(state.look);
   requestAnimationFrame(tick);
@@ -310,6 +322,9 @@ Object.assign(lab, {
   // setLookPanel(on) shows the panel.
   setLook(look) { state.look = lookFrom(look, state.look); return { ...state.look }; },
   resetLook() { state.look = lookFrom({}); return { ...state.look }; },
+  // Hold the frame pacing: a frame every `every` refreshes, each shown `lag`
+  // refreshes after it was asked for (setPace() for adaptive again).
+  setPace(every, lag = every) { pacer.fixed = every ? [every, lag] : null; if (every) { pacer.every = every; pacer.lag = lag; } },
   look() { return { ...state.look }; },
   setLookPanel(on) { if (lookPanel.on !== !!on) lookPanel.toggle(); },
   state() {
@@ -319,6 +334,7 @@ Object.assign(lab, {
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
       isolated: !!self.crossOriginIsolated, look: { ...state.look },
+      pace: local ? 1 : pacer.every, lag: local ? 0 : pacer.lag, refresh: pacer.refresh,
     };
   },
   // Resolves once a frame made after this call is on screen, with cast

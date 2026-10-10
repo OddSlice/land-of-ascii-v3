@@ -365,6 +365,47 @@ The first lake walk showed the tufts as flat ellipses at your feet, which led to
 
 ---
 
+## 6b. After phase 0c: turning no longer skips
+
+Martin reported that turning sometimes felt as if the camera skipped.
+
+**The cause was frame pacing, not the camera.**
+- A frame shows the camera as it was when the frame was asked for.
+- The workers' time varies from frame to frame while you turn, because the view sweeps across water and trees. In the lab's lake view their slowest stripe took 4 ms usually and 7–9 ms one frame in ten.
+- At 120 Hz, a frame that missed the 8.3 ms refresh reached the screen one refresh later than the others. The view then stalled for a refresh and jumped to catch up, several times a second.
+- Firefox, whose workers are slower, did it more. Running the clock made it worse, because the lab's shadows were also recomputed in one go four times a second.
+
+**The fix** (`src/app/pace.js`, the pool and the main loop):
+- **Same delay:** every frame is shown the same number of refreshes after it was asked for (`lag`): two on a fast display, one on a 60 Hz one.
+- **Overlap:** up to that many frames may be in flight, so the workers start the next frame while the page waits for the rest of this one.
+- **Steady rate:** frames are asked for every refresh while the workers keep up on average, and every second refresh where they cannot. That gives a steady 120 or a steady 60, never a mix.
+- **Hysteresis:** the rate slows when the workers' average stops fitting with 0.7 ms to spare, and speeds up again only once it fits with 1.8 ms to spare.
+- **Single spikes ignored:** a rare slow frame, such as a garbage collection, costs one late frame and does not change the pacing.
+- **Lab shadows:** recomputed over four frames, as the big map's already were.
+- **What it leaves alone:** pacing changes only when frames are shown, never what they show. Identity is unchanged across 0, 1, 3, 5 and 8 workers, and the regression lookbook reports 0.00% change.
+- **HUD:** it says "(every 2nd refresh)" when the rate is halved.
+
+**Measured** with the new `node tools/smooth.mjs`. The right arrow is held for 6 s (a steady 1.7 radians a second) in a visible window, three seconds after loading. A "jump" is a frame where the view moved on more than 1.4 times the time it was on screen; a "stall" is one where it moved less than 0.65 times. The table compares the build before the fix with the build after:
+
+| Browser | View | Before: fps, jumps, stalls | After: fps, jumps, stalls |
+|---|---|---|---|
+| Chromium | lab, road to the wall | 118, 1.3%, 1.0% | 119, 0.3%, 0.3% |
+| Chromium | lab, lake shore | 109, 3.6%, 3.1% | 89, 0%, 0% |
+| Chromium | lab, lake shore, clock running | 105, 5.3%, 4.7% | 82, 0%, 0% |
+| Chromium | stress, across the lake | 116, 2.1%, 1.9% | 98, 0.1%, 0% |
+| Firefox | lab, road to the wall | 115, 2.4%, 1.8% | 109, 0.4%, 0.3% |
+| Firefox | lab, lake shore | 85, 5.7%, 5.3% | 62, 1.1%, 0.4% |
+| Firefox | lab, lake shore, clock running | 84, 7.1%, 6.0% | 59, 1.0%, 0.6% |
+| Firefox | stress, across the lake | 85, 9.6%, 9.3% | 60, 2.6%, 0.8% |
+
+**What it costs:**
+- **Frame rate:** where the workers cannot keep up with 120, the view now runs at a steady 60 instead of an uneven 85–110. In Chromium that happens only as the view sweeps past the heaviest direction, the lake with its treeline. In Firefox it holds 60 in the lake views.
+- **Latency:** a frame now reaches the screen 16.7 ms after it was asked for on a 120 Hz display, up to 33 ms in Firefox's heaviest views.
+
+**Not ruled out:** some browsers occasionally report a wrong, very large mouse movement under pointer lock, which also reads as a skip. Nothing in these measurements needed it, and nothing guards against it yet; it is the next thing to look at if skips remain with the mouse.
+
+---
+
 ## 7. Tools
 
 | Command | What it does |
@@ -376,6 +417,11 @@ The first lake walk showed the tufts as flat ellipses at your feet, which led to
 | `node tools/bench.mjs --look ... --root DIR` | frame times under a look, or of another build |
 | `node tools/shoot.mjs --look ... --out DIR` | the fixed cameras and the private side-by-side sheets under a look |
 | `node tools/walk.mjs --look ... --suffix NAME` | the walk videos under a look |
+| `node tools/smooth.mjs [--root DIR]` | how evenly the view advances while turning: frames that jump or stall (section 6b) |
 
-New in `window.lab`: `setLook({ tree, cloud, meadow, shallows })`, `resetLook()`, `look()`, `setLookPanel(on)`; `state().look`.
+New in `window.lab`:
+- `setLook({ tree, cloud, meadow, shallows })`, `resetLook()`, `look()`, `setLookPanel(on)`;
+- `setPace(every, lag)` to hold the frame pacing (`setPace()` for adaptive again);
+- `state().look`, `state().pace` and `state().lag`;
+- each `timings(n)` entry carries `at` (when the frame was shown), `yaw` (the camera it was drawn from), `trip`, `every`, `lag` and `dropped`.
 

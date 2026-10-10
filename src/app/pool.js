@@ -6,6 +6,11 @@
 // share of the work, judged from the last frame's time per column, so the
 // slowest worker is not left with all the water or all the forest. Nothing
 // in a cell depends on where the edges fall.
+//
+// More than one frame can be in flight: each worker takes its stripes of
+// them in order, so it can start the next frame while the page is still
+// waiting for the others' stripes of this one (see app/pace.js). Finished
+// frames wait in `finished`, oldest first.
 
 /* global __WORKER_SOURCE__ */
 // The built single-file page carries the worker's bundled source inline.
@@ -29,8 +34,8 @@ export class Pool {
     this.buildMs = 0;
     this.workers = [];
     this.ready = 0;
-    this.pending = 0;
-    this.results = null;
+    this.flying = [];         // frames asked for and not yet back, oldest first
+    this.finished = [];       // frames back and not yet shown, oldest first
     this.failed = false;
     const url = workerURL();
     for (let i = 0; i < count; i++) {
@@ -59,19 +64,23 @@ export class Pool {
       this.buildMs = Math.max(this.buildMs, d.buildMs);
       if (++this.ready === this.count) this.readyResolve();
     } else if (d.type === 'done') {
-      if (!this.inflight || d.seq !== this.inflight.seq) return;
-      this.inflight.parts[i] = d;
-      if (--this.pending === 0) {
-        this.results = this.inflight;
-        this.inflight = null;
-        this.balance(this.results.parts);
+      const f = this.flying.find((x) => x.seq === d.seq);
+      if (!f) return;
+      f.parts[i] = d;
+      if (--f.pending === 0) {
+        f.ready = performance.now();
+        // frames finish in the order they were asked for
+        this.flying.splice(this.flying.indexOf(f), 1);
+        this.finished.push(f);
+        this.balance(f.parts);
       }
     } else if (d.type === 'error') {
       this.fail(`render worker ${i}: ${d.message}\n${d.stack}`);
     }
   }
 
-  get busy() { return !!this.inflight; }
+  // How many frames are asked for and not yet back.
+  get inFlight() { return this.flying.length; }
 
   stripes(cols) {
     const n = this.count;
@@ -111,19 +120,13 @@ export class Pool {
     this.edges = next;
   }
 
-  submit(frame) {
+  // Ask for a frame; `tag` is kept with it (the refresh it was asked in).
+  submit(frame, tag) {
     const st = this.stripes(frame.cols);
-    this.inflight = { seq: frame.seq, frame, parts: new Array(this.count), sent: performance.now() };
-    this.pending = this.count;
+    this.flying.push({ seq: frame.seq, frame, tag, parts: new Array(this.count), pending: this.count, sent: performance.now() });
     for (let i = 0; i < this.count; i++) {
       const [c0, c1] = st[i];
       this.workers[i].postMessage({ type: 'frame', id: i, frame, c0, c1 });
     }
-  }
-
-  take() {
-    const r = this.results;
-    this.results = null;
-    return r;
   }
 }

@@ -17,7 +17,7 @@ export class Hud {
     const hh = Math.floor(s.hour), mm = Math.floor((s.hour - hh) * 60);
     const time = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     this.el.textContent =
-      `${f(s.fps)} fps   march ${f(s.march)} ms   resolve ${f(s.resolve)} ms   draw ${f(s.draw)} ms\n` +
+      `${f(s.fps)} fps${s.pace > 1 ? ` (every ${s.pace === 2 ? '2nd' : s.pace === 3 ? '3rd' : `${s.pace}th`} refresh)` : ''}   march ${f(s.march)} ms   resolve ${f(s.resolve)} ms   draw ${f(s.draw)} ms\n` +
       `${s.cols} × ${s.rows} = ${s.cells.toLocaleString('en-US')} cells   density ${s.preset + 1}/4   ${s.threads ? `${s.threads} workers` : 'main thread'}\n` +
       `${time} ${s.timeName}${s.running ? ' ▸ running' : ''}${s.frozen ? ' (frozen)' : ''}   ${s.camName}\n` +
       (s.stress ? `stress scene: built in ${Math.round(s.buildMs)} ms, shadow sweep ${f(s.sweepMs)} ms${s.settled ? '' : ', shadows catching up'}\n` : '') +
