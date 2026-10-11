@@ -9,9 +9,41 @@ import { KIND, distanceTo } from './water.js';
 
 const SEA = SCALE.sea;
 
+// How far each node of the 4 m grid stands above the ground round it
+// (phase 2b): its height less the mean over SCALE.range.snowRelief[0] metres
+// (two box blurs), for the snow line.
+function relief(N, H) {
+  const n = N / 4, nn = n + 1, NN = N + 1, r = Math.max(1, Math.round(SCALE.range.snowRelief[0] / 4 / 2));
+  const a = new Float64Array(nn * nn), b = new Float64Array(nn * nn);
+  for (let k = 0; k <= n; k++) for (let i = 0; i <= n; i++) a[k * nn + i] = H[4 * k * NN + 4 * i];
+  const h0 = Float64Array.from(a);
+  const pass = (src, dst, along) => {
+    for (let k = 0; k <= n; k++) {
+      for (let i = 0; i <= n; i++) {
+        let s = 0;
+        for (let d = -r; d <= r; d++) {
+          let ii = along ? i + d : i, kk = along ? k : k + d;
+          ii = ii < 0 ? 0 : ii > n ? n : ii; kk = kk < 0 ? 0 : kk > n ? n : kk;
+          s += src[kk * nn + ii];
+        }
+        dst[k * nn + i] = s / (2 * r + 1);
+      }
+    }
+  };
+  for (let p = 0; p < 2; p++) { pass(a, b, true); pass(b, a, false); }
+  const out = new Float32Array(nn * nn);
+  for (let j = 0; j < out.length; j++) out[j] = h0[j] - a[j];
+  return { n, nn, R: out };
+}
+
 // Sand, rock and snow weights (0..255) for every node.
 export function materials(N, H, kind, level, seaDist, freshDist, seed) {
   const NN = N + 1, cells = NN * NN;
+  const rel = relief(N, H), RK = SCALE.range.snowRelief[1];
+  const reliefAt = (i, k) => {
+    const u = Math.min(rel.n - 1e-6, i / 4), w = Math.min(rel.n - 1e-6, k / 4), i0 = u | 0, k0 = w | 0, fx = u - i0, fz = w - k0, c = k0 * rel.nn + i0, R = rel.R;
+    return R[c] + (R[c + 1] - R[c]) * fx + (R[c + rel.nn] - R[c]) * fz + (R[c] - R[c + 1] - R[c + rel.nn] + R[c + rel.nn + 1]) * fx * fz;
+  };
   const wSand = new Uint8Array(cells), wRock = new Uint8Array(cells), wSnow = new Uint8Array(cells);
   for (let k = 0; k <= N; k++) {
     for (let i = 0; i <= N; i++) {
@@ -32,8 +64,11 @@ export function materials(N, H, kind, level, seaDist, freshDist, seed) {
       // rock: steep faces, and bare ground high in the range
       const high = smoothstep(SEA + 175, SEA + 225, h + 20 * n1) * smoothstep(0.22, 0.4, slope);
       wRock[j] = 255 * Math.min(1, smoothstep(0.62, 0.95, slope + 0.08 * n1) + high);
-      // snow on the tops, not on the steepest faces
-      wSnow[j] = 255 * smoothstep(SCALE.range.snow - 8, SCALE.range.snow + 8, SEA + (h - SEA) + 14 * n1) * (1 - smoothstep(0.9, 1.25, slope));
+      // snow on the tops, not on the steepest faces, and judged lower where
+      // a point stands above the ground round it (a crest just over the line
+      // stays bare; snow lingers in the hollows)
+      const hs = h > SCALE.range.snow - 60 ? h - RK * reliefAt(i, k) : h;
+      wSnow[j] = 255 * smoothstep(SCALE.range.snow - 8, SCALE.range.snow + 8, SEA + (hs - SEA) + 14 * n1) * (1 - smoothstep(0.9, 1.25, slope));
     }
   }
   return { wSand, wRock, wSnow };

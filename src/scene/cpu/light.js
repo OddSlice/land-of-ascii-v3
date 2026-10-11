@@ -6,6 +6,7 @@ import { sunDir, moonFor, WIND } from '../../world/sky.js';
 import { fbm } from '../../world/noise.js';
 import { spanAt } from '../../world/spans.js';
 import { SEED } from '../../world/layout.js';
+import { weatherParams } from '../../weather.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
@@ -169,8 +170,10 @@ export class Light {
   }
 
   // Called once per frame with the frame's hour and clock (and, with shared
-  // shadows, the frame's { buf, settled }), its day and its night rule.
-  update(hour, t, shadow, day = 0, night = 'p1') {
+  // shadows, the frame's { buf, settled }), its day, its night rule and its
+  // weather (phase 2b: how much cloud casts shadows, how far it has drifted).
+  update(hour, t, shadow, day = 0, night = 'p1', weather = null) {
+    this.wp = weatherParams(weather);
     const sun = sunDir(hour), moon = moonFor(hour, day, night);
     this.day = day; this.night = night;
     // the light that shades the ground: the sun while it is near or above
@@ -293,7 +296,10 @@ export class Light {
     if (!this.cloudsOn) return;
     const H = this.world.terrain.levels[0].H, NN = this.NN, G = this.G, step = this.step;
     const lift = 900;                       // height of the cloud layer
-    const ox = WIND[0] * t, oz = WIND[1] * t;
+    const P = this.wp;
+    const ox = WIND[0] * t + P.drift, oz = WIND[1] * t;
+    // more cloud, more of the land in its shadow (fair: from n = 0)
+    const a0 = P.fair ? 0 : P.clouds < 1 ? 0.3 * (1 - P.clouds) : -0.2 * (P.clouds - 1);
     for (let gz = 0; gz < G; gz++) {
       for (let gx = 0; gx < G; gx++) {
         const x = gx * step, z = gz * step;
@@ -301,7 +307,7 @@ export class Light {
         const k = (lift - y) / L[1];
         const cx = x + L[0] * k - ox + 1920, cz = z + L[2] * k - oz + 1740;
         const n = fbm(cx / 105, cz / 85, SEED + 91, 3);
-        g[gz * G + gx] = smooth(0.0, 0.11, n);
+        g[gz * G + gx] = smooth(a0, a0 + 0.11, n);
       }
     }
   }

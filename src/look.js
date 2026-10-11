@@ -97,7 +97,13 @@ export const LOOK = {
   // top cell fades into the sky by how much of it the land covers.
   // `gully`: how much a gully (where rain gathers on the range) darkens rock
   // and snow; `strata`: the strata bands' spacing in metres of height.
-  far: { fade: [300, 900], form: 0.55, bands: 0.5, gully: 0.55, strata: 38, edgeFrom: 250 },
+  // (phase 2b) Each keyframe's `light.far` is the share of direct light far
+  // land keeps (faded in over `fade`): at dusk the range stands as a dark
+  // silhouette against the sky, not a pale lit face. `warm`: [how much less,
+  // from, to]: lit ground high up keeps more of its own colour against the
+  // air's (the share by its light, over that many metres above the sea), so
+  // far lit rock stays warm tan instead of turning cool grey.
+  far: { fade: [300, 900], form: 0.55, bands: 0.5, gully: 0.55, strata: 38, edgeFrom: 250, warm: [0.75, 60, 260] },
 
   // Glyph families, light to heavy. Any character works; the atlas draws the
   // shade blocks (░ ▒ ▓ █) itself when the font gets them wrong at small sizes.
@@ -136,8 +142,10 @@ export const LOOK = {
   },
 
   // The coast (phase 2a, the generated world): a darker wet band where sand
-  // meets water (`wet`, metres wide: by the sea, by a lake), drawn in the
-  // bed's colours; a broken foam line in the water that runs up and back
+  // meets water (`wet.sea`, metres wide; at a lake, phase 2b, the ground up
+  // to `wet.lake.rise` metres above the water, so the band is wide on a
+  // gentle shore and gone on a steep bank, at most `wet.lake.max` metres),
+  // drawn in the bed's colours; a broken foam line in the water that runs up and back
   // (`reach` metres out from the shore at its highest, `swing` more at its
   // lowest, over `period` seconds, `width` metres either side of its line,
   // at `strength`), a pure function of position and time, faded by how much
@@ -145,7 +153,7 @@ export const LOOK = {
   // ([length m, direction deg, speed m/s, height m] as the ripples), faded
   // like them as a cell's footprint passes its length.
   coast: {
-    wet: [2.2, 0.4],
+    wet: { sea: 2.2, lake: { rise: 0.05, max: 0.5 } },
     foam: {
       sea:  { reach: 1.2, swing: 1.8, period: 9, width: 0.55, strength: 0.95 },
       lake: { reach: 0.3, swing: 0.4, period: 6, width: 0.22, strength: 0.3 },
@@ -220,6 +228,10 @@ export const LOOK = {
   clouds: {
     A: { body: [0.14, 0.66], under: [0.16, 0.16], edge: 9, streak: 0 },
     B: { body: [0.05, 0.75], under: [0.1, 0.24], edge: 10, streak: 0.45 },
+    // (phase 2b) a dissolving edge is at least this many rows deep, even on a
+    // flat or far puff; a puff too small for one fades as a whole instead of
+    // scattering into single cells
+    edgeMin: 2.5,
   },
 
   // Meadow mottling, by strength (0 = none, as in phase 0b): soft patches
@@ -243,6 +255,97 @@ export const LOOK = {
   // colour times the ink amount, so night glyphs still carry light.
   inkFloor: '#2a2c34',
 
+  // Weather (phase 2b). Five kinds, each a set of numbers the renderer's
+  // existing systems understand; the frame carries how much of each applies
+  // (src/weather.js blends them), and `fair` is exactly the look before
+  // weather. A kind's numbers:
+  // - `clouds`: how many of the world's clouds are up (1: those of fair;
+  //   0 none, 2 every one); `size`: their puffs' size; `flat`, `stretch`:
+  //   flattening and stretching of a bank (on top of the time of day's);
+  //   `low`: the cloud base's height; `dark`: how far cloud tops darken
+  //   toward their undersides;
+  // - `sun`: the share of direct sun or moon light that gets through (also
+  //   how much of the sun and moon discs and their glitter shows);
+  //   `skylight`: how much of the light held back returns as soft light from
+  //   the whole sky; `cast`, `cloudShadow`: how strong cast shadows and cloud
+  //   shadows stay (1: as fair, 0: gone);
+  // - `grey`: how far the sky, the air and the clouds turn to the
+  //   keyframe's overcast colour (`weather.cast` in every keyframe); `dim`:
+  //   how bright they stay;
+  // - `air`: [density, height] of the aerial-perspective air (times
+  //   LOOK.air's), so overcast and rain are thicker; `mist`: how much of the
+  //   mist layer (below) lies on the land;
+  // - `wind`: metres a second toward the east and the north, for the cloud
+  //   drift (its eastward part), the rain's slant; `swell`: the sea swell's
+  //   height (times LOOK.coast.swell's);
+  // - `rain`: how hard it rains (streaks, rings on water, wetting);
+  //   `wet`: [how much darker, how much sky it mirrors] ground is when wet;
+  //   `night`: the light at night (times the night keyframes' ambient), so
+  //   an overcast night is darker than a clear dark-moon night, never black;
+  //   `stars`: how much of the starry sky shows.
+  weather: {
+    kinds: {
+      clear:    { clouds: 0.45, size: 0.9, flat: 1, stretch: 1, low: 1, dark: 0, sun: 1, skylight: 0, cast: 1, cloudShadow: 1, grey: 0, dim: 1, air: [0.7, 1], mist: 0, wind: [1.6, 0.5], swell: 0.8, rain: 0, wet: [0.28, 0.4], night: 1, stars: 1 },
+      fair:     { clouds: 1, size: 1, flat: 1, stretch: 1, low: 1, dark: 0, sun: 1, skylight: 0, cast: 1, cloudShadow: 1, grey: 0, dim: 1, air: [1, 1], mist: 0, wind: [2.4, 0], swell: 1, rain: 0, wet: [0.28, 0.36], night: 1, stars: 1 },
+      overcast: { clouds: 1, size: 1.35, flat: 0.55, stretch: 1.15, low: 0.82, dark: 0.35, sun: 0.12, skylight: 0.45, cast: 0.18, cloudShadow: 0, grey: 0.85, dim: 0.96, air: [1.5, 1.1], mist: 0, wind: [4.2, -1.2], swell: 1, rain: 0, wet: [0.28, 0.28], night: 0.68, stars: 0 },
+      rain:     { clouds: 1.7, size: 1.5, flat: 0.45, stretch: 1.2, low: 0.68, dark: 0.5, sun: 0.06, skylight: 0.5, cast: 0.08, cloudShadow: 0, grey: 1, dim: 0.88, air: [2.6, 0.9], mist: 0, wind: [5.5, -2.4], swell: 1.8, rain: 1, wet: [0.3, 0.3], night: 0.92, stars: 0 },
+      mist:     { clouds: 1, size: 1, flat: 1, stretch: 1, low: 1, dark: 0, sun: 1, skylight: 0, cast: 1, cloudShadow: 1, grey: 0.15, dim: 1, air: [1.2, 1], mist: 1, wind: [2.4, 0], swell: 1, rain: 0, wet: [0.25, 0.32], night: 1, stars: 0.6 },
+    },
+    // The forecast: a pure function of the seed, the day and the hour
+    // (src/weather.js). Each day is fair or clear (`clear`: the share of
+    // clear days); some dawns are misty (`mist`, from `mistFrom` to
+    // `mistTo` o'clock); some days have an overcast spell (`overcast`,
+    // starting in `overcastFrom` and lasting `overcastFor` hours); about one
+    // day in four rains (`rain`) for `rainFor` hours, starting in
+    // `rainFrom`, with cloud building up `before` and clearing `after`
+    // (hours). One kind turns into the next over `blend` minutes. Day 0
+    // opens fair, with mist at dawn, so a plain visit opens on the settled look.
+    forecast: {
+      clear: 0.35, mist: 0.4, mistFrom: [3.5, 5], mistTo: [7.6, 9.2],
+      overcast: 0.22, overcastFrom: [8, 13], overcastFor: [3, 7],
+      rain: 0.25, rainFrom: [10, 19.5], rainFor: [1, 2], before: [1, 2.5], after: [0.6, 1.4],
+      blend: 20,
+    },
+    // The mist layer: denser than the air, lying lowest where the ground is
+    // low against its surroundings, so it pools in hollows, along rivers and
+    // over lakes, and trees and hills rise out of it. Its density (`density`,
+    // per metre, as 1 - e^-d of what is behind is veiled) is full up to
+    // `depth` metres above the ground smoothed over `floor` metres, then thins
+    // with height over `height` metres; it lies thinner on higher ground
+    // (`raise`: its floor sinks this many metres for every metre the smoothed
+    // ground stands above the sea), and thins away as the sun climbs from `sun[0]` to `sun[1]`
+    // degrees. Its colour is each keyframe's `weather.mist`.
+    mist: { density: 0.02, depth: 0, height: 5, floor: 160, raise: 0.12, sun: [5, 24] },
+    // Rain: thin falling streaks in the near air, fixed to the world round
+    // the eye: columns `spacing` metres apart, out to `reach` metres (none
+    // nearer than `near`), each with a drop every `period` metres of height
+    // falling at `speed` m/s, drawn `length` metres long, slanting with the
+    // wind; `strength`: how far a streak's glyph is inked toward the
+    // keyframe's `weather.rain` colour, fading with distance. `glyphs`: for a
+    // streak falling straight, leaning right and leaning left on screen.
+    // Rings: where drops land on water the surface is tilted by many small
+    // rings (a ring every `rings.size` metres square, each `rings.period`
+    // seconds, spreading at `rings.speed` m/s, `rings.width` metres wide, up
+    // to `rings.slope`), faded like ripples by a cell's footprint.
+    rain: { spacing: 2.4, reach: 26, near: 2.5, period: 15, speed: 8.5, length: 0.75, strength: 0.6, glyphs: '|/\\',
+      rings: { size: 0.9, period: 1.3, speed: 0.34, width: 0.1, slope: 0.4 },
+      // under rain the long ripple (over `calm[0]` metres) dies down by
+      // `calm[1]`, and far reflections dull toward the air's colour by `dull`
+      // (over `dullDist` metres), broken past what a cell can show
+      calm: [10, 0.8], dull: 0.55, dullDist: [15, 120],
+      // and reflections show less, since rain breaks them anyway: the clouds
+      // in them are looked for only `mirror.clouds` metres out, the land in
+      // them followed only `mirror.terrain` of its usual reach, trees mirrored
+      // only in water within `mirror.objects` of the usual distance (all at
+      // full rain, easing back as it eases)
+      mirror: { clouds: 600, terrain: 0.5, objects: 0.4 } },
+    // Wet ground: the ground's wetness follows the rain, reaching full within
+    // about a quarter of an hour (`soak`, per hour) and drying over the
+    // following hour or so (`dry`, hours); wet, it is darker and mirrors a
+    // little of the sky at low angles (the kind's `wet`).
+    wet: { soak: 4, dry: 1.5 },
+  },
+
   // The overhead map (M, phase 1). The land is drawn by the same resolve
   // step and day palette as the view, seen from straight above and lit by
   // the day's sun; these are only the marks laid over it. `heading`: the
@@ -263,7 +366,7 @@ export const LOOK = {
       sky:    { high: '#5266a4', horizon: '#6c7e9b', glow: '#9aa7bd', glowSize: 0.12 },
       cloud:  { lit: '#dfe1e8', shade: '#4c5070' },
       cloudFlat: 1, cloudStretch: 1,
-      light:  { ambient: 0.28, direct: 0.80, cloudShadow: 0.78, castShadow: 0.92 },
+      light:  { ambient: 0.28, direct: 0.80, cloudShadow: 0.78, castShadow: 0.92, far: 1 },
       haze:   { colour: '#72839e', dist: 700, max: 0.72 },
       air:    { dist: 1200, distC: 700, lum: 0.4, chroma: 0.62 },
       torch:  { colour: '#ffb060', strength: 0.04 },
@@ -287,14 +390,15 @@ export const LOOK = {
       bed:    { lit: '#6b6148', shade: '#353026' },
       floor:  { lit: '#4c4a33', shade: '#22231b' },
       foam:   { lit: '#d6dad4', shade: '#7a8290' },
+      weather: { cast: '#8b9099', mist: '#b4b9bd', rain: '#c3c7cc' },
     },
     dusk: {
       sky:    { high: '#4b3d5d', horizon: '#7a5a64', glow: '#c48a6e', glowSize: 0.30 },
       cloud:  { lit: '#b48c78', shade: '#3a3049' },
       cloudFlat: 0.72, cloudStretch: 1.3,
-      light:  { ambient: 0.30, direct: 0.55, cloudShadow: 0.25, castShadow: 0.80 },
-      haze:   { colour: '#5e4d5c', dist: 420, max: 0.85 },
-      air:    { dist: 850, distC: 520, lum: 0.45, chroma: 0.7 },
+      light:  { ambient: 0.30, direct: 0.55, cloudShadow: 0.25, castShadow: 0.80, far: 0.08 },
+      haze:   { colour: '#4f4352', dist: 420, max: 0.85 },
+      air:    { dist: 850, distC: 520, lum: 0.4, chroma: 0.64 },
       torch:  { colour: '#ff9f50', strength: 0.30 },
       stars:  0.15,
       sun:    '#f0b07a',
@@ -316,12 +420,13 @@ export const LOOK = {
       bed:    { lit: '#544a42', shade: '#2a2526' },
       floor:  { lit: '#34312d', shade: '#1b1a1b' },
       foam:   { lit: '#b8a8a8', shade: '#5a5262' },
+      weather: { cast: '#5d545c', mist: '#7c6e74', rain: '#93878c' },
     },
     night: {
       sky:    { high: '#161927', horizon: '#252438', glow: '#2c3046', glowSize: 0.10 },
       cloud:  { lit: '#3b3b47', shade: '#1a1b23' },
       cloudFlat: 0.85, cloudStretch: 1.12,
-      light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70 },
+      light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70, far: 1 },
       haze:   { colour: '#1e1f2c', dist: 330, max: 0.80 },
       air:    { dist: 900, distC: 600, lum: 0.4, chroma: 0.62 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
@@ -345,6 +450,7 @@ export const LOOK = {
       bed:    { lit: '#24231f', shade: '#121210' },
       floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
       foam:   { lit: '#4a4e5a', shade: '#262830' },
+      weather: { cast: '#1c1d25', mist: '#2a2c35', rain: '#3c404a' },
     },
   },
 
@@ -366,7 +472,7 @@ export const LOOK = {
       sky:    { high: '#4d5b8e', horizon: '#b6a0a4', glow: '#ecc092', glowSize: 0.28 },
       cloud:  { lit: '#e2c0ae', shade: '#4b4a68' },
       cloudFlat: 0.8, cloudStretch: 1.2,
-      light:  { ambient: 0.24, direct: 1.05, cloudShadow: 0.3, castShadow: 0.85 },
+      light:  { ambient: 0.24, direct: 1.05, cloudShadow: 0.3, castShadow: 0.85, far: 1 },
       haze:   { colour: '#9a93a6', dist: 420, max: 0.85 },
       air:    { dist: 800, distC: 480, lum: 0.48, chroma: 0.72 },
       torch:  { colour: '#ffb060', strength: 0.12 },
@@ -390,13 +496,14 @@ export const LOOK = {
       bed:    { lit: '#74684e', shade: '#363028' },
       floor:  { lit: '#54503a', shade: '#22231c' },
       foam:   { lit: '#efe2d6', shade: '#86808e' },
+      weather: { cast: '#8c8892', mist: '#c6bac4', rain: '#b2acb6' },
     },
-    dusk: { ...K.dusk, light: { ambient: 0.22, direct: 0.95, cloudShadow: 0.25, castShadow: 0.82 } },
+    dusk: { ...K.dusk, light: { ambient: 0.22, direct: 0.95, cloudShadow: 0.25, castShadow: 0.82, far: 0.08 } },
     moonlit: {
       sky:    { high: '#182033', horizon: '#2c3450', glow: '#343c58', glowSize: 0.10 },
       cloud:  { lit: '#4a5064', shade: '#1e2230' },
       cloudFlat: 0.85, cloudStretch: 1.12,
-      light:  { ambient: 0.26, direct: 0.62, cloudShadow: 0.15, castShadow: 0.55 },
+      light:  { ambient: 0.26, direct: 0.62, cloudShadow: 0.15, castShadow: 0.55, far: 1 },
       haze:   { colour: '#283048', dist: 330, max: 0.80 },
       air:    { dist: 900, distC: 600, lum: 0.4, chroma: 0.62 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
@@ -420,12 +527,13 @@ export const LOOK = {
       bed:    { lit: '#2e2f2c', shade: '#161614' },
       floor:  { lit: '#26262a', shade: '#121214' },
       foam:   { lit: '#8a90a2', shade: '#383c48' },
+      weather: { cast: '#262a33', mist: '#3a4051', rain: '#4c5262' },
     },
     starlit: {
       sky:    { high: '#121520', horizon: '#1c1f2e', glow: '#20243a', glowSize: 0.10 },
       cloud:  { lit: '#262832', shade: '#12131a' },
       cloudFlat: 0.85, cloudStretch: 1.12,
-      light:  { ambient: 0.42, direct: 0.10, cloudShadow: 0.1, castShadow: 0.4 },
+      light:  { ambient: 0.42, direct: 0.10, cloudShadow: 0.1, castShadow: 0.4, far: 1 },
       haze:   { colour: '#181a26', dist: 330, max: 0.80 },
       air:    { dist: 700, distC: 500, lum: 0.45, chroma: 0.66 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
@@ -449,6 +557,7 @@ export const LOOK = {
       bed:    { lit: '#1f1f1d', shade: '#121210' },
       floor:  { lit: '#18191b', shade: '#0f0f11' },
       foam:   { lit: '#3a3e4a', shade: '#22242c' },
+      weather: { cast: '#181a21', mist: '#24262f', rain: '#32353e' },
     },
   };
 }

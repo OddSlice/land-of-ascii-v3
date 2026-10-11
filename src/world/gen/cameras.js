@@ -159,25 +159,52 @@ export function worldCameras(world, { seaDist, shore }) {
     if (best) cams.push({ name: 'river valley', x: best.x, z: best.z, yaw: best.yaw, pitch: -3, time: 'day' });
   }
 
-  // 6. the coast: on a beach close to the sea, looking along the shore
-  // (the sea on one side, the land on the other), toward the side where
-  // the coast rises highest within view; turned 42 degrees from the sea (60
-  // in phase 1), so the waterline runs across the frame now beaches are narrower
+  // 6. the coast (phase 2b: chosen by how much sea and land it sees): from
+  // the land just behind the beach or its upper edge, looking along the
+  // shore, the spot and turn whose view below the horizon is closest to
+  // COAST_VIEW's shares of sea, other land and sand, so the camera no longer
+  // stands in the middle of the beach with sand filling the lower half
   {
+    const COAST_VIEW = { sea: 0.42, land: 0.38, sand: 0.2 };
+    const eyeAt = (x, z) => heightAt(H, N, x, z) + SCALE.eye;
+    // the share of sea, sand and other land in the view from (x, z) along
+    // yaw `ang`: columns across the picture's width, rows from just under
+    // the horizon down to its foot (pitch -2), each row's ground taken where
+    // a ray at that depression meets the level of the eye's foot
+    const view = (x, z, ang) => {
+      const eye = eyeAt(x, z), base = heightAt(H, N, x, z), out = { sea: 0, land: 0, sand: 0, n: 0 };
+      const halfW = Math.atan(Math.tan(Math.PI / 6) * 1.6);
+      for (let c = 0; c < 15; c++) {
+        const a = ang + halfW * (c / 7 - 1), dx = Math.sin(a), dz = Math.cos(a);
+        for (let r = 0; r < 12; r++) {
+          const dep = (0.6 + 31.4 * (r / 11) ** 1.5) * Math.PI / 180;
+          let d = (eye - base) / Math.tan(dep);
+          if (d > 1500) d = 1500;
+          const px = x + dx * d, pz = z + dz * d;
+          out.n++;
+          if (px < 0 || pz < 0 || px > N || pz > N) { out.sea++; continue; }
+          const q = Math.round(pz) * NN + Math.round(px);
+          if (kind[q] === KIND.SEA) out.sea++;
+          else if (terrain.wSand[q] > 127) out.sand++;
+          else out.land++;
+        }
+      }
+      return { sea: out.sea / out.n, land: out.land / out.n, sand: out.sand / out.n };
+    };
     let best = null;
     for (let z = 40; z < N - 40; z += 12) for (let x = 40; x < N - 40; x += 12) {
       const j = z * NN + x;
-      if (seaDist[j] < 6 || seaDist[j] > 16 || !dry(x, z) || slopeAt(x, z) > 0.12 || !terrain.wSand[j]) continue;
-      // toward the sea: down the distance field
+      if (seaDist[j] < 10 || seaDist[j] > 48 || !dry(x, z) || slopeAt(x, z) > 0.15) continue;
+      // (not out on the beach: on its upper edge or on the land behind it)
+      if (terrain.wSand[j] > 127 && seaDist[j] < SCALE.beach) continue;
       const gx = seaDist[j + 6] - seaDist[j - 6], gz = seaDist[j + 6 * NN] - seaDist[j - 6 * NN];
       const gl = Math.hypot(gx, gz);
       if (gl < 1) continue;
       const sx = -gx / gl, sz = -gz / gl;
-      for (const turn of [-42, 42]) {
-        const ang = Math.atan2(sx, sz) + turn * Math.PI / 180, dx = Math.sin(ang), dz = Math.cos(ang);
-        let rise = 0;
-        for (let d = 150; d <= 450; d += 50) rise = Math.max(rise, heightAt(H, N, x + dx * d - sx * 20, z + dz * d - sz * 20) - SCALE.sea);
-        const score = Math.min(rise, 25) - 50 * slopeAt(x, z) - 4 * near(x, z, 25).length;
+      for (const turn of [-60, -48, -36, 36, 48, 60]) {
+        const ang = Math.atan2(sx, sz) + turn * Math.PI / 180;
+        const v = view(x, z, ang);
+        const score = -(Math.abs(v.sea - COAST_VIEW.sea) + Math.abs(v.land - COAST_VIEW.land) + Math.abs(v.sand - COAST_VIEW.sand)) - 2 * slopeAt(x, z) - 0.05 * near(x, z, 25).length;
         if (!best || score > best.score) best = { x, z, yaw: deg(ang), score };
       }
     }

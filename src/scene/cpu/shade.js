@@ -5,13 +5,14 @@
 // row for reflect.js.
 import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
-import { rippleSlope, swellSlope, waterRays } from './water.js';
+import { rippleSlope, swellSlope, ringSlope, waterRays } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
 
 const MEADOW = LOOK.meadow, FAR = LOOK.far, COAST = LOOK.coast;
+const CALM_K = LOOK.weather.rain.calm[1];
 const SEA_LEVEL = 20;          // (the generated world's; water at it is the sea)
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -150,7 +151,13 @@ const methods = {
     // band in the bed's colours, wherever it covers most of the cell's footprint
     if (mat === MAT.SAND && T.shore) {
       const sd = this.shoreAt(T.shore, x, z);
-      const W = y < SEA_LEVEL + 3 ? COAST.wet[0] : COAST.wet[1];
+      let W = COAST.wet.sea;
+      if (y >= SEA_LEVEL + 3) {
+        // (at a lake, phase 2b: the ground within a few centimetres of the
+        // water's height, as wide as the shore is gentle)
+        const ny0 = Math.sqrt(Math.max(1e-6, 1 - nx * nx - nz * nz)), sl = Math.sqrt(nx * nx + nz * nz) / ny0;
+        W = sl > 1e-3 ? Math.min(COAST.wet.lake.max, COAST.wet.lake.rise / sl) : COAST.wet.lake.max;
+      }
       if (sd < W + fp && this.band(sd, fp, 0, W) > 0.5) mat = MAT.BED;
     }
     const Ld = light.L;
@@ -247,7 +254,10 @@ const methods = {
     const T = this.world.terrain;
     // (the open sea also has its swell)
     const sea = T.shore && W > SEA_LEVEL - 0.05 && W < SEA_LEVEL + 0.05;
-    const g = rippleSlope(x, z, this.t, this.dx, this.dz, fp) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) : 0);
+    // (the swell's height follows the weather's wind, and rain rings the water)
+    const wp = this.wp;
+    let g = rippleSlope(x, z, this.t, this.dx, this.dz, fp, wp.rain > 0 ? 1 - CALM_K * wp.rain : 1) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) * wp.swell : 0);
+    if (wp.rain > 0) g += wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp);
     const wr = waterRays(s, g);
     const glow = this.glowAt(x, W, z, 0, 1, 0);
     this.write(ci, 0, MAT.WATER, light.L[1], shadow, cloud, glow, wr.F * 2 - 1, D * len);

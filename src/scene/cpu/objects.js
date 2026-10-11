@@ -17,6 +17,7 @@
 // it falls between rays), so radii have a floor that grows with distance, and
 // the conifers' tiered outline melts into a smooth cone once a tier is only a
 // couple of rows tall. Reflections use the same floors.
+import { weatherParams } from '../../weather.js';
 import { MAT } from '../../contract.js';
 import { hash2 } from '../../world/noise.js';
 import { MAX_RIPPLE } from './water.js';
@@ -94,6 +95,11 @@ export class ObjectPass {
 
   run(v, rays, m, frame, torches) {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
+    // (under rain trees are mirrored only in nearer water, phase 2b)
+    const wp = weatherParams(frame.weather);
+    const mk = wp.rain > 0 ? 1 - (1 - LOOK.weather.rain.mirror.objects) * wp.rain : 1;
+    this.objCap = this.world.openEdge ? LOOK.water.objectsCap * mk : Infinity;
+    this.objFar = this.world.openEdge ? LOOK.water.objectsFar * mk : this.world.viewDist;
     this.treat = frame.look && frame.look.tree === 'B' ? 'B' : 'A';
     this.pass(false);
     // reflections, if this stripe sees water within reach of them (objects

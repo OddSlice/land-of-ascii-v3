@@ -30,7 +30,7 @@ export function createCpuBackend(world, opts = {}) {
     // for one frame.
     render(frame, c0, c1, hits) {
       const v = makeView(frame);
-      light.update(frame.hour, frame.t, frame.shadow, frame.day || 0, ruleOf(frame.look, 'night'));
+      light.update(frame.hour, frame.t, frame.shadow, frame.day || 0, ruleOf(frame.look, 'night'), frame.weather);
       rays.build(v, c0, c1);
       if (hits.length < rays.cells * HIT_STRIDE) throw new Error('hit buffer too small');
       // nothing met yet (so a record says only what this frame found), and no

@@ -7,7 +7,8 @@ import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { lineAt, crossLine, profileAt, leanWindow, leanBlend } from '../../world/backdrop.js';
 import { SCALE } from '../../world/scale.js';
 import { LOOK, ruleOf } from '../../look.js';
-import { clusterAt } from '../../world/sky.js';
+import { clusterAt, cloudAmount } from '../../world/sky.js';
+import { weatherParams } from '../../weather.js';
 import { hash2, vnoise, fbm } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { project } from './view.js';
@@ -17,6 +18,7 @@ import { makePalette } from '../../resolve.js';
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((b) => (b + 0.5) / 16);
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
+const EDGE_MIN = LOOK.clouds.edgeMin;
 
 // Fixed star directions on the upper hemisphere, brightest few rarest.
 const STARS = (() => {
@@ -138,7 +140,7 @@ export class SkyPass {
     if (bilU8(T.wWater, x, z, N, NN) < 0.5 || Math.abs(bil2(T.levels[0], T.levels[0].H, x, z) - sea) > 0.05) return false;
     // (with the swell, faded by the cell's footprint, in the generated world)
     const len = Math.sqrt(1 + s * s), fp = D * len * v.rowAngle / Math.max(0.006, -s / len);
-    const wr = waterRays(s, T.shore ? swellSlope(x, z, this.t, rays.pdx[p], rays.pdz[p], fp) : 0);
+    const wr = waterRays(s, T.shore ? swellSlope(x, z, this.t, rays.pdx[p], rays.pdz[p], fp) * this.swellK : 0);
     m.write(ci, 0, MAT.WATER, this.light.L[1], 0, this.light.cloudAt(x, z), 0, wr.F * 2 - 1, D * len);
     rays.rsig[ci] = wr.sr; rays.rdw[ci] = D; rays.rey[ci] = 2 * sea - v.ey; rays.rdepth[ci] = Infinity;
     return true;
@@ -148,27 +150,58 @@ export class SkyPass {
   // the treatment's puffs, and for banks the time of day's flattening.
   prepare(frame) {
     const t = frame.t, B = !!(frame.look && frame.look.cloud === 'B');
-    const pal = makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night')), k = pal.k;
+    const pal = makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night'), frame.weather), k = pal.k;
     this.illum = pal.night === 'p1' ? 1 : pal.illum;
     this.farRule = ruleOf(frame.look, 'air') === 'aerial';
     this.t = frame.t;
     this.treat = B ? LOOK.clouds.B : LOOK.clouds.A;
-    this.flat = B ? k.cloudFlat : 1; this.stretch = B ? k.cloudStretch : 1;
+    // the weather (phase 2b): how many clouds, how big, how flat and long,
+    // how low, how far drifted; how much of the sun, moon and stars shows
+    const P = weatherParams(frame.weather);
+    this.flat = (B ? k.cloudFlat : 1) * P.flat; this.stretch = (B ? k.cloudStretch : 1) * P.stretch;
+    this.disc = smooth(0.25, 0.9, P.sun);
+    this.starK = P.stars; this.swellK = P.swell;
+    // (under rain, how far a reflection looks for clouds)
+    this.mirrorMax = P.rain > 0 ? LOOK.weather.rain.mirror.clouds / P.rain : Infinity;
     this.streaky = B;
     this.cl = [];
     for (const c of this.world.clouds.clusters) {
-      const [x, z, fade] = clusterAt(c, t, this.world.center[0]);
+      const [x, z, fade0] = clusterAt(c, t, this.world.center[0], P.drift);
+      const amt = cloudAmount(c.rank, P.clouds) * P.size;
+      const fade = fade0 * amt;
       if (fade <= 0.01) continue;
-      const main = c.puffs[0][3];
+      const main = c.puffs[0][3], base = c.base * P.low;
       // each puff's centre, radii (scaled by the fade and the time of day)
       // and turn, worked out once per frame: 9 numbers a puff
       const src = B ? c.puffsB : c.puffs;
       const pp = new Float64Array(src.length * 9);
       src.forEach((pf, k) => {
         const a = pf[3] * fade * this.stretch, b = pf[4] * fade * this.flat, w = pf[5] * fade;
-        pp.set([x + pf[0], c.base + pf[2] * this.flat, z + pf[1], a, b, w, Math.cos(pf[6]), Math.sin(pf[6]), a === b && b === w ? 1 : 0], k * 9);
+        pp.set([x + pf[0], base + pf[2] * this.flat, z + pf[1], a, b, w, Math.cos(pf[6]), Math.sin(pf[6]), a === b && b === w ? 1 : 0], k * 9);
       });
-      this.cl.push({ x, z, fade, base: c.base, main, cy: c.base + main * 0.3, reach: (B ? c.reachB : c.reach) * fade + 40, pp, n: src.length, seed: c.seed });
+      // (puffs grown, stretched or lowered by the weather: bound them as they
+      // are this frame, round the cluster's middle)
+      const R = B ? c.reachB : c.reach;
+      let reach;
+      if (P.fair) reach = R * fade + 40;
+      else {
+        reach = 0;
+        const cyy = base + main * 0.3;
+        for (let k = 0; k < src.length; k++) {
+          const q9 = k * 9, a = pp[q9 + 3], b = pp[q9 + 4], w = pp[q9 + 5], big = a > w ? (a > b ? a : b) : (w > b ? w : b);
+          const d = Math.hypot(pp[q9] - x, pp[q9 + 1] - cyy, pp[q9 + 2] - z) + big;
+          if (d > reach) reach = d;
+        }
+        reach += 40;
+      }
+      // how far any of its puffs reaches from its middle across the ground
+      let hreach = 0;
+      for (let k = 0; k < src.length; k++) {
+        const q9 = k * 9, a = pp[q9 + 3], w = pp[q9 + 5];
+        const d = Math.hypot(pp[q9] - x, pp[q9 + 2] - z) + (a > w ? a : w);
+        if (d > hreach) hreach = d;
+      }
+      this.cl.push({ x, z, fade, base, main, cy: base + main * 0.3, reach, hreach, pp, n: src.length, seed: c.seed });
     }
   }
 
@@ -192,7 +225,7 @@ export class SkyPass {
     let npf = 0;
     for (const c of cl) npf += c.n;
     if (!this.plS || this.plS.length < np + 1) this.plS = new Int32Array(np + 64);
-    if (!this.plI || this.plI.length < np * ncl) { this.plI = new Int16Array(Math.max(64, (np + 64) * ncl)); this.plPS = new Int32Array(this.plI.length); this.plPN = new Int16Array(this.plI.length); }
+    if (!this.plI || this.plI.length < np * ncl) { this.plI = new Int16Array(Math.max(64, (np + 64) * ncl)); this.plPS = new Int32Array(this.plI.length); this.plPN = new Int16Array(this.plI.length); this.plL = new Float64Array(this.plI.length); this.plH = new Float64Array(this.plI.length); }
     if (!this.plP || this.plP.length < np * npf) this.plP = new Int16Array(Math.max(64, (np + 64) * npf));
     let at = 0, ap = 0;
     for (let p = 0; p < np; p++) {
@@ -209,7 +242,15 @@ export class SkyPass {
           if (pl <= big + 1 && pl >= -big - 1) this.plP[ap++] = u;
         }
         if (ap === p0) continue;
-        this.plI[at] = k; this.plPS[at] = p0; this.plPN[at] = ap - p0; at++;
+        // (phase 2b) the nearest any of its puffs can be along the plane: no
+        // ray of the plane can meet it nearer, so once a ray has met a cloud
+        // nearer than that, this one and those after it are passed over
+        const along = (c.x - v.ex) * pdx + (c.z - v.ez) * pdz, lb = along - c.reach;
+        // kept sorted by that, nearest first (the lists are short), with the
+        // furthest any of its puffs reaches along the plane
+        let q = at;
+        while (q > this.plS[p] && this.plL[q - 1] > lb) { this.plI[q] = this.plI[q - 1]; this.plPS[q] = this.plPS[q - 1]; this.plPN[q] = this.plPN[q - 1]; this.plL[q] = this.plL[q - 1]; this.plH[q] = this.plH[q - 1]; q--; }
+        this.plI[q] = k; this.plPS[q] = p0; this.plPN[q] = ap - p0; this.plL[q] = lb; this.plH[q] = along + c.hreach; at++;
       }
     }
     this.plS[np] = at;
@@ -266,7 +307,7 @@ export class SkyPass {
       const ey = rays.rey[ci];
       const bk = useBd ? this.backdropHit(p, s, ey) : -1;
       const bDist = bk >= 0 ? this.bT[p * K + bk] / inv : Infinity;
-      const cd = dy > 0.01 ? this.cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, 1, p) : Infinity;
+      const cd = dy > 0.01 ? this.cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, 1, p, this.mirrorMax) : Infinity;
       // (a ridgeline in the water: its leg is from the water on)
       if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 1, p, bk, s, ey, bDist - rays.rdw[ci] / inv, v.rowAngle); continue; }
       if (cd < Infinity) continue;
@@ -281,7 +322,7 @@ export class SkyPass {
       const up = Math.asin(Math.max(-1, Math.min(1, dy))) - Math.asin(Math.max(-1, Math.min(1, Lg[1])));
       const aw = across / (G.width * D2R), al = Math.abs(up) / (G.length * D2R);
       if (aw >= 1 || al >= 1) continue;
-      const pr = (1 - aw * aw) * (1 - al) * G.density * (Lg === sun ? 1 : this.illum);
+      const pr = (1 - aw * aw) * (1 - al) * G.density * (Lg === sun ? 1 : this.illum) * this.disc;
       const wx = v.ex + rays.pdx[p] * rays.rdw[ci], wz = v.ez + rays.pdz[p] * rays.rdw[ci];
       if (hash2(Math.floor(wx * 1.7), Math.floor(wz * 1.7) * 7919 + tick, SEED + 99) >= pr) continue;
       hits[o] = Lg === sun ? MAT.SUN : MAT.MOON;
@@ -296,8 +337,11 @@ export class SkyPass {
     const ds = dx * sun[0] + dy * sun[1] + dz * sun[2];
     const dm = dx * moon[0] + dy * moon[1] + dz * moon[2];
     let mat = MAT.SKY, lit = dy > 0 ? dy : 0;
-    if (ds > cosSun && sun[1] > -0.02) { mat = MAT.SUN; lit = 1; }
-    else if (dm > cosMoon && moon[1] > -0.02 && this.illum >= LOOK.moon.showAt) {
+    // (under cloud the discs fade into the sky behind them, phase 2b)
+    // (resolve fades them by the palette's `disc`)
+    const disc = this.disc;
+    if (ds > cosSun && sun[1] > -0.02 && disc > 0.02) { mat = MAT.SUN; lit = 1; }
+    else if (dm > cosMoon && moon[1] > -0.02 && this.illum >= LOOK.moon.showAt && disc > 0.02) {
       // (the moon as bright as its lit share; a new moon is not drawn)
       mat = MAT.MOON; lit = this.illum >= 1 ? 1 : LOOK.moon.disc + (1 - LOOK.moon.disc) * this.illum;
     }
@@ -313,13 +357,20 @@ export class SkyPass {
   // The nearest cloud along a ray, if any. Puffs are ellipsoids (spheres for
   // cumulus), cut flat at the cloud's base; the edge is a lumpy band a few
   // cells wide that dissolves into the sky behind, with streaks along a bank.
-  cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot, p) {
+  // `far`: no cloud is looked for that lies wholly beyond this (a reflection under rain).
+  cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, slot, p, far = Infinity) {
     const ex = v.ex, ez = v.ez, P = this.treat, F = this.flat, streak = P.streak;
     const jitter = hash2(cx, cy, SEED + 83) - 0.5;
     let best = Infinity, bl = 0, bdist = 0, bcover = 0;
-    const plI = this.plI, plP = this.plP, cl = this.cl;
+    const plI = this.plI, plP = this.plP, cl = this.cl, plL = this.plL, plH = this.plH;
+    const hs = Math.sqrt(dx * dx + dz * dz);
     for (let q = this.plS[p], qe = this.plS[p + 1]; q < qe; q++) {
+      // (a nearer cloud already met: this one and the rest lie beyond it)
+      if (plL[q] >= best || plL[q] >= far) break;
       const c = cl[plI[q]];
+      // (phase 2b) a cloud is cut flat at its base: a ray still under it
+      // past the cloud's far side cannot meet it
+      if ((c.base - ey) * hs > plH[q] * dy) continue;
       // this cloud's nearest puff, and how solid its other puffs are behind it
       let cBest = Infinity, cBl = 0, cCover = 0, behind = 0;
       // bounding sphere of the cluster
@@ -364,14 +415,20 @@ export class SkyPass {
         }
         // a lumpy edge a few cells wide, dissolving into the sky
         const rad = Math.cbrt(a * b * w);
-        const edgeW = Math.min(0.6, Math.max(0.08, P.edge * v.colAngle * t0 / rad));
+        let edgeW = Math.min(0.6, Math.max(0.08, P.edge * v.colAngle * t0 / rad));
+        // (phase 2b) at least LOOK.clouds.edgeMin rows deep across the puff's
+        // smallest radius; a puff too small for that fades as a whole
+        const small = a < b ? (a < w ? a : w) : (b < w ? b : w);
+        const need = EDGE_MIN * v.rowAngle * t0 / small;
+        let whole = 1;
+        if (need > edgeW) { if (need > 0.6) { whole = 0.6 / need; edgeW = 0.6; } else edgeW = need; }
         const hx = lox + ldx * t0, hy = loy + ldy * t0, hz = loz + ldz * t0;
         let lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
           + vnoise(hx * 6.1 - hz * 2.9, hy * 6.1 + hz * 4.3 + k * 3, SEED + 82) * 0.2;
         // a bank's edge breaks into streaks along it: noise slow along the
         // band and quick across it, fixed to the cloud
         if (streak > 0) lumps += streak * (vnoise(hx * 1.1 + c.seed * 3.1 + k, hy * 4.2 + hz * 3.4, SEED + 84) - 0.15);
-        const cover = (eps + lumps * Math.min(0.45, 2.2 * edgeW)) / edgeW + jitter * 0.35;
+        const cover = ((eps + lumps * Math.min(0.45, 2.2 * edgeW)) / edgeW + jitter * 0.35) * whole;
         if (cover < 0.15) continue;
         // a puff's dissolving edge in front of another puff's body is not a
         // hole: remember how solid the cloud behind is
@@ -420,7 +477,9 @@ export class SkyPass {
       const o = (cy * sw + (cx - c0)) * HIT_STRIDE;
       if (hits[o] !== MAT.SKY) continue;
       hits[o] = MAT.STAR;
-      hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) + 0.5) | 0;
+      // (the sky's closeness to the sun moves to [3], phase 2b)
+      hits[o + 3] = hits[o + 5];
+      hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) * this.starK + 0.5) | 0;
     }
   }
 
@@ -438,7 +497,8 @@ export class SkyPass {
       const o = (cy * sw + (cx - c0)) * HIT_STRIDE + REC;
       if (hits[o] !== MAT.SKY) continue;
       hits[o] = MAT.STAR;
-      hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) * 0.8 + 0.5) | 0;
+      hits[o + 3] = hits[o + 5];
+      hits[o + 5] = (255 * (0.25 + 0.75 * b) * smooth(0.02, 0.15, y) * 0.8 * this.starK + 0.5) | 0;
     }
   }
 }

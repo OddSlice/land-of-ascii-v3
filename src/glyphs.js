@@ -33,6 +33,11 @@ export const MAP_GLYPH = {
   heading: Uint8Array.from(MG.heading, add),
 };
 
+// Rain streaks (phase 2b, LOOK.weather.rain.glyphs): falling straight,
+// leaning right, leaning left on screen. Added last, so no earlier index
+// changes (they are glyphs the families and the map already have).
+export const RAIN_GLYPHS = Uint8Array.from(LOOK.weather.rain.glyphs, add);
+
 // Glyphs the atlas draws by hand when the font renders them badly.
 export const SHADES = { '░': 0.25, '▒': 0.5, '▓': 0.75, '█': 1 };
 

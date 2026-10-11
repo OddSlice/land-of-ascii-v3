@@ -65,16 +65,29 @@ const CLUSTERS = [
 // The generated world's clouds: spread over its whole sky from the seed (a
 // jittered grid about a kilometre apart, some cells left clear), so there is
 // weather in every direction, not only where the lab's valley looked.
+// Each carries its rank (0..1): the clouds of fair weather are those ranked
+// up to CLOUD_CUT; more cloud (phase 2b's weather) brings in the rest, which
+// are listed after them so the first ones keep their places and shapes.
+export const CLOUD_CUT = 0.62;
 export function worldCloudList(seed, N) {
-  const out = [], G = 950, x0 = N / 2 - CLOUD_SPAN / 2, z0 = N / 2 - 3600;
+  const out = [], more = [], G = 950, x0 = N / 2 - CLOUD_SPAN / 2, z0 = N / 2 - 3600;
   for (let gz = 0; gz < 8; gz++) {
     for (let gx = 0; gx < 8; gx++) {
       const r = (n) => hash2(gx * 13 + gz, n, (seed | 0) + 641);
-      if (r(1) > 0.62) continue;
-      out.push([x0 + (gx + 0.15 + 0.7 * r(2)) * G, z0 + (gz + 0.15 + 0.7 * r(3)) * G, 860 + 140 * r(4), 0.8 + 0.6 * r(5)]);
+      (r(1) > CLOUD_CUT ? more : out).push([x0 + (gx + 0.15 + 0.7 * r(2)) * G, z0 + (gz + 0.15 + 0.7 * r(3)) * G, 860 + 140 * r(4), 0.8 + 0.6 * r(5), r(1)]);
     }
   }
-  return out;
+  return out.concat(more);
+}
+
+// How much of a cloud of rank `rank` is up under a cloud amount `m` (1:
+// fair's clouds whole and no others; 0: none; 2: all), growing and shrinking
+// smoothly as the amount changes. The lab's hand-placed clouds rank 0.
+const CLOUD_BAND = 0.08;
+export function cloudAmount(rank = 0, m = 1) {
+  const v = rank <= CLOUD_CUT ? (Math.min(m, 1) * (CLOUD_CUT + CLOUD_BAND) - rank) / CLOUD_BAND
+    : (CLOUD_CUT + Math.max(0, m - 1) * (1 - CLOUD_CUT + CLOUD_BAND) - rank) / CLOUD_BAND;
+  return v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v);
 }
 
 // Each cloud carries both treatments' puffs, as ellipsoids
@@ -83,7 +96,7 @@ export function worldCloudList(seed, N) {
 // the band's angle). `shift` moves every cluster, for maps centred elsewhere
 // than the lab's valley; `list` replaces the lab's hand-placed clusters.
 export function buildClouds(shift = 0, list = CLUSTERS) {
-  const clusters = list.map(([x0, z0, base, scale], c) => {
+  const clusters = list.map(([x0, z0, base, scale, rank = 0], c) => {
     const x = x0 + shift, z = z0 + shift;
     const r = (n) => hash2(c, n, SEED + 61);
     const main = (150 + 170 * r(1)) * scale;
@@ -112,16 +125,17 @@ export function buildClouds(shift = 0, list = CLUSTERS) {
     }
     // how far a puff can reach (B's are stretched up to 1.4 times at dusk)
     const reachOf = (list, k) => list.reduce((m, [dx, dz, , a, , cc]) => Math.max(m, Math.hypot(dx, dz) + Math.max(a * k, cc)), 0);
-    return { x, z, base, puffs, puffsB, reach: reachOf(puffs, 1), reachB: reachOf(puffsB, 1.4), seed: c };
+    return { x, z, base, puffs, puffsB, reach: reachOf(puffs, 1), reachB: reachOf(puffsB, 1.4), seed: c, rank };
   });
   return { clusters };
 }
 
 // Cluster position at time t: drifted by the wind, wrapped east-west, and a
 // size factor that shrinks it to nothing near the wrap so nothing pops.
-export function clusterAt(cl, t, CLOUD_CX = 256) {
+// `drift`: metres further east on the weather's wind (src/weather.js).
+export function clusterAt(cl, t, CLOUD_CX = 256, drift = 0) {
   const half = CLOUD_SPAN / 2;
-  let x = cl.x + WIND[0] * t - (CLOUD_CX - half);
+  let x = cl.x + WIND[0] * t + drift - (CLOUD_CX - half);
   x = ((x % CLOUD_SPAN) + CLOUD_SPAN) % CLOUD_SPAN + (CLOUD_CX - half);
   const z = cl.z + WIND[1] * t;
   const edge = half - Math.abs(x - CLOUD_CX);

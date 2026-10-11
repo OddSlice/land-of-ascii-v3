@@ -20,6 +20,7 @@
 // Rows are handled in "row sets": the cells of one plane that share an eye,
 // sorted by slope. The direct view is one row set; each water level seen in
 // the plane gives one mirrored row set, whose rows only start at their water.
+import { weatherParams } from '../../weather.js';
 import { LOOK, ruleOf } from '../../look.js';
 import { LEVELS } from '../../world/terrain.js';
 import { SPAN_MERLON, SPAN_ARCH, archY, spanAt } from '../../world/spans.js';
@@ -130,6 +131,7 @@ export class Marcher {
   // March every plane of a stripe. `hits` is the stripe's HitBuffer.
   run(v, rays, hits, frame, torches) {
     this.v = v; this.rays = rays; this.hits = hits; this.torches = torches; this.t = frame.t;
+    this.wp = weatherParams(frame.weather);
     if (!this.tg) this.buildTorchGrid(torches);
     this.meadow = (frame.look && frame.look.meadow) || 0;
     // the far rule (air 'aerial'): far snow lines and rock, gullies, strata, the skyline's fade
@@ -144,6 +146,8 @@ export class Marcher {
     const sp = this.world.spans;
     this.merlonFar = Math.min(sp.merlonW / (1.6 * v.colAngle), sp.merlon / (1.6 * v.rowAngle));
     this.reflectCap = Math.min(LOOK.water.reflectCap, this.world.viewDist);
+    // (under rain reflections show less, phase 2b)
+    if (this.wp.rain > 0) this.reflectCap *= 1 - (1 - LOOK.weather.rain.mirror.terrain) * this.wp.rain;
     this.startStripe();
     const rs = this.direct;
     rs.sig = rays.osig; rs.ord = rays.order; rs.act = null; rs.ey = v.ey; rs.slot = 0;

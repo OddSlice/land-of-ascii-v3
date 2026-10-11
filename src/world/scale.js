@@ -27,8 +27,11 @@ export const SCALE = {
   // power `steep` (phase 2a: from 70 to 400 m, 1.45, 45 m, so they stand
   // higher at the back and no steeper at the front; phase 1: 50 to 380 m,
   // 1.25, 20 m); toward the edges they even out into a shoulder `shoulder`
-  // metres under `top`
-  range: { top: 300, rise: 50, steep: 1.45, climb: [70, 390], shoulder: 95, snow: 235, front: 430 },
+  // metres under `top`; snow lies from `snow` metres up, judged also by how
+  // far a point stands above the ground round it (phase 2b, `snowRelief`:
+  // [over how many metres, metres lower for each metre it stands above]), so
+  // a crest just over the line stays bare instead of wearing a thin white line
+  range: { top: 300, rise: 50, steep: 1.45, climb: [70, 390], shoulder: 95, snow: 235, snowRelief: [160, 1.2], front: 430 },
   coast: 240,                 // the sea closes the south and west: the shore lies about this far in
   beach: 16,                  // beaches run about this far up from the sea (phase 2a; 34 before)
   lowlandSlope: 0.08,         // the lowland's usual steepest, in the long rises

@@ -68,6 +68,7 @@ export const MAT_NONE = 255;
 //             Cloud: the sky's elevation behind it (as the sky's light).
 // [3] cloud   cloud shadow, 0 = none .. 255 = deepest
 //             Cloud: the sky's closeness to the sun behind it (as the sky's tone).
+//             Star (phase 2b): the same, the sky's closeness to the sun.
 // [4] glow    point light (the torch), 0..255
 // [5] tone    material detail, 0..255 with 128 = none (patches, joints, strata).
 //             Sky: closeness to the sun, 255 * (1 - angle / pi).
@@ -112,7 +113,20 @@ export const CELL_STRIDE = 8;
 //                             take the defaults
 //   day,                      (phase 2a) whole days since day 0, which the
 //                             moon's phase follows; missing means day 0
+//   weather: { mix, wet, drift }   (phase 2b) how much of each kind of
+//                             weather applies (mix: { clear, fair, overcast,
+//                             rain, mist }, missing kinds 0), how wet the
+//                             ground is (0..1) and how many metres east the
+//                             clouds have drifted beyond the animation
+//                             clock's drift; every layer blends the kinds'
+//                             numbers in src/look.js by the mix
+//                             (src/weather.js). Missing means fair, dry, no
+//                             drift: exactly the look before weather.
 // }
+// (phase 2b) Resolve also reads one thing from the world besides the frame:
+// the mist's floor (the ground smoothed over its surroundings,
+// src/weather.js mistFloorOf), only while there is mist; it is world data,
+// not the backend's, so another backend still needs only fill a HitBuffer.
 // Cell (cx, cy) has its centre at screen position
 //   x = 2 (cx + 0.5) / cols - 1,  y = 1 - 2 (cy + 0.5) / rows   (both -1..1)
 // and looks along camera-space (x tan(fovX/2), y tan(fovY/2), 1).
