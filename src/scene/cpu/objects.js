@@ -20,7 +20,7 @@
 import { weatherParams } from '../../weather.js';
 import { MAT } from '../../contract.js';
 import { hash2 } from '../../world/noise.js';
-import { MAX_RIPPLE } from './water.js';
+import { MAX_RIPPLE, RING_TILT, MAX_SWELL } from './water.js';
 import { TIER } from '../../world/objects.js';
 import { LOOK } from '../../look.js';
 
@@ -114,8 +114,6 @@ export class ObjectPass {
     for (let ci = 0; ci < rays.cells; ci++) if (rays.rdepth[ci] >= 0 && rays.rdw[ci] < cap) this.wl[nw++] = (rays.rey[ci] + v.ey) / 2;
     if (nw) {
       const lv = this.wl.subarray(0, nw).sort();
-      // a ripple can tilt a mirrored ray by up to twice the surface's slope
-      this.margin = Math.ceil(2.2 * MAX_RIPPLE / v.rowAngle) + 1;
       // groups: levels within 3 m of the next; then the closest neighbours
       // merged until there are at most three
       const groups = [];
@@ -131,6 +129,12 @@ export class ObjectPass {
         groups.splice(k, 2, [groups[k][0], groups[k + 1][1]]);
       }
       for (const [lo, hi] of groups) {
+        // a ripple can tilt a mirrored ray by up to twice the surface's
+        // slope; so can the swell, on the sea, and (phase 2b) rain's rings,
+        // as far as they are let tilt it
+        const sea = this.world.sea !== undefined && lo <= this.world.sea + 0.05 && hi >= this.world.sea - 0.05;
+        const tilt = MAX_RIPPLE + (sea ? MAX_SWELL * wp.swell : 0) + (wp.rain > 0 ? RING_TILT : 0);
+        this.margin = Math.ceil(2.2 * tilt / v.rowAngle) + 1;
         const colLo = this.colLo, colHi = this.colHi;
         colLo.fill(v.R, 0, sw); colHi.fill(-1, 0, sw);
         for (let ci = 0; ci < rays.cells; ci++) {

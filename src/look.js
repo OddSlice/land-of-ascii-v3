@@ -328,7 +328,9 @@ export const LOOK = {
     // seconds, spreading at `rings.speed` m/s, `rings.width` metres wide, up
     // to `rings.slope`), faded like ripples by a cell's footprint.
     rain: { spacing: 2.4, reach: 26, near: 2.5, period: 15, speed: 8.5, length: 0.75, strength: 0.6, glyphs: '|/\\',
-      rings: { size: 0.9, period: 1.3, speed: 0.34, width: 0.1, slope: 0.4 },
+      // (the mirrored and refracted rays take a ring's tilt only up to
+      // `rings.tilt`; the share of mirror takes all of it)
+      rings: { size: 0.9, period: 1.3, speed: 0.34, width: 0.1, slope: 0.4, tilt: 0.03 },
       // under rain the long ripple (over `calm[0]` metres) dies down by
       // `calm[1]`, and far reflections dull toward the air's colour by `dull`
       // (over `dullDist` metres), broken past what a cell can show

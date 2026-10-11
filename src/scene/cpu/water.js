@@ -101,6 +101,11 @@ export function ringSlope(x, z, t, dx, dz, footprint) {
   return s * fade;
 }
 
+// How far rain's rings may tilt the mirrored and refracted rays (phase 2b),
+// and the steepest the swell can tilt the sea, for culling margins.
+export const RING_TILT = RG.tilt;
+export const MAX_SWELL = SW.reduce((a, w) => a + Math.abs(w[3]), 0);
+
 const out = { sr: 0, st: 0, F: 0 };
 
 // For an incoming ray of slope sigma (negative, looking down) meeting water

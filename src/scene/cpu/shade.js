@@ -5,7 +5,7 @@
 // row for reflect.js.
 import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
-import { rippleSlope, swellSlope, ringSlope, waterRays } from './water.js';
+import { rippleSlope, swellSlope, ringSlope, waterRays, RING_TILT } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
@@ -256,12 +256,14 @@ const methods = {
     const sea = T.shore && W > SEA_LEVEL - 0.05 && W < SEA_LEVEL + 0.05;
     // (the swell's height follows the weather's wind, and rain rings the water)
     const wp = this.wp;
-    let g = rippleSlope(x, z, this.t, this.dx, this.dz, fp, wp.rain > 0 ? 1 - CALM_K * wp.rain : 1) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) * wp.swell : 0);
-    if (wp.rain > 0) g += wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp);
-    const wr = waterRays(s, g);
+    const g = rippleSlope(x, z, this.t, this.dx, this.dz, fp, wp.rain > 0 ? 1 - CALM_K * wp.rain : 1) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) * wp.swell : 0);
+    // (rain's rings: the share of mirror takes their whole tilt, the rays
+    // only up to RING_TILT, which the mirrored objects' culling allows for)
+    const ring = wp.rain > 0 ? wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp) : 0;
+    const wr = waterRays(s, ring === 0 ? g : g + (ring > RING_TILT ? RING_TILT : ring < -RING_TILT ? -RING_TILT : ring));
+    const sr = wr.sr, st = wr.st, F = ring === 0 ? wr.F : waterRays(s, g + ring).F;
     const glow = this.glowAt(x, W, z, 0, 1, 0);
-    this.write(ci, 0, MAT.WATER, light.L[1], shadow, cloud, glow, wr.F * 2 - 1, D * len);
-    const sr = wr.sr, st = wr.st, F = wr.F;
+    this.write(ci, 0, MAT.WATER, light.L[1], shadow, cloud, glow, F * 2 - 1, D * len);
     // where the surface is nearly all mirror the bed cannot show: no bed ray
     if (F < 0.85) this.refract(ci, x, W, z, st);
     // the foam line at the shore of the sea or a lake (phase 2a): in place

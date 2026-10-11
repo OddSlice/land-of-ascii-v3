@@ -96,6 +96,7 @@ const methods = {
     const ey = ms.ey, cap = this.reflectCap, ev = this.ev;
     // start at the crossing before the first water
     const first = ms.act[0];
+    if (first >= cap) return;
     let i = 0;
     while (this.crossing(i) && this.cd[i] <= first) i++;
     let d0, h0;
@@ -125,10 +126,12 @@ const methods = {
     }
   },
 
-  // Rows whose water lies before distance d join the heap.
+  // Rows whose water lies before distance d join the heap. A row whose
+  // water lies beyond the cap is never marched (phase 2b): whether it is
+  // must not depend on the other rows of its group, which depend on the stripe.
   join(next, d) {
-    const ms = this.ms;
-    while (next < ms.n && ms.act[next] < d) { this.heapPush(next); next++; }
+    const ms = this.ms, cap = this.reflectCap;
+    while (next < ms.n && ms.act[next] < d) { if (ms.act[next] < cap) this.heapPush(next); next++; }
     return next;
   },
 
