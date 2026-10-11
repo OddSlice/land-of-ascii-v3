@@ -9,13 +9,18 @@
 //                           [--seed N]                the generated world's seed (default: the page's)
 //                           [--look tree=B,cloud=B]   one look (the rest at their defaults)
 //                           [--looks all]             every combination of the look candidates
+//                           [--weather all]           (phase 2b) every view under each kind of
+//                                                     weather held (or a list: rain,mist); the
+//                                                     world gains the lake and the river at dawn,
+//                                                     where the mist lies; the default is fair
 import { launch } from './lib/browser.mjs';
 import { serve, args, openLab, parseLook } from './lib/serve.mjs';
 import { LOOK } from '../src/look.js';
 
 const a = args();
 const counts = String(a.threads || '0,1,3,5,8').split(',').map(Number);
-const { server, url } = await serve();
+// (--root DIR: a copy of a build to check, so the repository can change meanwhile)
+const { server, url } = await serve(a.root);
 const browser = await launch(a.browser || 'chromium');
 const LAB = [
   { cam: 0, t: 'day' }, { cam: 1, t: 'day' }, { cam: 2, t: 'dusk' }, { cam: 3, t: 'night' }, { cam: 4, t: 'dusk' },
@@ -46,6 +51,9 @@ const WORLD = [
   { site: 'coastUp', t: 'day' }, { site: 'edge', t: 'day' }, { site: 'gate', t: 'night' }, { site: 'river', t: 'day' },
   { cam: 0, t: 'dawn' }, { cam: 0, t: 'night', day: 15 }, { cam: 6, t: 'night' }, { site: 'shoreL', t: 'day' }, { site: 'shoreR', t: 'dusk' },
 ];
+const WEATHERS = a.weather === 'all' ? ['clear', 'fair', 'overcast', 'rain', 'mist'] : a.weather ? String(a.weather).split(',') : ['fair'];
+// (phase 2b) where the mist lies: over the lake and along the river at dawn
+if (a.weather) WORLD.push({ cam: 1, t: 6.6 }, { cam: 4, t: 6.6 });
 const scenes = {
   lab: [['lab', LAB]], stress: [['stress', STRESS]], both: [['lab', LAB], ['stress', STRESS]],
   world: [['world', WORLD, true], ['world', WORLD, false]],
@@ -65,7 +73,7 @@ const lookName = (l) => (l ? Object.entries(l).map(([k, v]) => `${k}=${v}`).join
 const table = {};
 const worlds = {};
 let bad = 0;
-const plain = await serve(undefined, { isolated: false });
+const plain = await serve(a.root, { isolated: false });
 try {
   for (const [scene, views, iso = true] of scenes) for (const n of counts) {
     const name = scene === 'world' ? `world (${iso ? 'shared' : 'fallback'})` : scene;
@@ -75,12 +83,13 @@ try {
       worlds[`${name} ${n}`] = st;
       if (n > 0 && st.shared !== iso) throw new Error(`${name} with ${n} workers: shared memory ${st.shared ? 'on' : 'off'}`);
     }
-    for (const look of looks) {
+    for (const look of looks) for (const weather of WEATHERS) {
       for (let i = 0; i < views.length; i++) {
         const v = views[i];
-        const h = await lab.page.evaluate(async ({ v, look }) => {
+        const h = await lab.page.evaluate(async ({ v, look, weather }) => {
           const L = window.lab;
           if (L.resetLook) { L.resetLook(); if (look) L.setLook(look); }
+          if (L.setWeather) L.setWeather(weather);
           if (v.free) L.setCamera(v.free);
           else if (v.site) {
             const s = L.world.sites, c = L.cameras;
@@ -94,9 +103,9 @@ try {
           L.freeze(v.t, 12.5, v.day || 0);
           await L.whenIdle();
           return L.cellHash();
-        }, { v, look });
+        }, { v, look, weather });
         await lab.check();
-        (table[`${name} ${i}|${lookName(look)}`] ||= {})[n] = h;
+        (table[`${name} ${i}${WEATHERS.length > 1 || a.weather ? ` ${weather}` : ''}|${lookName(look)}`] ||= {})[n] = h;
       }
     }
     await lab.ctx.close();
@@ -118,7 +127,7 @@ try {
       console.log(`${view}${looks.length > 1 ? ` [${look}]` : ''}: ${same ? 'identical' : 'DIFFERENT'}  ${Object.entries(row).map(([n, h]) => `${n}:${h}`).join(' ')}`);
     }
   }
-  console.log(`\n${rows - bad} of ${rows} view-and-look combinations identical across ${counts.join(', ')} workers (${looks.length} look${looks.length > 1 ? 's' : ''})`);
+  console.log(`\n${rows - bad} of ${rows} view-and-look combinations identical across ${counts.join(', ')} workers (${looks.length} look${looks.length > 1 ? 's' : ''}, weather ${WEATHERS.join(', ')})`);
 } finally {
   await browser.close();
   server.close();

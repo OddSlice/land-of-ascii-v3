@@ -13,6 +13,9 @@
 //
 // --look sets the look candidates for every run; --root measures another
 // build's folder (for example a copy of an earlier phase) instead of this one.
+// --weather rain (phase 2b) holds a kind of weather for every run (the
+// default is fair, the look before weather); --hour 6.6 times every camera at
+// that hour instead of its own (the mist lies only round dawn).
 //
 // "worker" is the slowest stripe's march + resolve in a frame; "verdict" is
 // that plus the main thread's draw, per frame (the phase 0b decision rule).
@@ -85,7 +88,11 @@ try {
           for (let cam = 0; cam < ncams; cam++) {
             // keep the window in front: macOS throttles a covered window's frames
             await page.bringToFront();
-            await page.evaluate(({ d, cam }) => { window.lab.setDensity(d - 1); window.lab.camera(cam); window.lab.freeze(window.lab.cameras[cam].time, 0); }, { d, cam });
+            await page.evaluate(({ d, cam, weather, hour }) => {
+              const L = window.lab;
+              if (L.setWeather) L.setWeather(weather);
+              L.setDensity(d - 1); L.camera(cam); L.freeze(hour !== null ? hour : L.cameras[cam].time, 0);
+            }, { d, cam, weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null });
             await page.evaluate(() => window.lab.whenIdle());
             await page.evaluate(() => window.lab.timings(60));            // warm up, and let the stripes settle
             const t = await page.evaluate((n) => window.lab.timings(n), frames);
@@ -103,6 +110,7 @@ try {
               worker: r2(med(t.map((x) => x.worker))), draw: r2(med(t.map((x) => x.draw))),
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
               isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
+              weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null,
               ...(stress || scene === 'world' ? world : {}),
             };
             rows.push(row);

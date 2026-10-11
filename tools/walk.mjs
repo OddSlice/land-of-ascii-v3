@@ -32,6 +32,10 @@ const WALKS = [
   // ridge-top vista at the brow of its hill
   { name: 'world-dusk', world: true, road: 120, hour: 17.55 },
   { name: 'world-pan', world: true, cam: 6, pan: 60, panDeg: 150 },
+  // phase 2b: three minutes along the road on day 227 of seed 3, from 06:12
+  // in the dawn mist, through a fair spell, the cloud building and an hour of
+  // rain, to the clearing after it, the clock running an hour every 27 s
+  { name: 'world-weather', world: true, road: 180, hour: 6.2, day: 227, rate: 1 / 27 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -43,6 +47,8 @@ try {
   for (const w of WALKS) {
     if (only ? !only.includes(w.name) : !DEFAULT.includes(w.name)) continue;
     const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, recordVideo: { dir: OUT, size: { width, height } } });
+    // (no menu, hint or start card in the video, phase 2b)
+    await ctx.addInitScript(() => { self.LAND_QUIET = true; });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -54,14 +60,15 @@ try {
     else if (w.world) { if (a.seed) q.set('seed', String(a.seed)); } else q.set('lab', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-    await page.evaluate(async ({ cam, hour }) => {
+    await page.evaluate(async ({ cam, hour, day, rate }) => {
       await window.lab.ready;
       if (cam !== undefined) window.lab.camera(cam);
+      if (day !== undefined) window.lab.setDay(day);
       if (hour !== undefined) window.lab.setHour(hour);
       await window.lab.whenIdle();
       window.lab.unfreeze();
-      window.lab.runClock(true);
-    }, { cam: w.cam, hour: w.hour });
+      window.lab.runClock(true, rate);
+    }, { cam: w.cam, hour: w.hour, day: w.day, rate: w.rate });
     const s0 = await page.evaluate(() => window.lab.state().presented);
     const t0 = Date.now();
     if (w.road) await followRoad(page, w.road);

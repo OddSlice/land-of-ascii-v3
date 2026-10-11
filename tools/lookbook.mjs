@@ -24,6 +24,13 @@
 //       main lake at day, dawn, dusk and night under a bright and a dark
 //       moon, each beside the same camera in the build in DIR (a copy of
 //       phase 1's), and the overhead maps of the seeds (shots/phase2a/)
+//   node tools/lookbook.mjs --phase 2b --ref DIR [--built]
+//       docs/phase2b.md (shots/phase2b/): the spawn, the main lake, a forest
+//       edge and the coast under each kind of weather by day and at night;
+//       one view across a whole day of the forecast (seed 3, day 227); the
+//       five look fixes before (the build in DIR, a copy of phase 2b before
+//       them) and after; the menu's sections, the start card, the hint and
+//       the clean screen
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -34,6 +41,7 @@ const a = args();
 if (a.regress) { await regress(); process.exit(process.exitCode || 0); }
 if (String(a.phase) === '1') { await phase1(); process.exit(0); }
 if (String(a.phase) === '2a') { await phase2a(); process.exit(0); }
+if (String(a.phase) === '2b') { await phase2b(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -158,6 +166,7 @@ async function regress() {
   const frames = [];
   const scenes = String(a.scenes || 'lab,stress,world').split(',');
   const look = a.look ? Object.fromEntries(String(a.look).split(',').map((kv) => kv.split('='))) : null;
+  const weather = String(a.weather || 'fair');
   try {
     for (const scene of scenes) {
       const lab = await openLab(browser, url, { built: !!a.built, scene, density, threads: 8 });
@@ -165,15 +174,17 @@ async function regress() {
       const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
       for (let i = 0; i < cams.length; i++) {
         for (const t of times) {
-          const cells = await page.evaluate(async ({ i, t, look }) => {
+          const cells = await page.evaluate(async ({ i, t, look, weather }) => {
             const L = window.lab;
             L.resetLook();
             if (look) L.setLook(look);
+            // (phase 2b: the weather held at fair, the look before weather)
+            if (L.setWeather) L.setWeather(weather);
             L.camera(i); L.freeze(t, 0);
             await L.whenIdle();
             const st = L.state();
             return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
-          }, { i, t, look });
+          }, { i, t, look, weather });
           await lab.check();
           frames.push({ name: `${scene} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
         }
@@ -485,5 +496,128 @@ async function phase2a() {
   } finally {
     await browser.close();
     now.server.close(); ref.server.close();
+  }
+}
+
+// ---- phase 2b: weather, the fixes, the menu --------------------------------------
+async function phase2b() {
+  const OUT = path.join(ROOT, 'shots', 'phase2b');
+  fs.mkdirSync(OUT, { recursive: true });
+  const now = await serve(), ref = a.ref ? await serve(a.ref) : null;
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  const pageShot = async (page) => `data:image/png;base64,${(await page.screenshot()).toString('base64')}`;
+  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const hm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60 + 1e-6)).padStart(2, '0')}`;
+  try {
+    const bench = await workbench(browser);
+    // a sheet: frames in rows of `per`, each labelled, optionally cropped
+    const compose = (srcs, labels, title, per, scale = 1, crop = null, notes = null) => bench.evaluate(async ({ srcs, labels, title, per, scale, crop, notes }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const im0 = ims[0], cx = crop ? crop[0] * im0.width : 0, cy = crop ? crop[1] * im0.height : 0, cw = crop ? crop[2] * im0.width : im0.width, ch = crop ? crop[3] * im0.height : im0.height;
+      const pad = 12, top = notes ? 30 + 17 * notes.length : 30, w = Math.round(cw * scale), h = Math.round(ch * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      if (notes) notes.forEach((n, k) => g.fillText(n, pad, 40 + 17 * k));
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, cx, cy, cw, ch, x, y, w, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.88);
+    }, { srcs, labels, title, per, scale, crop, notes });
+
+    // 1. the four views under each kind of weather, by day and at night (mist
+    // lies only round dawn, so its day frame is at 07:00)
+    {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed: 3 });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      const CAMS = [[0, 'spawn view'], [1, 'main lake shore'], [3, 'forest edge across meadow'], [5, 'the coast']];
+      const KINDS = ['clear', 'fair', 'overcast', 'rain', 'mist'];
+      for (const [ci, name] of CAMS) {
+        const srcs = [], labels = [];
+        for (const kind of KINDS) {
+          for (const [label, hour] of [[kind === 'mist' ? 'morning (07:00)' : 'day (14:00)', kind === 'mist' ? 7 : 14], ['night (23:00, day 0)', 23]]) {
+            await lab.page.evaluate(async ({ ci, kind, hour }) => { const L = window.lab; L.setWeather(kind); L.camera(ci); L.freeze(hour, 12.5, 0); await L.whenIdle(); }, { ci, kind, hour });
+            await lab.check();
+            srcs.push(await shot(lab.page)); labels.push(`${kind}, ${label}`);
+          }
+        }
+        writeDataURL(path.join(OUT, `weather-${slug(name)}.jpg`), await compose(srcs, labels, `${name} (seed 3) under each kind of weather, by day and at night`, 2, 0.25));
+      }
+      // 2. one view across a whole day of the forecast: seed 3, day 227
+      const plan = await lab.page.evaluate(() => { window.lab.setDay(227); return window.lab.weather().forecast; });
+      const HOURS = [3, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11, 12, 14, 17.85, 22];
+      const srcs = [], labels = [];
+      for (const h of HOURS) {
+        const w = await lab.page.evaluate(async ({ h }) => { const L = window.lab; L.setWeather('auto'); L.camera(1); L.freeze(h, 12.5, 227); await L.whenIdle(); const w = L.weather(); return { kind: w.kind, mix: w.mix, wet: w.wet }; }, { h });
+        await lab.check();
+        const mix = Object.entries(w.mix).sort((p, q) => q[1] - p[1]).map(([k, v]) => (v < 0.995 ? `${k} ${Math.round(v * 100)}%` : k)).join(' + ');
+        srcs.push(await shot(lab.page)); labels.push(`${hm(h)}  ${mix}${w.wet > 0.02 ? `, ground ${Math.round(w.wet * 100)}% wet` : ''}`);
+      }
+      const notes = [`the forecast: ${plan.map(([s, e, k]) => `${hm(s)}-${hm(e)} ${k}`).join(', ')}`];
+      writeDataURL(path.join(OUT, 'day-227.jpg'), await compose(srcs, labels, 'Main lake shore across day 227 of seed 3, the weather from the forecast', 4, 0.25, null, notes));
+      await lab.ctx.close();
+    }
+
+    // 3. the five fixes, before (the build in --ref) and after
+    if (ref) {
+      const FIX = [
+        { file: 'fix-1-dusk-silhouette', title: 'Fix 1: the far range at dusk, a dark silhouette instead of a pale lit face', cam: 0, hour: 'dusk', crop: [0, 0.2, 1, 0.45] },
+        { file: 'fix-2-warm-far-rock', title: 'Fix 2: far lit rock stays warm tan (spawn view, 14:00)', cam: 0, hour: 'day', crop: [0, 0.25, 0.7, 0.3] },
+        { file: 'fix-3-crest-snow', title: 'Fix 3: no thin line of snow along the crests (near the range, 14:00)', free: { x: 1500, z: 1300, yaw: 45, pitch: 8 }, hour: 'day', crop: [0, 0, 1, 0.6] },
+        { file: 'fix-4-dawn-specks', title: 'Fix 4: no specks in the dawn sky (spawn view, 06:09)', cam: 0, hour: 'dawn', crop: [0.2, 0.02, 0.6, 0.4] },
+        { file: 'fix-5a-lake-wet-band', title: 'Fix 5: the lake\'s wet band follows how gently the shore slopes (main lake shore, 14:00)', cam: 1, hour: 'day', crop: [0.3, 0.45, 0.7, 0.55] },
+        { file: 'fix-5b-coast-camera', title: 'Fix 5: the coast camera chosen by how much sea and land it sees (14:00)', cam: 5, hour: 'day', crop: null },
+      ];
+      const frames = {};
+      for (const [tag, srv] of [['before', ref], ['after', now]]) {
+        const lab = await openLab(browser, srv.url, { built: true, scene: 'world', seed: 3 });
+        await lab.page.evaluate(() => window.lab.setHud(false));
+        for (const f of FIX) {
+          await lab.page.evaluate(async (f) => { const L = window.lab; if (L.setWeather) L.setWeather('fair'); if (f.free) L.setCamera(f.free); else L.camera(f.cam); L.freeze(f.hour, 12.5, 0); await L.whenIdle(); }, f);
+          await lab.check();
+          frames[`${tag} ${f.file}`] = await shot(lab.page);
+        }
+        await lab.ctx.close();
+      }
+      for (const f of FIX) writeDataURL(path.join(OUT, `${f.file}.jpg`), await compose([frames[`before ${f.file}`], frames[`after ${f.file}`]], ['before', 'after'], f.title, 2, f.crop ? 0.5 : 0.3, f.crop));
+    }
+
+    // 4. the menu: the clean screen, the start card, the hint, each section
+    {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed: 3, quiet: false, dpr: 1 });
+      const { page } = lab;
+      await page.waitForTimeout(400);
+      const card = await pageShot(page);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+      const hint = await pageShot(page);
+      await page.waitForTimeout(4800);
+      const clean = await pageShot(page);
+      writeDataURL(path.join(OUT, 'screen.jpg'), await compose([card, hint, clean], ['the start card (first visit only)', 'the hint, for four seconds', 'the clean screen'], 'The game screen: almost free of text', 3, 0.42));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(450);
+      const secs = [];
+      for (const id of ['controls', 'display', 'world', 'advanced']) {
+        await page.click(`#menu nav button:text("${id}")`);
+        await page.waitForTimeout(700);
+        secs.push(await pageShot(page));
+      }
+      writeDataURL(path.join(OUT, 'menu.jpg'), await compose(secs, ['Controls', 'Display', 'World', 'Advanced (opened)'], 'The menu (Esc): its four sections, over the world, dimmed and still drawn', 2, 0.5));
+      for (const [k, id] of ['controls', 'display', 'world', 'advanced'].entries()) writeDataURL(path.join(OUT, `menu-${id}.jpg`), await compose([secs[k]], [id], `The menu: ${id}`, 1, 0.75));
+      await lab.check();
+      await lab.ctx.close();
+    }
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase2b/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    now.server.close(); if (ref) ref.server.close();
   }
 }

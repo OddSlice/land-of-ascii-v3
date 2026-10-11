@@ -50,9 +50,13 @@ export function args(argv = process.argv.slice(2)) {
 // error or worker failure. `scene`: 'lab' (the default, for the tools written
 // before the generated world), 'stress' (or stress: true) or 'world' (with
 // `seed`).
-export async function openLab(browser, base, { built = false, threads, density, stress = false, scene, seed, look = null, width = 1440, height = 900, dpr = 2, extra = null } = {}) {
+// `quiet` (the default): the menu, the hint and the start card (phase 2b) are
+// suppressed from the first frame, so no picture or measurement changes
+// because of them; builds without them ignore it.
+export async function openLab(browser, base, { built = false, threads, density, stress = false, scene, seed, look = null, width = 1440, height = 900, dpr = 2, extra = null, quiet = true, context = {} } = {}) {
   scene = scene || (stress ? 'stress' : 'lab');
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr });
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr, ...context });
+  if (quiet) await ctx.addInitScript(() => { self.LAND_QUIET = true; });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));

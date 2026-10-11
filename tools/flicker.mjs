@@ -15,6 +15,14 @@
 //                                          sky and land) is counted on its own; with --ref, the same for
 //                                          another build (e.g. a copy of phase 1's sources)
 //   --only forest,stand                    only the runs whose label contains one of these
+//   --built [--root DIR]                   the single-file build (in DIR: a copy, so the repository can change meanwhile)
+//   (phase 2b) the world set also counts glyph flips (a glyph that changes and changes back, whatever
+//   its colour does) and colour flips (a background that jumps more than 6 levels and comes back to
+//   within a quarter of the jump): "glyph blinks" counts a glyph's change only where the whole cell
+//   comes back exactly, so flatter colours (overcast, mist, wet ground) inflate it
+//   --weather fair,overcast,wet,rain,mist  (phase 2b) each run under each weather held (wet: fair
+//                                          weather on wet ground); --time 6.6 for another hour
+//                                          (mist lies only round dawn); the default is fair
 //   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look tree=B]
 //
 // step is metres a frame (0.075 m = 4.5 m/s at 60 fps), dir the walking
@@ -149,6 +157,13 @@ if (a.at) {
     for (const o of OPTIONS[r.axis]) runs.push({ ...r, look: { [r.axis]: o }, option: `${r.axis} ${o}` });
   }
 }
+// (phase 2b) each run under each weather asked for, at the hour asked for
+const WEATHERS = { wet: { mix: { fair: 1 }, wet: 1 } };
+if (a.weather || a.time) {
+  const ws = String(a.weather || 'fair').split(',');
+  runs = runs.flatMap((r) => ws.map((w) => ({ ...r, weather: WEATHERS[w] || w, weatherName: w, time: a.time ? (isNaN(+a.time) ? a.time : +a.time) : r.time,
+    option: [r.option, ws.length > 1 || a.weather ? w : null, a.time ? `at ${a.time}` : null].filter(Boolean).join(', ') || null })));
+}
 
 // one build: every run, on pages for the lab and the stress scene
 async function measure(browser, root, list) {
@@ -158,7 +173,7 @@ async function measure(browser, root, list) {
     for (const scene of ['lab', 'stress', 'world']) {
       const mine = list.filter((r) => (r.scene || (r.stress ? 'stress' : 'lab')) === scene);
       if (!mine.length) continue;
-      const lab = await openLab(browser, url, { scene, density: a.density });
+      const lab = await openLab(browser, url, { scene, density: a.density, built: !!a.built });
       for (const run of mine) {
         const r = await lab.page.evaluate(async ({ run, frames }) => {
           const L = window.lab;
@@ -171,8 +186,10 @@ async function measure(browser, root, list) {
             s0 = L.state();
             if (run.y !== undefined) s0.eye = run.y;
           }
+          // (phase 2b: the weather held, fair unless asked)
+          if (L.setWeather) L.setWeather(run.weather || 'fair');
           L.freeze(run.time || 'day', 0);
-          let prev2 = null, prev = null, blinks = 0, changed = 0, glyphBlinks = 0, colourBlinks = 0, n = 0;
+          let prev2 = null, prev = null, blinks = 0, changed = 0, glyphBlinks = 0, colourBlinks = 0, n = 0, glyphFlips = 0, colourFlips = 0;
           let dir = run.dir;
           if (run.level) {
             // how far the ground rises or falls, or the water deepens, over the walk
@@ -185,8 +202,15 @@ async function measure(browser, root, list) {
             await L.whenIdle();
             const cur = L.cells();
             if (prev2) {
-              let b = 0, ch = 0, gb = 0, cb = 0;
+              let b = 0, ch = 0, gb = 0, cb = 0, gf = 0, cf = 0;
               for (let k = 0; k < cur.length; k += 8) {
+                // (phase 2b) a glyph that changes and changes back, whatever
+                // its colour does; a background that jumps more than 6 levels
+                // and comes back to within a quarter of the jump
+                if (prev2[k + 3] === cur[k + 3] && prev2[k + 3] !== prev[k + 3]) gf++;
+                const jump = Math.max(Math.abs(prev2[k] - prev[k]), Math.abs(prev2[k + 1] - prev[k + 1]), Math.abs(prev2[k + 2] - prev[k + 2]));
+                const back = Math.max(Math.abs(prev2[k] - cur[k]), Math.abs(prev2[k + 1] - cur[k + 1]), Math.abs(prev2[k + 2] - cur[k + 2]));
+                if (jump > 6 && back <= jump / 4) cf++;
                 const same = (x, y) => x[k] === y[k] && x[k + 1] === y[k + 1] && x[k + 2] === y[k + 2] && x[k + 3] === y[k + 3];
                 // a visible colour step: more than 6 levels in some channel
                 const far = (x, y) => Math.abs(x[k] - y[k]) > 6 || Math.abs(x[k + 1] - y[k + 1]) > 6 || Math.abs(x[k + 2] - y[k + 2]) > 6;
@@ -197,12 +221,13 @@ async function measure(browser, root, list) {
                   if (far(prev2, prev)) cb++;
                 }
               }
-              blinks += b; changed += ch; glyphBlinks += gb; colourBlinks += cb; n++;
+              blinks += b; changed += ch; glyphBlinks += gb; colourBlinks += cb; glyphFlips += gf; colourFlips += cf; n++;
             }
             prev2 = prev; prev = cur;
           }
           const cells = prev.length / 8;
-          return { cells, blinkPct: 100 * blinks / n / cells, changedPct: 100 * changed / n / cells, glyphPct: 100 * glyphBlinks / n / cells, colourPct: 100 * colourBlinks / n / cells };
+          return { cells, blinkPct: 100 * blinks / n / cells, changedPct: 100 * changed / n / cells, glyphPct: 100 * glyphBlinks / n / cells, colourPct: 100 * colourBlinks / n / cells,
+            glyphFlipPct: 100 * glyphFlips / n / cells, colourFlipPct: 100 * colourFlips / n / cells };
         }, { run, frames });
         await lab.check();
         out.push({ ...run, ...r });
@@ -219,7 +244,7 @@ async function measure(browser, root, list) {
 const browser = await launch(a.browser || 'chromium');
 let results, ref = null;
 try {
-  results = await measure(browser, ROOT, runs);
+  results = await measure(browser, a.root || ROOT, runs);
   if (a.ref) {
     // the reference build: each view once (it has no look candidates)
     const seen = new Set();
@@ -239,7 +264,7 @@ if (!a.at && (a.set || 'look') === 'look') {
     console.log(`| ${r.label} | ${r.option} | ${f3(r.blinkPct)} | ${f3(r.glyphPct)} | ${f3(r.colourPct)} | ${rr ? `${f3(rr.blinkPct)} / ${f3(rr.glyphPct)} / ${f3(rr.colourPct)}` : '–'} |`);
   }
 } else if (!a.at) {
-  console.log('\n| run | blinking cells per frame | glyph blinks | colour blinks (>6 levels) | cells changing at all |');
-  console.log('|---|---|---|---|---|');
-  for (const r of results) console.log(`| ${r.label} | ${f3(r.blinkPct)} | ${f3(r.glyphPct)} | ${f3(r.colourPct)} | ${r.changedPct.toFixed(1)}% |`);
+  console.log(`\n| run${a.weather ? ' | weather' : ''} | blinking cells per frame | glyph blinks | colour blinks (>6 levels) | cells changing at all | glyph flips | colour flips (>6 levels) |`);
+  console.log(`|---${a.weather ? '|---' : ''}|---|---|---|---|---|---|`);
+  for (const r of results) console.log(`| ${r.label}${a.weather ? ` | ${r.weatherName}` : ''} | ${f3(r.blinkPct)} | ${f3(r.glyphPct)} | ${f3(r.colourPct)} | ${r.changedPct.toFixed(1)}% | ${f3(r.glyphFlipPct)} | ${f3(r.colourFlipPct)} |`);
 }
