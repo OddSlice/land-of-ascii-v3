@@ -10,6 +10,9 @@ import { buildSpans } from './spans.js';
 import { buildClouds, worldCloudList } from './sky.js';
 import { LEVELS } from './terrain.js';
 
+// the weights kept filtered for the coarser levels (as gen/world.js makes them)
+const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock'];
+
 const TREE_F = 15;        // numbers per tree in the tree table
 const BUSH_F = 6;
 
@@ -25,9 +28,10 @@ export function packWorld(world, Shared = null) {
     arrays[name] = b;
   };
   put('ground', T.ground);
+  if (T.form) put('form', T.form);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
   for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code']) put(k, T[k]);
-  for (const k of ['wWater', 'wRoad', 'wSand']) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
+  for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
   // trees: a table of numbers, and their tiers (both treatments) in one pool
   const trees = world.objects.trees;
   const tab = new Float64Array(trees.length * TREE_F);
@@ -77,8 +81,9 @@ export function unpackWorld(packed) {
   const terrain = {
     N, NN, ground: a.ground, levels, wWater: a.wWater, wRoad: a.wRoad, wSand: a.wSand, wRock: a.wRock, wSnow: a.wSnow,
     wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH,
+    form: a.form || null,
   };
-  for (const k of ['wWater', 'wRoad', 'wSand']) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
+  for (const k of FILTERED) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
   const trees = [], tab = a.trees, tiers = a.tiers;
   for (let q = 0; q < tab.length / TREE_F; q++) {
     const o = q * TREE_F, at = tab[o + 13], n = tab[o + 14];

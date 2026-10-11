@@ -3,10 +3,12 @@
 // their edges are stippled with a scattered threshold so they break up into cells
 // the way the reference footage does. Stars are projected from fixed
 // directions onto the cell they fall in, so they never blink as you turn.
-import { MAT, HIT_STRIDE, REC } from '../../contract.js';
-import { LOOK } from '../../look.js';
+import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
+import { lineAt, crossLine, profileAt, leanAt } from '../../world/backdrop.js';
+import { SCALE } from '../../world/scale.js';
+import { LOOK, ruleOf } from '../../look.js';
 import { clusterAt } from '../../world/sky.js';
-import { hash2, vnoise } from '../../world/noise.js';
+import { hash2, vnoise, fbm } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { project } from './view.js';
 import { waterRays } from './water.js';
@@ -37,6 +39,78 @@ export class SkyPass {
     // the generated world's sea runs on past the edge of the map and past the
     // view distance, so it meets the sky at the horizon, not in a line
     this.seaLevel = world.openEdge && world.sea !== undefined ? world.sea : null;
+    // the generated world's backdrop (built by the backend), drawn under the far rule
+    this.bd = world.openEdge && world.backdrop ? world.backdrop : null;
+    this.X = [0, 0]; this.Pr = [0, 0]; this.Pl = [0, 0, 0, 0, 0, 0];
+  }
+
+  // For each plane of the stripe, where its line leaves the map's side of
+  // each ridgeline: distance, arc length, the ridgeline's height and slope
+  // there; and the plane's skyline on the backdrop as seen from the eye.
+  backdropPlanes(v, rays) {
+    const bd = this.bd, np = rays.np, K = bd.layers.length;
+    if (!this.bT || this.bT.length < np * K) {
+      const n = (np + 64) * K;
+      this.bT = new Float64Array(n); this.bU = new Float64Array(n); this.bH = new Float64Array(n); this.bDH = new Float64Array(n);
+      this.bTop = new Float64Array(np + 64); this.bTopK = new Int8Array(np + 64);
+    }
+    const X = this.X, Pr = this.Pr;
+    for (let p = 0; p < np; p++) {
+      let top = -Infinity, tk = 0;
+      for (let k = 0; k < K; k++) {
+        const q = p * K + k, Ly = bd.layers[k];
+        crossLine(bd, Ly.D, v.ex, v.ez, rays.pdx[p], rays.pdz[p], X);
+        this.bT[q] = X[0]; this.bU[q] = X[1];
+        if (X[0] === Infinity) continue;
+        profileAt(Ly, bd.step, X[1], Pr);
+        this.bH[q] = Pr[0];
+        if (Pr[0] <= SCALE.sea + 3) continue;
+        const st = (Pr[0] - v.ey) / X[0];
+        if (st > top) { top = st; tk = k; }
+      }
+      this.bTop[p] = top; this.bTopK[p] = tk;
+    }
+  }
+
+  // The first ridgeline a ray of slope s from height ey meets in plane p (-1: none).
+  // (where a ridgeline has fallen to the sea it is not there: the sea is)
+  backdropHit(p, s, ey) {
+    const K = this.bd.layers.length, low = SCALE.sea + 3;
+    for (let k = 0, q = p * K; k < K; k++, q++) {
+      const t = this.bT[q], h = this.bH[q];
+      if (t < Infinity && h > low && ey + s * t < h) return k;
+    }
+    return -1;
+  }
+
+  // A ray of slope s from height ey meets ridgeline k of plane p: its rock,
+  // snow, or wooded lower slopes, lit by the sun or moon through the face's
+  // own lean (it faces the map, leaning back, turned by the line's peaks and
+  // saddles), its gullies dark and its rock in broad strata.
+  backdropShade(m, ci, slot, p, k, s, ey, dist) {
+    const bd = this.bd, K = bd.layers.length, q = p * K + k, Ly = bd.layers[k];
+    const t = this.bT[q], u = this.bU[q], H = this.bH[q], y = ey + s * t;
+    const P = lineAt(bd, Ly.D, u, this.Pl);
+    const FAR = LOOK.far, C = SCALE.backdrop, sea = SCALE.sea;
+    const g = smooth(0.6, 0.88, vnoise(u / 75, y / 320, SEED + 141 + k));
+    const snowY = sea + Ly.snow + 45 * fbm(u / 700, k * 3.1, SEED + 142, 2) - 40 * g;
+    let mat, tone;
+    if (y > snowY) { mat = MAT.SNOW; tone = 0.25 * (vnoise(u / 60, y / 40, SEED + 143) * 2 - 1); }
+    else if (y < sea + Ly.tree + 30 * vnoise(u / 500, k * 3.3, SEED + 144)) {
+      const wood = vnoise(u / 90, y / 60, SEED + 145) > 0.42;
+      mat = wood ? MAT.CONIFER : MAT.GRASS;
+      tone = 0.6 * (vnoise(u / 25, y / 30, SEED + 146) * 2 - 1);
+    } else { mat = MAT.ROCK; tone = FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(u / 400, k * 2.7, SEED + 147)); }
+    // the face's normal: leaning back from the map at C.face, turned along
+    // the line by the ridgeline's slope near the crest
+    const lean = C.lean * leanAt(Ly, bd.step, u, H - y);
+    let nx = -lean * P[4] - C.face * P[2], nz = -lean * P[5] - C.face * P[3], ny = 1;
+    const nl = Math.sqrt(nx * nx + ny * ny + nz * nz); nx /= nl; ny /= nl; nz /= nl;
+    const L = this.light.L;
+    let lam = nx * L[0] + ny * L[1] + nz * L[2];
+    if (mat === MAT.CONIFER || mat === MAT.GRASS) lam = Math.max(0, (lam + 0.2) / 1.2);
+    else lam = Math.max(0, lam) * (1 - FAR.gully * g);
+    m.write(ci, slot, mat, lam, 0, 0, 0, tone, dist);
   }
 
   // A ray that met nothing within the view distance and comes down to sea
@@ -58,7 +132,9 @@ export class SkyPass {
   // the treatment's puffs, and for banks the time of day's flattening.
   prepare(frame) {
     const t = frame.t, B = !!(frame.look && frame.look.cloud === 'B');
-    const k = makePalette(frame.hour).k;
+    const pal = makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night')), k = pal.k;
+    this.illum = pal.night === 'p1' ? 1 : pal.illum;
+    this.farRule = ruleOf(frame.look, 'air') === 'aerial';
     this.treat = B ? LOOK.clouds.B : LOOK.clouds.A;
     this.flat = B ? k.cloudFlat : 1; this.stretch = B ? k.cloudStretch : 1;
     this.streaky = B;
@@ -81,6 +157,9 @@ export class SkyPass {
 
   run(v, rays, m, frame) {
     const hits = m.hits;
+    const useBd = !!(this.bd && this.farRule);
+    if (useBd) this.backdropPlanes(v, rays);
+    const K = this.bd ? this.bd.layers.length : 0;
     const light = this.light;
     const sun = light.sun, moon = light.moon;
     const sunR = Math.max(1.7 * Math.PI / 180, 1.2 * v.colAngle);
@@ -125,11 +204,34 @@ export class SkyPass {
       const dx = rays.pdx[p] * inv, dy = s * inv, dz = rays.pdz[p] * inv;
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE;
+      // the backdrop (the far rule): the first ridgeline the ray meets
+      const bk = useBd ? this.backdropHit(p, s, v.ey) : -1;
+      const bDist = bk >= 0 ? this.bT[p * K + bk] / inv : Infinity;
       // the open sea, beyond the view distance (generated world only)
-      if (dy < 0 && this.seaLevel !== null && this.farSea(v, rays, m, ci, p, s)) continue;
-      // clouds
-      if (dy > 0.01 && this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0, p)) continue;
-      this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
+      if (bk < 0 && dy < 0 && this.seaLevel !== null && this.farSea(v, rays, m, ci, p, s)) { hits[o + 2 * REC] = MAT_NONE; continue; }
+      // a skyline just below the ray (the map's, from the march, or the
+      // backdrop's) covers part of the cell: how much, and how far it is
+      let fc = rays.fringe[ci], fBd = false, fDist = fc > 0 ? (hits[o + 2 * REC + 6] | (hits[o + 2 * REC + 7] << 8)) / 10 : Infinity;
+      if (useBd && bk < 0) {
+        const st = this.bTop[p], sb = rays.sigB[ci];
+        if (st > sb && st < s) {
+          const c2 = (st - sb) / (s - sb);
+          if (c2 > fc) { fc = c2; fBd = true; fDist = this.bT[p * K + this.bTopK[p]] * Math.sqrt(1 + st * st); }
+        }
+      }
+      // what the ray meets: a cloud, a ridgeline, or the sky
+      const cd = dy > 0.01 ? this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0, p) : Infinity;
+      let behind = cd;
+      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 0, p, bk, s, v.ey, bDist); behind = bDist; }
+      else if (cd === Infinity) this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
+      // the skyline in front: what the ray meets moves behind (R1), with the
+      // share the land covers; the land at the skyline takes the cell
+      if (fc > 0 && fDist < behind) {
+        if (fBd) { const st = this.bTop[p]; this.backdropShade(m, ci, 2, p, this.bTopK[p], st, v.ey, fDist); }
+        for (let b = 0; b < REC; b++) { hits[o + REC + b] = hits[o + b]; hits[o + b] = hits[o + 2 * REC + b]; }
+        hits[o + REC + 4] = Math.round(fc >= 1 ? 255 : fc * 255);
+      }
+      hits[o + 2 * REC] = MAT_NONE;
     }
     this.stars(v, rays, hits);
     // what mirrored rays that met nothing see: the sky above the water, and
@@ -144,7 +246,13 @@ export class SkyPass {
       const dx = rays.pdx[p] * inv, dy = s * inv, dz = rays.pdz[p] * inv;
       const cx = c0 + ci % sw, cy = (ci / sw) | 0;
       const o = ci * HIT_STRIDE + REC;
-      if (dy > 0.01 && this.cloud(v, rays.rey[ci], dx, dy, dz, cx, cy, Lc, m, ci, 1, p)) continue;
+      const ey = rays.rey[ci];
+      const bk = useBd ? this.backdropHit(p, s, ey) : -1;
+      const bDist = bk >= 0 ? this.bT[p * K + bk] / inv : Infinity;
+      const cd = dy > 0.01 ? this.cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, 1, p) : Infinity;
+      // (a ridgeline in the water: its leg is from the water on)
+      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 1, p, bk, s, ey, bDist - rays.rdw[ci] / inv); continue; }
+      if (cd < Infinity) continue;
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
       if (hits[o] !== MAT.SKY) continue;
       // the glitter: near the light's direction, narrow across and long in
@@ -156,7 +264,7 @@ export class SkyPass {
       const up = Math.asin(Math.max(-1, Math.min(1, dy))) - Math.asin(Math.max(-1, Math.min(1, Lg[1])));
       const aw = across / (G.width * D2R), al = Math.abs(up) / (G.length * D2R);
       if (aw >= 1 || al >= 1) continue;
-      const pr = (1 - aw * aw) * (1 - al) * G.density;
+      const pr = (1 - aw * aw) * (1 - al) * G.density * (Lg === sun ? 1 : this.illum);
       const wx = v.ex + rays.pdx[p] * rays.rdw[ci], wz = v.ez + rays.pdz[p] * rays.rdw[ci];
       if (hash2(Math.floor(wx * 1.7), Math.floor(wz * 1.7) * 7919 + tick, SEED + 99) >= pr) continue;
       hits[o] = Lg === sun ? MAT.SUN : MAT.MOON;
@@ -172,7 +280,10 @@ export class SkyPass {
     const dm = dx * moon[0] + dy * moon[1] + dz * moon[2];
     let mat = MAT.SKY, lit = dy > 0 ? dy : 0;
     if (ds > cosSun && sun[1] > -0.02) { mat = MAT.SUN; lit = 1; }
-    else if (dm > cosMoon && moon[1] > -0.02) { mat = MAT.MOON; lit = 1; }
+    else if (dm > cosMoon && moon[1] > -0.02 && this.illum >= LOOK.moon.showAt) {
+      // (the moon as bright as its lit share; a new moon is not drawn)
+      mat = MAT.MOON; lit = this.illum >= 1 ? 1 : LOOK.moon.disc + (1 - LOOK.moon.disc) * this.illum;
+    }
     hits[o] = mat;
     hits[o + 1] = (lit * 255 + 0.5) | 0;
     hits[o + 2] = 0; hits[o + 3] = 0; hits[o + 4] = 0;
@@ -272,12 +383,12 @@ export class SkyPass {
       // a puff's dissolving edge in front of the cloud's own body is not a hole
       if (cBest < best) { best = cBest; bdist = cBest; bl = cBl; bcover = Math.min(1, Math.max(cCover, behind)); }
     }
-    if (best === Infinity) return false;
+    if (best === Infinity) return Infinity;
     // the sky behind the cloud, for its dissolving edge
     const sun = this.light.sun;
     const ang = Math.acos(Math.max(-1, Math.min(1, dx * sun[0] + dy * sun[1] + dz * sun[2])));
     m.write(ci, slot, MAT.CLOUD, bl, dy, 1 - ang / Math.PI, 0, bcover * 2 - 1, Math.min(6500, bdist));
-    return true;
+    return bdist;
   }
 
   stars(v, rays, hits) {

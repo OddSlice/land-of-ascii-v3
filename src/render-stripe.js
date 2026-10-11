@@ -3,6 +3,7 @@
 // main thread with ?threads=0, so both give the same bytes.
 import { createCpuBackend } from './scene/cpu/backend.js';
 import { makePalette, resolveStripe } from './resolve.js';
+import { ruleOf } from './look.js';
 import { HIT_STRIDE, CELL_STRIDE } from './contract.js';
 
 export function createStripeRenderer(world, opts) {
@@ -17,7 +18,7 @@ export function createStripeRenderer(world, opts) {
       backend.render(frame, c0, c1, hits);
       const t1 = performance.now();
       const cells = new Uint8Array(n * CELL_STRIDE);
-      resolveStripe(makePalette(frame.hour), hits, cells, sw, frame.rows, c0, frame.look);
+      resolveStripe(makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night')), hits, cells, sw, frame.rows, c0, frame);
       const t2 = performance.now();
       return { cells, march: t1 - t0, resolve: t2 - t1, settled: backend.settled, sweepMs: backend.sweepMs };
     },

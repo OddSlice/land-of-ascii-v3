@@ -67,6 +67,11 @@ export class StripeRays {
       this.cap = cells;
       this.plane = new Int32Array(cells);
       this.sigma = new Float32Array(cells);
+      // the slope of the cell one row below in the same column (its centre),
+      // and how much of the cell a skyline below it covers (the far rule):
+      // both the cell's own, so they never depend on the stripe
+      this.sigB = new Float32Array(cells);
+      this.fringe = new Float32Array(cells);
       this.depth = new Float32Array(cells);
       // mirrored rays of water cells: slope, distance to the water, the
       // mirrored eye's height, and what they hit (-1: no water in this cell)
@@ -90,11 +95,13 @@ export class StripeRays {
     let jlo = 1e9, jhi = -1;
     this.ensure(cells, v.J);
     const { plane, sigma } = this;
+    const { sigB, fringe } = this;
     for (let cy = 0; cy < R; cy++) {
       const y = 1 - 2 * (cy + 0.5) / R;
       const yb = y * v.ty;
       const b = v.cp - yb * v.sp;
       const up = yb * v.cp + v.sp;
+      const yb2 = (1 - 2 * (cy + 1.5) / R) * v.ty, b2 = v.cp - yb2 * v.sp, up2 = yb2 * v.cp + v.sp;
       for (let cx = c0; cx < c1; cx++) {
         const a = (2 * (cx + 0.5) / v.W - 1) * v.tx;
         let j = Math.round((a / b - v.t0) / v.dt);
@@ -102,6 +109,8 @@ export class StripeRays {
         const i = cy * sw + (cx - c0);
         plane[i] = j;
         sigma[i] = up / Math.sqrt(a * a + b * b);
+        sigB[i] = up2 / Math.sqrt(a * a + b2 * b2);
+        fringe[i] = 0;
         if (j < jlo) jlo = j;
         if (j > jhi) jhi = j;
       }

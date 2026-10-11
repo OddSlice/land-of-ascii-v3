@@ -18,7 +18,7 @@ import { CG, KIND, coarsen, flood, accumulate, findLakes, pickRivers, wetFine, d
 import { forestField, chooseThreshold, plant } from './plants.js';
 import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt } from './sites.js';
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, STEEP } from './roads.js';
-import { materials, detail } from './ground.js';
+import { materials, detail, gullies } from './ground.js';
 import { worldCameras } from './cameras.js';
 import { makeLevels, materialCode, weightLevels } from '../terrain.js';
 import { floorField } from '../objects.js';
@@ -26,6 +26,8 @@ import { buildSpans } from '../spans.js';
 import { buildClouds, worldCloudList } from '../sky.js';
 
 const SEA = SCALE.sea;
+// the weights kept filtered for the coarser levels (see pack.js)
+export const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock'];
 
 // The seed the page opens on, chosen for its first view (docs/phase1.md);
 // ?seed= gives any other.
@@ -202,7 +204,11 @@ export function* generateWorld(seed) {
   Object.assign(terrain, { wWater, wRoad, wSand, wRock, wSnow, tone: det.tone, fine: det.fine, toneK: det.toneK, maxH });
   terrain.wFloor = floorField(terrain, trees);
   terrain.code = materialCode(terrain);
-  for (const k of ['wWater', 'wRoad', 'wSand']) terrain[`${k}L`] = weightLevels(terrain[k], N);
+  // (filtered copies for the coarser levels: thin water, roads and sand fade
+  // with distance; snow and rock end at a clean line far away)
+  for (const k of FILTERED) terrain[`${k}L`] = weightLevels(terrain[k], N);
+  // the range's gullies, on the 4 m grid (the far rule)
+  terrain.form = gullies(co, acc, gOf);
   lap('ground');
   yield { stage: STAGES[8], p: 0.9 };
   terrain.levels = makeLevels(surface, N, false);

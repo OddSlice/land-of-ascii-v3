@@ -48,6 +48,7 @@ export class Input {
       case 'Digit1': a.time('day'); break;
       case 'Digit2': a.time('dusk'); break;
       case 'Digit3': a.time('night'); break;
+      case 'Digit4': a.time('dawn'); break;
       case 'KeyT': a.toggleClock(); break;
       case 'KeyC': a.nextCamera(); break;
       case 'KeyG': a.toggleGlyphs(); break;

@@ -32,4 +32,29 @@ export const SCALE = {
   trees: { target: 12000, height: [11, 24], spacing: 5 },
   road: { width: 4, maxSlope: 0.12 },
   wall: { length: 120, thick: 3, height: 6, gate: 4 },
+
+  // the backdrop (phase 2a): the range going on past the north and east
+  // edges as receding ridgelines, never walkable. Each runs `dist` metres
+  // outside the edges (rounding the corner on an arc), its heights above the
+  // sea between `low` and `high` with peaks `wave` metres apart; snow from
+  // `snow`, trees below `tree` (heights above the sea). They stand to their full
+  // height where the map's own edge beside them (smoothed over `reach`
+  // metres along it) is `mount[1]` metres above the sea, and fall away to
+  // nothing where it is `mount[0]` (coast, and out past the map's corners).
+  // Profiles are kept every `step` metres, from `west` to `south`.
+  backdrop: {
+    step: 8, west: -2600, south: -2600, reach: 900, mount: [110, 210],
+    // the faces' lean along the line, smoothed over these windows (metres)
+    // from the crest down (each window three times the last)
+    windows: [24, 72, 216, 648],
+    // the faces lean back from the map at this slope (rise over run), and
+    // turn along the line by `lean` times the line's own slope near a crest,
+    // so a peak has a lit flank and a shaded one
+    face: 0.8, lean: 2.2,
+    layers: [
+      { dist: 450, low: 200, high: 580, wave: 1100, snow: 450, tree: 210 },
+      { dist: 1400, low: 320, high: 840, wave: 1700, snow: 560, tree: 220 },
+      { dist: 3200, low: 440, high: 980, wave: 2600, snow: 640, tree: 230 },
+    ],
+  },
 };

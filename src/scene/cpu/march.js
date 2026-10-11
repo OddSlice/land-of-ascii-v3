@@ -20,11 +20,12 @@
 // Rows are handled in "row sets": the cells of one plane that share an eye,
 // sorted by slope. The direct view is one row set; each water level seen in
 // the plane gives one mirrored row set, whose rows only start at their water.
-import { LOOK } from '../../look.js';
+import { LOOK, ruleOf } from '../../look.js';
 import { LEVELS } from '../../world/terrain.js';
 import { SPAN_MERLON, SPAN_ARCH, archY, spanAt } from '../../world/spans.js';
 import { installShading } from './shade.js';
 import { installReflection } from './reflect.js';
+import { stopsAt } from '../../world/backdrop.js';
 import { bil } from './sample.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -131,6 +132,11 @@ export class Marcher {
     this.v = v; this.rays = rays; this.hits = hits; this.torches = torches; this.t = frame.t;
     if (!this.tg) this.buildTorchGrid(torches);
     this.meadow = (frame.look && frame.look.meadow) || 0;
+    // the far rule (air 'aerial'): far snow lines and rock, gullies, strata, the skyline's fade
+    this.farRule = ruleOf(frame.look, 'air') === 'aerial';
+    // with the backdrop, the march past the north and east edges stops at its
+    // first ridgeline (the sky pass draws the ridgelines beyond)
+    this.bdD = this.farRule && this.world.backdrop ? this.world.backdrop.layers[0].D : Infinity;
     this.dEnd = [];
     for (let L = 0; L < LEVELS; L++) this.dEnd.push((1 << L) / (LOD_Q * v.colAngle));
     // merlons sink into the walkway before they get thinner than about two
@@ -195,7 +201,8 @@ export class Marcher {
       // the generated world has no wrapping and no wall at its edge: past it
       // the edge's own heights run on (the sea to the south and west, high
       // ground to the north and east) as far as the view distance
-      const out = this.openEdge ? d1 > this.world.viewDist : px < 0 || pz < 0 || px > N || pz > N || d1 > this.world.viewDist;
+      let out = this.openEdge ? d1 > this.world.viewDist : px < 0 || pz < 0 || px > N || pz > N || d1 > this.world.viewDist;
+      if (!out && this.bdD < Infinity && (px > N || pz > N)) out = stopsAt(this.world.backdrop, px, pz);
       if (out) { this.cEnded = true; this.lastOut = k; }
       else if (L + 1 < LEVELS && d1 >= this.dEnd[L]) { this.cL = L + 1; this.initDDA(d1); }
     }
@@ -228,8 +235,13 @@ export class Marcher {
     const ev = this.ev, sig = rs.sig, off = rs.off, n = rs.n;
     let e = 0, d0 = 0.02, h0 = this.h0start;
     const ey = rs.ey;
+    // the far rule: the skyline of this plane (the steepest the land rises
+    // to as seen from the eye) and where, so the cell just above it can fade
+    const fringe = this.farRule, sigB = this.rays.sigB;
+    let sMax = -Infinity, sD = 0, sL = 0, sBeta = 0;
     for (let i = 0; this.crossing(i); i++) {
       const d1 = this.cd[i], h1 = this.ch[i], L = this.cl[i], beta = this.cb[i];
+      if (fringe) { const st = (h1 - ey) / d1; if (st > sMax) { sMax = st; sD = d1; sL = L; sBeta = beta; } }
       // span cells entered before this crossing come first, splitting the ramp
       while (e < ev.n && ev.d[e] < d1) {
         const ds = ev.d[e];
@@ -245,11 +257,23 @@ export class Marcher {
       d0 = d1; h0 = h1;
       const low = rs.find(0);
       if (low >= n) break;
-      if (this.clearAhead(sig[off + low], ey, d1)) break;
+      // (under the far rule, on until nothing ahead can reach even the
+      // lowest open row's lower neighbour, so the skyline in it is exact)
+      if (this.clearAhead(fringe ? sigB[rs.ord[off + low]] : sig[off + low], ey, d1)) break;
       if (i === this.lastOut) {
         // past the edge of the map: nothing more to hit
         while (e < ev.n) { this.spanCell(rs, e); e++; }
         break;
+      }
+    }
+    // the open rows the skyline reaches into from below: how much of each
+    // the land covers (from the row below's centre to its own), and the land
+    // at the skyline, kept in its third record for the sky pass
+    if (fringe && sMax > -Infinity) {
+      for (let r = rs.find(0); r < n; r = rs.find(r + 1)) {
+        const ci = rs.ord[off + r], s = sig[off + r], sb = sigB[ci];
+        if (sb >= sMax) break;
+        if (s > sMax && this.ground(rs, r, ci, sD, sMax, sL, sBeta, 2)) this.rays.fringe[ci] = (sMax - sb) / (s - sb);
       }
     }
     this.endReflections();

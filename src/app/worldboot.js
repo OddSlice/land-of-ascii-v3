@@ -53,14 +53,14 @@ export class SharedShadows {
   }
 
   // Each refresh: start a sweep if the light has moved on and a store is free.
-  update(hour) {
-    const k = lightKey(hour, this.N);
+  update(hour, day, night) {
+    const k = lightKey(hour, this.N, day, night);
     this.key = k.key;
     if (this.pending || k.key === this.frontKey) return;
     const back = this.front === 0 ? 1 : 0;
     if (this.pool && this.pool.flying.some((f) => f.frame.shadow && f.frame.shadow.buf === back)) return;
     this.pending = { key: k.key, buf: back };
-    this.w.postMessage({ type: 'sweep', key: k.key, keyHour: k.keyHour, isSun: k.isSun, buf: back });
+    this.w.postMessage({ type: 'sweep', key: k.key, keyHour: k.keyHour, isSun: k.isSun, day: k.day, night: k.night, buf: back });
   }
 
   // What a frame reads: the store, and whether it is up to date.

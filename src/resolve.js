@@ -12,7 +12,7 @@
 import { LOOK } from './look.js';
 import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
 import { FAMILY, SHADE_STEPS } from './glyphs.js';
-import { sunDir, moonDir } from './world/sky.js';
+import { sunDir, moonDir, moonDirOn, moonLit } from './world/sky.js';
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -42,6 +42,8 @@ function unflatten(shape, flat) {
   return walk(shape);
 }
 const KEYS = ['day', 'dusk', 'night'].map((k) => flatten(LOOK.keys[k]));
+// the night rule 'moon' (phase 2a): day, dawn, its dusk, and night under a bright and a dark moon
+const MKEYS = [LOOK.keys.day, LOOK.moonKeys.dawn, LOOK.moonKeys.dusk, LOOK.moonKeys.moonlit, LOOK.moonKeys.starlit].map(flatten);
 
 // How much of each keyframe applies at an hour, from the sun's height.
 export function keyWeights(hour) {
@@ -51,17 +53,45 @@ export function keyWeights(hour) {
   return [day, Math.max(0, 1 - day - night), night];
 }
 
-let cacheHour = null, cachePal = null;
+// The same under the night rule 'moon': twilight is dawn in the morning and
+// dusk in the evening; night is moonlit by how much of the moon is lit and
+// how high it is, else starlit.
+export function moonWeights(hour, day) {
+  const [d, tw, n] = keyWeights(hour);
+  const moon = moonDirOn(hour, day);
+  const ml = moonLit(hour, day) * smooth(-0.05, 0.12, moon[1]);
+  const am = hour < 12 ? 1 : 0;
+  return [d, tw * am, tw * (1 - am), n * ml, n * (1 - ml)];
+}
 
-export function makePalette(hour) {
-  if (hour === cacheHour) return cachePal;
-  const w = keyWeights(hour);
-  const flat = KEYS[0].map((_, i) => KEYS[0][i] * w[0] + KEYS[1][i] * w[1] + KEYS[2][i] * w[2]);
-  const k = unflatten(LOOK.keys.day, flat);
-  // the light that shades the ground fades out as it reaches the horizon
-  const sun = sunDir(hour), moon = moonDir(hour);
-  const L = sun[1] > -0.035 ? sun : moon;
-  const dirFade = smooth(-0.035, 0.06, L[1]);
+let cacheKey = null, cachePal = null;
+
+// The palette for an hour, a day (the moon's phase) and a night rule.
+export function makePalette(hour, day = 0, night = 'p1') {
+  const ck = night === 'p1' ? hour : `${hour}|${day}`;
+  if (ck === cacheKey) return cachePal;
+  let k, dirFade, illum = 1, L;
+  const sun = sunDir(hour);
+  if (night === 'p1') {
+    const w = keyWeights(hour);
+    const flat = KEYS[0].map((_, i) => KEYS[0][i] * w[0] + KEYS[1][i] * w[1] + KEYS[2][i] * w[2]);
+    k = unflatten(LOOK.keys.day, flat);
+    // the light that shades the ground fades out as it reaches the horizon
+    const moon = moonDir(hour);
+    L = sun[1] > -0.035 ? sun : moon;
+    dirFade = smooth(-0.035, 0.06, L[1]);
+  } else {
+    const w = moonWeights(hour, day);
+    const flat = MKEYS[0].map((_, i) => MKEYS[0][i] * w[0] + MKEYS[1][i] * w[1] + MKEYS[2][i] * w[2] + MKEYS[3][i] * w[3] + MKEYS[4][i] * w[4]);
+    k = unflatten(LOOK.keys.day, flat);
+    const moon = moonDirOn(hour, day);
+    illum = moonLit(hour, day);
+    // sunlight fades out as the sun sets; moonlight fades in only as the
+    // twilight deepens (and as the moon rises), so the change from one to
+    // the other never flashes
+    if (sun[1] > -0.035) { L = sun; dirFade = smooth(-0.035, 0.06, sun[1]); }
+    else { L = moon; dirFade = smooth(-0.035, -0.15, sun[1]) * smooth(-0.035, 0.06, moon[1]); }
+  }
   const lit = new Float32Array(MAT_COUNT * 3), shade = new Float32Array(MAT_COUNT * 3);
   for (let m = 0; m < MAT_COUNT; m++) {
     const e = k[MAT_NAMES[m]];
@@ -70,7 +100,9 @@ export function makePalette(hour) {
   }
   const mats = MAT_NAMES.map((n) => LOOK.materials[n]);
   cachePal = {
-    k, lit, shade, dirFade,
+    k, lit, shade, dirFade, night, illum,
+    // the flat ground's share of direct light (the far rule's pivot)
+    flat: Math.max(0.035, L[1]),
     ambient: k.light.ambient, direct: k.light.direct * dirFade,
     cloudK: k.light.cloudShadow, castK: k.light.castShadow,
     inkLit: Float32Array.from(mats.map((m) => m.ink.lit)),
@@ -82,7 +114,7 @@ export function makePalette(hour) {
     toneRung: Float32Array.from(mats.map((m) => (m.toneRung !== undefined ? m.toneRung : LOOK.toneRung))),
     water: LOOK.water || {},
   };
-  cacheHour = hour;
+  cacheKey = ck;
   return cachePal;
 }
 
@@ -118,6 +150,37 @@ function skyColour(pal, el, sunAng, o) {
 
 const sky3 = [0, 0, 0];
 
+// Aerial perspective (air 'aerial'): the air a ray passes through on its way
+// out of the eye at height y0, rising at mu (the sine of its elevation) for
+// d metres, in metres of air as dense as at LOOK.air.base. Air thins with
+// height as exp(-(y - base) / height), plus a thin share the same everywhere.
+const AIR = LOOK.air, FAR = LOOK.far;
+function airOf(y0, mu, d) {
+  let base = Math.exp(-(y0 - AIR.base) / AIR.height);
+  if (base > 1.5) base = 1.5;
+  const x = mu * d / AIR.height;
+  const th = x > -1e-4 && x < 1e-4 ? base * d : base * d * (1 - Math.exp(-x)) / x;
+  return th + AIR.uniform * d;
+}
+
+// Mix a colour toward the horizon tone by `tau` metres of air: colour
+// shifts by the keyframe's `chroma` share, light and dark close up only by
+// its `lum` share. Fills rec.r/g/b and returns the light share (for glyphs).
+function airMix(pal, r, g, b, tau) {
+  const A = pal.k.air, H = pal.k.haze.colour;
+  const hl = A.lum * (1 - Math.exp(-tau / A.dist)), hc = A.chroma * (1 - Math.exp(-tau / A.distC));
+  const dy = (hl - hc) * ((0.3 * H[0] + 0.59 * H[1] + 0.11 * H[2]) - (0.3 * r + 0.59 * g + 0.11 * b));
+  rec.r = r + (H[0] - r) * hc + dy; rec.g = g + (H[1] - g) * hc + dy; rec.b = b + (H[2] - b) * hc + dy;
+  return hl;
+}
+
+// the materials of the ground, whose large forms the far rule strengthens
+const FORM = new Uint8Array(32);
+for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.SNOW, MAT.FLOOR]) FORM[m] = 1;
+// the rules of the stripe being resolved: air (aerial perspective and the
+// far-land rules) and the air a record's ray passed through (-1: phase 1's haze)
+let airOn = false;
+
 // The colour of one record of a HitBuffer (any material). Fills `rec` with
 // r, g, b, the brightness that picks a rung, and the haze share. A cloud
 // record's edge is returned as its coverage in `rec.cover` with the sky
@@ -125,11 +188,12 @@ const sky3 = [0, 0, 0];
 const rec = { r: 0, g: 0, b: 0, bright: 0, h: 0, cover: 1, skyR: 0, skyG: 0, skyB: 0 };
 // the look candidates of the stripe being resolved (set by resolveStripe)
 let grassHue = 0, blueShallows = false;
-function recordColour(pal, hits, o) {
+function recordColour(pal, hits, o, tau = -1) {
   const { lit, shade, k } = pal;
   const haze = k.haze, torch = k.torch;
   const m = hits[o];
-  const light = hits[o + 1] / 255, sh = hits[o + 2] / 255, cl = hits[o + 3] / 255, gl = hits[o + 4] / 255;
+  let light = hits[o + 1] / 255;
+  const sh = hits[o + 2] / 255, cl = hits[o + 3] / 255, gl = hits[o + 4] / 255;
   const toneB = hits[o + 5];
   const dist = (hits[o + 6] | (hits[o + 7] << 8)) / 10;
   let r, g, b, bright, h = 0;
@@ -153,11 +217,17 @@ function recordColour(pal, hits, o) {
     }
   } else if (m === MAT.SUN || m === MAT.MOON || m === MAT.FLAME) {
     const c = m === MAT.SUN ? k.sun : m === MAT.MOON ? k.moon : k.flame;
-    const f = m === MAT.FLAME ? 0.75 + 0.25 * light : 1;
+    // (under the night rule 'moon' the moon is as bright as its lit share)
+    const f = m === MAT.FLAME ? 0.75 + 0.25 * light : m === MAT.MOON && pal.night !== 'p1' ? light : 1;
     r = c[0] * f; g = c[1] * f; b = c[2] * f;
     bright = light;
   } else {
-    // a lit surface
+    // a lit surface; far away (the far rule) the large forms gain contrast
+    // about the flat ground's light, as the fine detail fades
+    if (tau >= 0 && FORM[m]) {
+      const f = smooth(FAR.fade[0], FAR.fade[1], dist);
+      if (f > 0) { light = pal.flat + (light - pal.flat) * (1 + FAR.form * f); if (light < 0) light = 0; else if (light > 1) light = 1; }
+    }
     const L = pal.ambient + pal.direct * light * (1 - pal.castK * sh) * (1 - pal.cloudK * cl);
     const t0 = L < 0 ? 0 : L > 1 ? 1 : L;
     const t = Math.pow(t0, pal.curve[m]);
@@ -181,8 +251,11 @@ function recordColour(pal, hits, o) {
     }
     const tg = gl * torch.strength;
     r += torch.colour[0] * tg; g += torch.colour[1] * tg; b += torch.colour[2] * tg;
-    h = haze.max * (1 - Math.exp(-dist / haze.dist));
-    r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
+    if (tau >= 0) { h = airMix(pal, r, g, b, tau); r = rec.r; g = rec.g; b = rec.b; }
+    else {
+      h = haze.max * (1 - Math.exp(-dist / haze.dist));
+      r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
+    }
     bright = t0 + tg * 2.5 + pal.toneRung[m] * ((toneB - 128) / 127);
     if (bright > 1) bright = 1; else if (bright < 0) bright = 0;
   }
@@ -193,11 +266,13 @@ function recordColour(pal, hits, o) {
 // A water cell from its three records: the mirror (R1) and the bed seen
 // through the water (R2), mixed by the Fresnel share (R0's tone); then the
 // surface's own torchlight and haze. Fills `rec` like recordColour.
-function waterColour(pal, hits, o) {
+function waterColour(pal, hits, o, ey = 0, mu = 0) {
   const k = pal.k, W = pal.water, haze = k.haze;
   const F = hits[o + 5] / 255;
-  // the mirror
-  recordColour(pal, hits, o + REC);
+  const dist = (hits[o + 6] | (hits[o + 7] << 8)) / 10;
+  // the mirror (with aerial perspective, over its own leg up from the water)
+  const tau1 = airOn ? airOf(ey + mu * dist, -mu, (hits[o + REC + 6] | (hits[o + REC + 7] << 8)) / 10) : -1;
+  recordColour(pal, hits, o + REC, tau1);
   let mr = rec.r, mg = rec.g, mb = rec.b;
   if (rec.cover < 1) {
     // a reflected cloud's edge melts into the reflected sky
@@ -207,7 +282,7 @@ function waterColour(pal, hits, o) {
   // the bed, darkened and tinted by the water it is seen through
   let br, bg, bb, bBright;
   if (hits[o + 2 * REC] !== MAT_NONE) {
-    recordColour(pal, hits, o + 2 * REC);
+    recordColour(pal, hits, o + 2 * REC, airOn ? 0 : -1);
     const path = (hits[o + 2 * REC + 6] | (hits[o + 2 * REC + 7] << 8)) / 10;
     // warm: the bed shows through the shallows, tinted toward the deep
     // colour with depth; blue: an even blue, the bed only in the last half metre
@@ -227,32 +302,78 @@ function waterColour(pal, hits, o) {
   const tg = (hits[o + 4] / 255) * k.torch.strength * W.torchSurface;
   r += k.torch.colour[0] * tg; g += k.torch.colour[1] * tg; b += k.torch.colour[2] * tg;
   // haze over the way to the surface
-  const dist = (hits[o + 6] | (hits[o + 7] << 8)) / 10;
-  const h = haze.max * (1 - Math.exp(-dist / haze.dist));
-  r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
+  let h;
+  if (airOn) { h = airMix(pal, r, g, b, airOf(ey, mu, dist)); r = rec.r; g = rec.g; b = rec.b; }
+  else {
+    h = haze.max * (1 - Math.exp(-dist / haze.dist));
+    r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
+  }
   let bright = bBright + (mBright - bBright) * F + tg * 2.5;
   if (bright > 1) bright = 1; else if (bright < 0) bright = 0;
   rec.r = r; rec.g = g; rec.b = b; rec.bright = bright; rec.h = h; rec.cover = 1;
 }
 
+// A cell a skyline covers only in part (the far rule): R1 is what lies
+// behind (sky, cloud or a far ridgeline) with, in its [4], the share of the
+// cell the land in R0 covers. The colours blend by that share; the glyph is
+// the one of whichever covers more. Fills `rec`; returns that material.
+function fringeColour(pal, hits, o, ey, mu) {
+  const cov = hits[o + REC + 4] / 255;
+  hits[o + REC + 4] = 0;
+  const m1 = hits[o + REC];
+  const d1 = (hits[o + REC + 6] | (hits[o + REC + 7] << 8)) / 10;
+  recordColour(pal, hits, o + REC, airOn && m1 > MAT.STAR && m1 !== MAT.CLOUD ? airOf(ey, mu, d1) : -1);
+  let br = rec.r, bg = rec.g, bb = rec.b;
+  if (rec.cover < 1) { br = rec.skyR + (br - rec.skyR) * rec.cover; bg = rec.skyG + (bg - rec.skyG) * rec.cover; bb = rec.skyB + (bb - rec.skyB) * rec.cover; }
+  const bBright = rec.bright, bh = rec.h;
+  const m0 = hits[o];
+  recordColour(pal, hits, o, airOn ? airOf(ey, mu, (hits[o + 6] | (hits[o + 7] << 8)) / 10) : -1);
+  rec.r = br + (rec.r - br) * cov; rec.g = bg + (rec.g - bg) * cov; rec.b = bb + (rec.b - bb) * cov;
+  rec.h = bh + (rec.h - bh) * cov; rec.cover = 1;
+  if (cov >= 0.5) return m0;
+  rec.bright = bBright;
+  return m1;
+}
+
 let faint = new Int32Array(256), faintW = new Float32Array(256);
 
 // Resolve a stripe. `hits` and `cells` cover columns c0..c0+sw-1, all rows.
-export function resolveStripe(pal, hits, cells, sw, rows, c0, look) {
+// `frame` is the frame description (src/contract.js); a call without one
+// (the overhead map passes the look alone) resolves with phase 1's haze.
+export function resolveStripe(pal, hits, cells, sw, rows, c0, frame) {
+  const viewed = !!(frame && frame.cam);
+  const look = viewed ? frame.look : frame;
   const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade;
+  airOn = viewed && (look && look.air ? look.air : LOOK.choices.air.default) === 'aerial';
+  // every cell's ray, from the frame by the contract's own formula: its
+  // elevation (as a sine) and the eye's height
+  let ey = 0, tx = 0, ty = 0, cp = 1, sp = 0, W = 1;
+  if (airOn) {
+    const cam = frame.cam;
+    ey = cam.y; ty = Math.tan(frame.fovY / 2); tx = ty * frame.aspect; cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch); W = frame.cols;
+  }
   const [ifr, ifg, ifb] = pal.inkFloor;
   const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
   grassHue = look ? LOOK.meadow.hue[look.meadow] || 0 : 0;
   blueShallows = !!(look && look.shallows === 'blue');
   let nf = 0;
   for (let cy = 0; cy < rows; cy++) {
+    const yb = (1 - 2 * (cy + 0.5) / rows) * ty, bRow = cp - yb * sp, up = yb * cp + sp;
     for (let q = 0; q < sw; q++) {
       const i = cy * sw + q, o = i * HIT_STRIDE, oc = i * CELL_STRIDE;
       const cx = c0 + q;
       const m = hits[o];
+      let mu = 0;
+      if (airOn) {
+        const a = (2 * (cx + 0.5) / W - 1) * tx;
+        const sg = up / Math.sqrt(a * a + bRow * bRow);
+        mu = sg / Math.sqrt(1 + sg * sg);
+      }
       const mirrorFlame = m === MAT.WATER && hits[o + REC] === MAT.FLAME;
-      if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) waterColour(pal, hits, o);
-      else recordColour(pal, hits, o);
+      let gm = m;
+      if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) waterColour(pal, hits, o, ey, mu);
+      else if (hits[o + REC] !== MAT_NONE) gm = fringeColour(pal, hits, o, ey, mu);
+      else recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, (hits[o + 6] | (hits[o + 7] << 8)) / 10) : -1);
       if (m === MAT.FLAME || mirrorFlame) {
         // a flame held at its minimum size, or any flame by day: blended
         // with what is behind it once every other cell is done
@@ -274,17 +395,17 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, look) {
       }
       const r = rec.r, g = rec.g, b = rec.b, bright = rec.bright, h = rec.h;
       // glyph: the rung of the family's ladder
-      const fam = FAMILY[m];
+      const fam = FAMILY[gm];
       const n = fam.length;
       let rung;
-      if (pal.emissive[m]) rung = Math.round(bright * (n - 1));
+      if (pal.emissive[gm]) rung = Math.round(bright * (n - 1));
       else rung = Math.floor((1 - bright) * (n - 1) + 0.5 + BAYER[(cy & 3) * 4 + (cx & 3)] * dither);
       if (rung < 0) rung = 0; else if (rung > n - 1) rung = n - 1;
       let glyph = fam[rung];
       // ink: a tint of the background, darker on lit ground, lighter in the dark
-      let ink = pal.inkDark[m] + (pal.inkLit[m] - pal.inkDark[m]) * bright;
+      let ink = pal.inkDark[gm] + (pal.inkLit[gm] - pal.inkDark[gm]) * bright;
       ink *= 1 - h * glyphFade;
-      if (m === MAT.STAR && bright < 0.06) { glyph = 0; ink = 0; }
+      if (gm === MAT.STAR && bright < 0.06) { glyph = 0; ink = 0; }
       const bg = clampColour(r, g, b);
       const br = bg[0], bgG = bg[1], bb = bg[2];
       cells[oc] = br; cells[oc + 1] = bgG; cells[oc + 2] = bb; cells[oc + 3] = glyph;

@@ -3,7 +3,7 @@
 // mirrored ones (R1). A direct ray that meets water also writes the surface
 // (R0), marches its refracted ray down to the bed (R2) and leaves a mirrored
 // row for reflect.js.
-import { MAT, HIT_STRIDE, REC } from '../../contract.js';
+import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
 import { rippleSlope, waterRays } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
@@ -11,7 +11,7 @@ import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
 
-const MEADOW = LOOK.meadow;
+const MEADOW = LOOK.meadow, FAR = LOOK.far;
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 // detail of a given size fades as the cell's footprint grows past it
@@ -31,6 +31,9 @@ function normalAt(level, x, z) {
 const methods = {
   write(ci, slot, mat, light, shadow, cloud, glow, tone, dist) {
     const h = this.hits, o = ci * HIT_STRIDE + slot * REC;
+    // something drawn over water (a tree in front of a lake): its mirror and
+    // bed are no longer the cell's, and it takes no more reflections
+    if (slot === 0 && mat !== MAT.WATER && h[o] === MAT.WATER) { h[o + REC] = MAT_NONE; h[o + 2 * REC] = MAT_NONE; this.rays.rdepth[ci] = -1; }
     h[o] = mat;
     h[o + 1] = light <= 0 ? 0 : light >= 1 ? 255 : (light * 255 + 0.5) | 0;
     h[o + 2] = shadow <= 0 ? 0 : shadow >= 1 ? 255 : (shadow * 255 + 0.5) | 0;
@@ -86,7 +89,9 @@ const methods = {
 
   setDepth(rs, ci, D) { if (rs.slot === 0) this.rays.depth[ci] = D; else this.rays.rdepth[ci] = D; },
 
-  ground(rs, r, ci, D, s, L, beta) {
+  // `into`: write the hit into this record instead, without marking the cell
+  // as met (a skyline's land, for the cell above it); false if it is water.
+  ground(rs, r, ci, D, s, L, beta, into = -1) {
     const { v, world, light } = this;
     const T = world.terrain;
     const x = v.ex + this.dx * D, z = v.ez + this.dz * D, y = rs.ey + s * D;
@@ -104,7 +109,7 @@ const methods = {
     }
     let ny = Math.sqrt(Math.max(0, 1 - nx * nx - nz * nz));
     const len = Math.sqrt(1 + s * s);
-    this.setDepth(rs, ci, D);
+    if (into < 0) this.setDepth(rs, ci, D);
     // footprint of the cell on the ground, for fading detail that would alias
     const graze = Math.abs(this.dx * nx + s * ny + this.dz * nz) / len;
     const fp = D * len * v.colAngle / Math.max(0.04, graze);
@@ -128,8 +133,8 @@ const methods = {
     else if ((thin ? this.thinW(T.wWaterL, lv, L, beta, x, z) : bilU8(T.wWater, x, z, N, NN)) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && (thin ? this.thinW(T.wRoadL, lv, L, beta, x, z) : bilU8(T.wRoad, x, z, N, NN)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
     else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
-    else if (bilU8(T.wSnow, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
-    else if (bilU8(T.wRock, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
+    else if (this.weight(T.wSnow, T.wSnowL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
+    else if (this.weight(T.wRock, T.wRockL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
     else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
     else mat = MAT.GRASS;
     const Ld = light.L;
@@ -137,7 +142,8 @@ const methods = {
     const cloud = light.cloudAt(x, z);
     let lam, tone;
     if (mat === MAT.WATER) {
-      if (rs.slot === 0) { this.water(ci, D, s, x, y, z, shadow, cloud); return; }
+      if (into >= 0) return false;
+      if (rs.slot === 0) { this.water(ci, D, s, x, y, z, shadow, cloud); return true; }
       // a mirrored ray meeting water again is not mirrored twice
       nx = 0; ny = 1; nz = 0;
       lam = Ld[1];
@@ -149,11 +155,38 @@ const methods = {
       const patch = bilD(T.tone, x, z, N, NN) * tk;
       if (mat === MAT.ROCK) tone = 0.3 * Math.sin(y * 0.9 + patch * 4) * fadeOf(3, fp) + 0.6 * patch + 0.3 * fine * fadeOf(2, fp);
       else tone = 0.75 * patch * fadeOf(5, fp) + 0.45 * fine * fadeOf(1.8, fp);
+      // the far rule: on the range, gullies darken rock and snow (the coarse
+      // normals miss them) and rock shows broad strata, both fixed to the land
+      if (this.farRule && T.form && (mat === MAT.ROCK || mat === MAT.SNOW)) {
+        lam *= 1 - FAR.gully * this.gullyAt(T.form, x, z);
+        if (mat === MAT.ROCK) tone += FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(x / 210, z / 210, SEED + 131)) * fadeOf(FAR.strata / 2, fp);
+      }
       // (judged by the cell's footprint along the view, where rows are tall)
       if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
     }
     const glow = this.glowAt(x, y, z, nx, ny, nz);
-    this.write(ci, rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
+    this.write(ci, into >= 0 ? into : rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
+    return true;
+  },
+
+  // A material weight: the fine one near the eye; under the far rule, past
+  // LOOK.far.edgeFrom metres, its filtered copy at the level being marched,
+  // so a snow line or a rock band ends at a clean edge instead of breaking
+  // into cells (blended over a band, so nothing pops as you walk).
+  weight(A, AL, lv, L, beta, x, z, D) {
+    const w0 = bilU8(A, x, z, this.N, this.NN);
+    if (!this.farRule || !AL || L === 0) return w0;
+    const f = smooth(FAR.edgeFrom * 0.7, FAR.edgeFrom * 1.3, D);
+    return f > 0 ? w0 + (this.thinW(AL, lv, L, beta, x, z) - w0) * f : w0;
+  },
+
+  // The range's gullies (0..1) at a point, from the 4 m grid.
+  gullyAt(G, x, z) {
+    const n = this.N / 4, nn = n + 1;
+    const u = Math.max(0, Math.min(n - 1e-6, x / 4)), w = Math.max(0, Math.min(n - 1e-6, z / 4));
+    const i0 = u | 0, k0 = w | 0, fx = u - i0, fz = w - k0, c = k0 * nn + i0;
+    const a = G[c], b = G[c + 1], d = G[c + nn], e = G[c + nn + 1];
+    return (a + (b - a) * fx + (d - a) * fz + (a - b - d + e) * fx * fz) / 127;
   },
 
   // A weight from its filtered copy at level L, blended toward L+1 by beta.

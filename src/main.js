@@ -48,6 +48,9 @@ const SHARED = WORLD && ISOLATED && THREADS > 0;
 
 const state = {
   hour: LOOK.hours.day, t: 0,
+  // the day count (?day=), which the moon's phase follows; it moves on as
+  // the clock passes midnight
+  day: params.has('day') ? (parseInt(params.get('day'), 10) || 0) : LOOK.moon.startDay,
   running: false,            // T: time of day moves
   frozen: false,             // lab.freeze: every clock stands still
   held: false,               // lab.setCamera with a height: no walking or falling
@@ -55,7 +58,7 @@ const state = {
   preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1)) : 2,
   cam: 0, camName: CAMERAS[0].name,
   // the look candidates in use (LOOK.choices), from the URL or the defaults
-  look: lookFrom(Object.fromEntries(['tree', 'cloud', 'meadow', 'shallows'].map((k) => [k, params.get(k)]))),
+  look: lookFrom(Object.fromEntries(Object.keys(LOOK.choices).map((k) => [k, params.get(k)]))),
   seq: 0, presented: 0, failed: false,
 };
 
@@ -218,7 +221,7 @@ function makeFrame() {
     cols: grid.cols, rows: grid.rows,
     fovY: LOOK.fovY * DEG,
     aspect: grid.cols / (2 * grid.rows),
-    hour: state.hour, t: state.t,
+    hour: state.hour, t: state.t, day: state.day,
     look: state.look,
   };
   // which shared shadow store this frame reads
@@ -318,9 +321,12 @@ function tick(now) {
   if (!state.held) player.update(dt, k);
   if (!state.frozen) {
     state.t += dt;
-    if (state.running) state.hour = (state.hour + dt * CLOCK_RATE) % 24;
+    if (state.running) {
+      state.hour += dt * CLOCK_RATE;
+      if (state.hour >= 24) { state.hour -= 24; state.day++; }
+    }
   }
-  if (shadows) shadows.update(state.hour);
+  if (shadows) shadows.update(state.hour, state.day, state.look.night);
   try {
     if (map && map.on) { if (started || local) presentMap(); }
     else if (local) renderLocal();
@@ -350,7 +356,7 @@ function tick(now) {
   const timeName = keyName(state.hour);
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
-    threads: THREADS, hour: state.hour, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
+    threads: THREADS, hour: state.hour, day: state.day, night: state.look.night, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
     stress: STRESS, buildMs: buildMs(), sweepMs: shadows ? shadows.sweepMs : light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
     world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on) } : null,
   });
@@ -359,8 +365,12 @@ function tick(now) {
 }
 
 function keyName(h) {
-  const d = Math.abs(h - LOOK.hours.day), k = Math.abs(h - LOOK.hours.dusk), n = Math.min(Math.abs(h - LOOK.hours.night), 24 - Math.abs(h - LOOK.hours.night));
-  return d <= k && d <= n ? 'day' : k <= n ? 'dusk' : 'night';
+  let best = 'day', bd = Infinity;
+  for (const [name, at] of Object.entries(LOOK.hours)) {
+    const d = Math.min(Math.abs(h - at), 24 - Math.abs(h - at));
+    if (d < bd) { bd = d; best = name; }
+  }
+  return best;
 }
 
 // the stress scene's build time: the workers' (they build everything), or the page's
@@ -397,12 +407,15 @@ Object.assign(lab, {
     state.held = y !== undefined;
     state.camName = 'free';
   },
-  // Freeze every clock (time of day and the animation clock).
-  freeze(hour, t = 0) {
+  // Freeze every clock (time of day and the animation clock); `day` sets
+  // the day count too (the moon's phase).
+  freeze(hour, t = 0, day) {
     state.frozen = true; state.running = false;
     if (hour !== undefined) state.hour = typeof hour === 'string' ? LOOK.hours[hour] : hour;
     state.t = t;
+    if (day !== undefined) state.day = day;
   },
+  setDay(d) { state.day = d; },
   unfreeze() { state.frozen = false; },
   setHour(h) { state.hour = typeof h === 'string' ? LOOK.hours[h] : h; },
   runClock(on = true) { state.running = on; },
@@ -423,7 +436,7 @@ Object.assign(lab, {
   state() {
     return {
       x: player.x, z: player.z, eye: player.eye, yaw: player.yaw / DEG, pitch: player.pitch / DEG,
-      hour: state.hour, t: state.t, frozen: state.frozen, running: state.running,
+      hour: state.hour, t: state.t, day: state.day, frozen: state.frozen, running: state.running,
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
       isolated: !!self.crossOriginIsolated, shared: SHARED, look: { ...state.look }, mode: player.mode, flying: player.flying,

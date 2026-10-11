@@ -58,7 +58,7 @@ self.onmessage = (e) => {
       shadow = [first, new Light(world, { store: { V: msg.shadows.V[1], S: msg.shadows.S[1] }, occ: first.occ })];
       self.postMessage({ type: 'shadowReady' });
     } else if (msg.type === 'sweep') {
-      const ms = shadow[msg.buf].sweepNow(msg.keyHour, msg.isSun);
+      const ms = shadow[msg.buf].sweepNow(msg.keyHour, msg.isSun, msg.day, msg.night);
       self.postMessage({ type: 'swept', key: msg.key, buf: msg.buf, ms });
     }
   } catch (err) {

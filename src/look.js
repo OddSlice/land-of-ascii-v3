@@ -16,6 +16,9 @@
 // Colours are sRGB hex. Three keyframes (day, dusk, night) are blended by the
 // height of the sun, so time can run between them.
 
+// A look rule in use: the frame's choice, else its default (LOOK.choices).
+export function ruleOf(look, name) { return look && look[name] !== undefined ? look[name] : LOOK.choices[name].default; }
+
 export const LOOK = {
   // Camera: vertical field of view in degrees. The eye is 1.7 m up (world/layout.js).
   fovY: 60,
@@ -32,10 +35,23 @@ export const LOOK = {
     cloud:    { label: 'clouds',   key: '8', default: 'B', options: { A: 'cumulus', B: 'banks' } },
     meadow:   { label: 'meadow',   key: '9', default: 2,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
     shallows: { label: 'shallows', key: '0', default: 'blue', options: { warm: 'warm bed', blue: 'even blue' } },
+    // Phase 2a's rules, each with phase 1's beside it for comparison:
+    // `air`, aerial perspective and the far-land rules (air, below; `far`;
+    // the backdrop beyond the north and east edges); `night`, the moon's
+    // phases, moonlight and starlight, and dawn (`moonKeys`).
+    air:      { label: 'distance', key: '5', default: 'aerial', options: { p1: 'phase 1 haze', aerial: 'aerial perspective, far land' } },
+    night:    { label: 'night',    key: '6', default: 'moon', options: { p1: 'phase 1 night', moon: 'moon phases, dawn' } },
   },
 
-  // Hours the 1, 2, 3 keys jump to.
-  hours: { day: 14.0, dusk: 17.85, night: 23.0 },
+  // Hours the 1, 2, 3, 4 keys jump to (dawn: the sun as low as at dusk).
+  hours: { day: 14.0, dusk: 17.85, night: 23.0, dawn: 6.15 },
+
+  // The day the page opens on (?day= for another): the moon's phase follows
+  // the day count, a month of 29.53 days. Day 0 has a bright moon, high in
+  // the south-east late at night, as in phases 0a to 1; about day 15 a dark one.
+  moon: { startDay: 0, month: 29.53,
+    // the moon disc is drawn only above this share lit, at least `disc` bright
+    showAt: 0.03, disc: 0.3 },
 
   // Clamps applied to every colour after lighting, haze and ink.
   clamp: {
@@ -56,10 +72,32 @@ export const LOOK = {
   // is fixed to the land, so this does not crawl as you walk.
   toneRung: 0.45,
 
-  // Haze: the share of the horizon colour mixed in at distance d is
-  // 1 - exp(-d / dist), times `max`.
+  // Haze (phase 1, air 'p1'): the share of the horizon colour mixed in at
+  // distance d is 1 - exp(-d / dist), times `max`.
   // Glyph contrast fades with the same haze, times `glyphFade`.
   haze: { glyphFade: 0.9 },
+
+  // Aerial perspective (phase 2a, air 'aerial'). Air is thickest low down and
+  // thins with height: at height y its density is exp(-(y - base) / height)
+  // (metres; `base` is the generated world's sea level), plus a thin share
+  // (`uniform`) that is the same at every height, so far land still recedes.
+  // A ray's haze is the air it passes through, in metres of air as dense as
+  // at the base. Each keyframe's `air` turns that into two shares: `chroma`,
+  // how far colour shifts toward the horizon tone (over `distC` metres), and
+  // `lum`, how far light and dark close up (over `dist`), which stays well
+  // short of 1, so lit and shaded sides, snow, rock, forest and water remain
+  // apart out to the view distance while their colours cool.
+  air: { base: 20, height: 220, uniform: 0.05 },
+
+  // Far land (phase 2a, air 'aerial'). Past `fade[0]` metres the large forms
+  // gain light-and-shade contrast (`form`, at full strength from `fade[1]`),
+  // as fine ground detail fades; rock shows strata and gullies as broad
+  // bands (`bands`: how far they move its tone); snow and rock end at a clear
+  // line, from the coarser levels' weights past `edgeFrom` metres; a skyline's
+  // top cell fades into the sky by how much of it the land covers.
+  // `gully`: how much a gully (where rain gathers on the range) darkens rock
+  // and snow; `strata`: the strata bands' spacing in metres of height.
+  far: { fade: [300, 900], form: 0.55, bands: 0.5, gully: 0.55, strata: 38, edgeFrom: 250 },
 
   // Glyph families, light to heavy. Any character works; the atlas draws the
   // shade blocks (░ ▒ ▓ █) itself when the font gets them wrong at small sizes.
@@ -207,6 +245,7 @@ export const LOOK = {
       cloudFlat: 1, cloudStretch: 1,
       light:  { ambient: 0.28, direct: 0.80, cloudShadow: 0.78, castShadow: 0.92 },
       haze:   { colour: '#72839e', dist: 700, max: 0.72 },
+      air:    { dist: 1200, distC: 700, lum: 0.4, chroma: 0.62 },
       torch:  { colour: '#ffb060', strength: 0.04 },
       stars:  0,
       sun:    '#f4eedc',
@@ -234,6 +273,7 @@ export const LOOK = {
       cloudFlat: 0.72, cloudStretch: 1.3,
       light:  { ambient: 0.30, direct: 0.55, cloudShadow: 0.25, castShadow: 0.80 },
       haze:   { colour: '#5e4d5c', dist: 420, max: 0.85 },
+      air:    { dist: 850, distC: 520, lum: 0.45, chroma: 0.7 },
       torch:  { colour: '#ff9f50', strength: 0.30 },
       stars:  0.15,
       sun:    '#f0b07a',
@@ -261,6 +301,7 @@ export const LOOK = {
       cloudFlat: 0.85, cloudStretch: 1.12,
       light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70 },
       haze:   { colour: '#1e1f2c', dist: 330, max: 0.80 },
+      air:    { dist: 900, distC: 600, lum: 0.4, chroma: 0.62 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
       stars:  1,
       sun:    '#f4eedc',
@@ -283,4 +324,105 @@ export const LOOK = {
       floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
     },
   },
+
+  // The keyframes of the night rule 'moon' (phase 2a), in place of phase
+  // 1's dusk and night: dawn (the sun low in the east, its own colours, cooler
+  // above and rosier at the horizon than dusk, with a pale morning mist),
+  // dusk (phase 1's, with the low sun raking across the meadow: less ambient
+  // light, more direct), and night in two: under a bright moon (`moonlit`,
+  // enough to walk by, soft moon shadows) and under a dark one (`starlit`, a
+  // faint floor so the land is never a black screen), blended by how much
+  // moonlight there is.
+  moonKeys: null,
 };
+
+{
+  const K = LOOK.keys;
+  LOOK.moonKeys = {
+    dawn: {
+      sky:    { high: '#4d5b8e', horizon: '#b6a0a4', glow: '#ecc092', glowSize: 0.28 },
+      cloud:  { lit: '#e2c0ae', shade: '#4b4a68' },
+      cloudFlat: 0.8, cloudStretch: 1.2,
+      light:  { ambient: 0.24, direct: 1.05, cloudShadow: 0.3, castShadow: 0.85 },
+      haze:   { colour: '#9a93a6', dist: 420, max: 0.85 },
+      air:    { dist: 800, distC: 480, lum: 0.48, chroma: 0.72 },
+      torch:  { colour: '#ffb060', strength: 0.12 },
+      stars:  0.05,
+      sun:    '#f6d4a0',
+      moon:   '#c8ccd6',
+      grass:  { lit: '#7a8a48', shade: '#26302a' },
+      dirt:   { lit: '#8f7a62', shade: '#3a3330' },
+      sand:   { lit: '#a48c6c', shade: '#463c36' },
+      rock:   { lit: '#9a8a7a', shade: '#3a3a48' },
+      snow:   { lit: '#f0dcd0', shade: '#6f7088' },
+      water:  { lit: '#3e4a58', shade: '#2c3644', sky: '#8e8ca2', deep: '#2a3444', shallow: '#625a4c', blue: '#4c5a7c' },
+      grassDry: '#8e9450', grassLush: '#4e6a40',
+      stone:  { lit: '#a49a90', shade: '#4a4850' },
+      conifer:{ lit: '#3c4a38', shade: '#1e2620' },
+      trunk:  { lit: '#54443a', shade: '#261f1c' },
+      bush:   { lit: '#5a703c', shade: '#283220' },
+      wood:   { lit: '#705844', shade: '#342a22' },
+      flame:  '#f0dfba',
+      flameStrength: 0.65, flameFloor: 0.1,
+      bed:    { lit: '#74684e', shade: '#363028' },
+      floor:  { lit: '#54503a', shade: '#22231c' },
+    },
+    dusk: { ...K.dusk, light: { ambient: 0.22, direct: 0.95, cloudShadow: 0.25, castShadow: 0.82 } },
+    moonlit: {
+      sky:    { high: '#182033', horizon: '#2c3450', glow: '#343c58', glowSize: 0.10 },
+      cloud:  { lit: '#4a5064', shade: '#1e2230' },
+      cloudFlat: 0.85, cloudStretch: 1.12,
+      light:  { ambient: 0.26, direct: 0.62, cloudShadow: 0.15, castShadow: 0.55 },
+      haze:   { colour: '#283048', dist: 330, max: 0.80 },
+      air:    { dist: 900, distC: 600, lum: 0.4, chroma: 0.62 },
+      torch:  { colour: '#ffc46a', strength: 0.55 },
+      stars:  0.75,
+      sun:    '#f4eedc',
+      moon:   '#d9dce4',
+      grass:  { lit: '#3b4a4a', shade: '#172022' },
+      dirt:   { lit: '#3b3d45', shade: '#1a1b20' },
+      sand:   { lit: '#43444a', shade: '#1c1d22' },
+      rock:   { lit: '#44464f', shade: '#1a1b21' },
+      snow:   { lit: '#7d8498', shade: '#2e3240' },
+      water:  { lit: '#222a38', shade: '#151a24', sky: '#2c3550', deep: '#10141c', shallow: '#2c2c28', blue: '#18202e' },
+      grassDry: '#3f4b44', grassLush: '#2c3a38',
+      stone:  { lit: '#45464e', shade: '#1c1c22' },
+      conifer:{ lit: '#222a2c', shade: '#10141a' },
+      trunk:  { lit: '#2a2626', shade: '#141212' },
+      bush:   { lit: '#2a3434', shade: '#141a1a' },
+      wood:   { lit: '#2e2924', shade: '#161311' },
+      flame:  '#ffb468',
+      flameStrength: 1, flameFloor: 0.5,
+      bed:    { lit: '#2e2f2c', shade: '#161614' },
+      floor:  { lit: '#26262a', shade: '#121214' },
+    },
+    starlit: {
+      sky:    { high: '#121520', horizon: '#1c1f2e', glow: '#20243a', glowSize: 0.10 },
+      cloud:  { lit: '#262832', shade: '#12131a' },
+      cloudFlat: 0.85, cloudStretch: 1.12,
+      light:  { ambient: 0.34, direct: 0.10, cloudShadow: 0.1, castShadow: 0.4 },
+      haze:   { colour: '#181a26', dist: 330, max: 0.80 },
+      air:    { dist: 700, distC: 500, lum: 0.45, chroma: 0.66 },
+      torch:  { colour: '#ffc46a', strength: 0.55 },
+      stars:  1.15,
+      sun:    '#f4eedc',
+      moon:   '#c9ccd4',
+      grass:  { lit: '#1f2726', shade: '#151b1c' },
+      dirt:   { lit: '#22232a', shade: '#16171c' },
+      sand:   { lit: '#25262c', shade: '#17181d' },
+      rock:   { lit: '#24262c', shade: '#15161b' },
+      snow:   { lit: '#3e4352', shade: '#22252f' },
+      water:  { lit: '#161b25', shade: '#10141b', sky: '#1a1f30', deep: '#0c0f15', shallow: '#1e1e1c', blue: '#121722' },
+      grassDry: '#222a26', grassLush: '#19221f',
+      stone:  { lit: '#25262c', shade: '#15161a' },
+      conifer:{ lit: '#141a1c', shade: '#0d1013' },
+      trunk:  { lit: '#191717', shade: '#100e0f' },
+      bush:   { lit: '#182020', shade: '#0f1314' },
+      wood:   { lit: '#1d1a18', shade: '#110f0e' },
+      flame:  '#ffb468',
+      flameStrength: 1, flameFloor: 0.5,
+      bed:    { lit: '#1f1f1d', shade: '#121210' },
+      floor:  { lit: '#18191b', shade: '#0f0f11' },
+    },
+  };
+}

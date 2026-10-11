@@ -39,6 +39,43 @@ export function materials(N, H, kind, level, seaDist, freshDist, seed) {
   return { wSand, wRock, wSnow };
 }
 
+// Gullies on the range (phase 2a, the far rule): where rain gathers on steep
+// ground past the range front, from the flow accumulation on the 4 m grid,
+// widened into bands 10 to 20 m across so they still read from the valley.
+// 0..127 on the 4 m grid (Int8); the march darkens rock and snow by it.
+export function gullies(co, acc, gOf) {
+  const { Hc, n, nn } = co, CGm = 4;
+  let v = new Float32Array(nn * nn);
+  const lo = Math.log(30), hi = Math.log(600);
+  for (let k = 1; k < n; k++) {
+    for (let i = 1; i < n; i++) {
+      const c = k * nn + i;
+      const sx = (Hc[c + 1] - Hc[c - 1]) / (2 * CGm), sz = (Hc[c + nn] - Hc[c - nn]) / (2 * CGm);
+      const slope = Math.hypot(sx, sz);
+      const inRange = smoothstep(0, 140, gOf(i * CGm, k * CGm));
+      if (inRange <= 0) continue;
+      v[c] = smoothstep(lo, hi, Math.log(Math.max(1, acc[c]))) * smoothstep(0.18, 0.5, slope) * inRange;
+    }
+  }
+  // widen: two passes of a 5 x 5 box, then lift what is left of a line
+  for (let pass = 0; pass < 2; pass++) {
+    const out = new Float32Array(nn * nn);
+    for (let k = 0; k <= n; k++) for (let i = 0; i <= n; i++) {
+      let s = 0, w = 0;
+      for (let dk = -2; dk <= 2; dk++) for (let di = -2; di <= 2; di++) {
+        const kk = k + dk, ii = i + di;
+        if (kk < 0 || ii < 0 || kk > n || ii > n) continue;
+        s += v[kk * nn + ii]; w++;
+      }
+      out[k * nn + i] = s / w;
+    }
+    v = out;
+  }
+  const g = new Int8Array(nn * nn);
+  for (let c = 0; c < nn * nn; c++) g[c] = Math.round(127 * Math.min(1, v[c] * 3.2));
+  return g;
+}
+
 // The fixed detail every material's tone is built from: patches about 11 m
 // across, and a fine grain. Kept as small integers (-127..127): `toneK`
 // scales them back.
