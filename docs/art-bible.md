@@ -1,6 +1,6 @@
 # Land of Ascii v3: the art bible
 
-Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look was locked. This is the set of rules every later phase has to obey. It records the rules the look follows (phases 0a and 0b), the ones phase 0c added, the choices locked at the start of phase 1 (section 9), and phase 2a's new rules for haze, far land and night (sections 5 and 5b), which replaced phase 1's there.
+Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look was locked. This is the set of rules every later phase has to obey. It records the rules the look follows (phases 0a and 0b), the ones phase 0c added, the choices locked at the start of phase 1 (section 9), phase 2a's new rules for haze, far land and night (sections 5 and 5b), which replaced phase 1's there, and phase 2b's weather (section 5c) and five look fixes (marked where they apply).
 
 Three things hold it together:
 - **`src/look.js` is the only place** where colours, glyphs, ladders and strengths are set. Renderer code reads it and never hard-codes a colour.
@@ -17,6 +17,7 @@ The picture is a grid of monospace cells, twice as tall as wide: about 40,000 at
 - the **background** carries the surface's colour under the light that reaches it;
 - the **glyph** is a tint of the same colour, a little darker on lit ground and a little lighter in the dark;
 - the cell carries no outline and no second material. Colour does most of the work; the glyph adds grain.
+- the two exceptions, both things in front of what the cell's ray hit: a cloud's dissolving edge, and (phase 2b) a rain streak, whose glyph stands over the background of whatever is behind it.
 
 **What the renderer knows about a cell** (the HitBuffer, `src/contract.js`), for each ray:
 - the material it hit;
@@ -69,7 +70,9 @@ How the rung is set:
 
 **Haze fades glyph contrast** with the same share as it closes up light and dark (`glyphFade` 0.9), so distant land is calmer.
 
-**Cloud edges** are the one place a cell shows two things: the sky behind as the background and the cloud as a shade block (░ ▒ ▓) over it. The edge dissolves without a hard outline.
+**Cloud edges** show two things in one cell: the sky behind as the background and the cloud as a shade block (░ ▒ ▓) over it. The edge dissolves without a hard outline. Phase 2b gives the dissolving edge a minimum depth of 2.5 rows (`clouds.edgeMin`), measured across a puff's smallest radius, so a flat or far puff never thins to a one-cell rim; a puff too small for that fades as a whole instead of scattering into single cells.
+
+**Rain streaks** (phase 2b) are the other: the background is what the ray hit, and the glyph is the streak (`| / \`, by its slant on screen), inked toward the keyframe's rain colour.
 
 The atlas draws the shade blocks itself, because fonts get them wrong at small sizes.
 
@@ -180,7 +183,7 @@ Phase 1's haze stays behind the air rule 'p1', for comparison.
 - **The change from sun to moon never flashes.** Sunlight fades out as the sun sets (from 3.4° up to 2° below); moonlight fades in only as the twilight deepens (from 2° to 8.6° below) and as the moon rises. At the moment the light that shades the ground changes from one to the other, both are dark.
 - **Dawn has its own keyframe:** cooler blue above and rosier at the horizon than dusk, with a pale lilac morning mist and pink-gold cloud tops.
 - **The low sun rakes across the meadow at both ends of the day.** Dawn and dusk have less ambient light (0.22–0.24) and more direct (0.95–1.05) than phase 1's dusk, so slopes facing the low sun stand out from the flat ground.
-- 900 fixed stars, projected so they never blink; torches make small warm pools (torchlight 0.55); cloud shadows fade out once the light is low.
+- 900 fixed stars, projected so they never blink; torches make small warm pools (torchlight 0.55); cloud shadows fade out once the light is low. A star's cell keeps the sky's colour round it (phase 2b): before, it lost the glow round a low sun, so at dawn and dusk the hidden stars showed as blue specks.
 - The colours are `LOOK.moonKeys`; the moon's settings `LOOK.moon`.
 
 Phase 1's night stays behind the night rule 'p1', for comparison.
@@ -189,6 +192,8 @@ Phase 1's night stays behind the night rule 'p1', for comparison.
 
 Phase 1 had no rule of its own for far terrain: past a few hundred metres the ground's detail faded, and nothing took its place. Now (air 'aerial'):
 - **Large forms are strengthened as fine detail fades.** From 300 m (full by 900 m) the light a surface catches gains contrast about the flat ground's light (`far.form` 0.55), so a far mountain has a clear lit face and a dark shadow side.
+- **At dusk the far range is a silhouette** (phase 2b). Far land keeps only a share of the direct light (each keyframe's `light.far`: 0.08 at dusk, 1 otherwise), faded in over the same 300 to 900 m, and dusk's air tone is darker (`#4f4352`), so the range stands dark against the glowing sky instead of showing a pale lit face.
+- **Far lit rock stays warm** (phase 2b). Lit ground high up keeps more of its own colour against the air's: the air's colour shift is cut by up to 75% (`far.warm`), by the surface's light and its height from 60 to 260 m above the sea. Far rock stays tan instead of turning cool grey, while low far ground still cools.
 - **Rock shows strata and gullies as broad bands.**
   - Gullies are where rain gathers on the range, found from the water's flow, widened to 10–20 m. They darken rock and snow (`far.gully` 0.55).
   - Strata run along the height every 38 m.
@@ -209,6 +214,33 @@ It is reflected in water and sits behind nearer clouds. It is never walkable and
 **Water** mirrors whatever the time of day gives it, by the Fresnel share:
 - the glitter path (the sun or moon caught by ripples) is broken by a sparkle fixed to the water;
 - torches reflect at night.
+
+### 5c. Weather (phase 2b; new)
+
+**The weather is a pure function** of the world's seed, the day count and the hour, never simulated state, so any moment can be reproduced with the clock frozen. The page works it out (`src/weather.js`) and sends it in the frame as how much of each kind applies, how wet the ground is and how far the clouds have drifted; every layer blends the kinds' numbers in `look.js` by that mix. A frame with no weather is fair.
+
+**Five kinds**, each a set of numbers the existing systems understand (`LOOK.weather.kinds`): how many of the world's clouds are up, how big, flat and long they are and how low; how much direct sun or moon gets through, how much of what is held back returns as soft light from the whole sky, how strong cast shadows and cloud shadows stay; how far the sky, the air and the clouds turn to the keyframe's overcast colour and how bright they stay; how thick the air is and how deep its height profile; how much mist lies; the wind; how hard it rains; how dark and how reflective wet ground is; how bright the night is; how many stars show.
+
+| Kind | What it is |
+|---|---|
+| **clear** | fewer clouds (under half of fair's), clearer air (0.7), a lighter wind |
+| **fair** | exactly the look before weather: the regression set holds it |
+| **overcast** | fair's clouds, bigger and flatter, on a grey sky; 12% of the direct light, shadows nearly gone, cloud shadows gone, soft light from the whole sky; air 1.5 times as thick; no sun or moon disc, no stars |
+| **rain** | overcast, darker and lower, air 2.6 times as thick and grey, a stronger wind and a rougher sea, the rain streaks, rings on water, wet ground |
+| **mist** | fair's light and sky with the mist layer at dawn, a little grey and thicker air (a misty morning is a sunny one above the mist) |
+
+**The forecast** (`LOOK.weather.forecast`): each day is fair or clear (35% clear); 40% of dawns are misty; 22% of the days without rain have an overcast spell of 3 to 7 hours; one day in four rains for one to two hours, after cloud has built for one to two and a half hours, and stays overcast for an hour after. One kind turns into the next over 20 game minutes. Day 0 opens fair, with mist at dawn, so a plain visit opens on the settled look.
+
+**The mist** uses the aerial perspective's own model: a density by height, integrated in closed form along each ray from the eye to what it hits. It lies on a floor that follows the ground smoothed over 160 m and sinks on high ground. Where the ground lies below that floor (a hollow, a valley floor, a lake) the mist lies deep; where it stands above (a knoll, a ridge, the treetops) the mist thins away. So the mist pools in hollows, along rivers and over lakes, and trees and hills rise out of it. It veils what lies behind by 1 − e^(−0.022 d) inside its full depth, and thins above it over 5 m. It thins away as the sun climbs from 5 to 24 degrees, and veils a lake's mirror too. Its colour is each keyframe's `weather.mist`: lilac at dawn, grey by day, blue-grey at night. On a fair or clear day there is none, so it cannot flatten the far range into the sky.
+
+**Rain:**
+- **Streaks** are thin glyphs in the near air, fixed to the world round the eye: columns 2.4 m apart out to 26 m, each with a drop every 15 m of height falling at 8.5 m/s, drawn 0.75 m long and slanting with the wind. They wrap as the eye moves and are a pure function of position and time, so turning never makes them swim. They fade with distance into the rain's greying of the air, and show only in front of what the cell's ray hit.
+- **On water**, the long ripple dies down by 80%, and near the eye the surface is tilted by many small spreading rings (one in every 0.9 m square every 1.3 s), faded like the ripples by a cell's footprint. Their full tilt changes how much of the surface is mirror; the mirrored and refracted rays take it only up to 0.03 (`rings.tilt`), which the mirrored objects' culling allows for, so the picture never depends on the stripe. Far reflections dull toward the air's colour, broken past what a cell can show. Since rain breaks reflections anyway, they also show less: clouds in them only within 600 m, the land in them followed only half as far, trees mirrored only in water within 40% of the usual distance (`rain.mirror`, all easing back as the rain eases). That keeps Firefox's lake view inside its frame-time limit under rain without touching fair weather.
+- **Wet ground** soaks to full within about a quarter of an hour of rain and dries over the hour or so after it. Wet, it is 30% darker (half that on foliage; snow and the bed not at all) and mirrors a little of the horizon's colour at low angles.
+
+**Under overcast and rain** the sun and moon discs fade into the sky round them (with their glitter on water) and the stars go. The moon's light does not get through, so the night is starlit and darker still: less than a clear dark-moon night, never black. Measured as the mean background brightness of the spawn view on a dark-moon night: clear 26.5, overcast 25.4, rain 21.1, against the floor of 10; the world's other cameras fall in the same order.
+
+The weather's colours are each keyframe's `weather` (`cast`, the overcast sky; `mist`; `rain`, the streaks), so every time of day has its own.
 
 ---
 
@@ -239,7 +271,9 @@ So everything has a floor that grows with distance (`minR`, the width of a cell 
 - the ripples travel;
 - the glitter sparkles at 4 changes a second.
 
-Nothing else changes with the clock. **Every variation is a pure function of world position or of an object's own identity, never of screen position or time.** So nothing crawls or reshuffles when you walk or turn, and a frozen clock repeats exactly.
+- (phase 2b) the weather turns from one kind to the next over 20 game minutes, with the time of day; the rain falls; rings spread on rained-on water; wet ground dries.
+
+Nothing else changes with the clock. **Every variation is a pure function of world position or of an object's own identity, never of screen position or time.** So nothing crawls or reshuffles when you walk or turn, and a frozen clock repeats exactly. The weather is no exception: it is a pure function of the seed, the day and the hour (section 5c).
 
 ---
 
@@ -262,7 +296,7 @@ Nothing else changes with the clock. **Every variation is a pure function of wor
 - forest floor under and round the stands;
 - sand on beaches (low, gentle ground within about 34 m of the sea), in a strip round lakes and along rivers, and on the shallow beds next to them;
 - rock on faces steeper than about 32 degrees and on steep ground high in the range;
-- snow on the tops, from 235 m above the sea, not on the steepest faces;
+- snow on the tops, from 235 m above the sea, not on the steepest faces; phase 2b judges a point lower by how far it stands above the ground within 160 m round it (`SCALE.range.snowRelief`), so a crest just over the line stays bare instead of wearing a thin white line, and snow lingers in the hollows;
 - dirt on the roads, pressed level across their width;
 - bed under lakes and rivers, seen through the water.
 
@@ -271,7 +305,7 @@ There is **no marsh**: it would need a material, colours and a ladder the bible 
 **The sea runs to the horizon.** Past the map's edge the edge's sea goes on, and past the view distance a ray that comes down to sea level over open sea meets a surface whose mirror is the sky. It never ends in a line.
 
 **The coast (phase 2a).** All of it is a pure function of world position and time, so a frozen clock repeats exactly:
-- **Wet band:** where sand meets the sea a darker wet band 2.2 m wide (0.4 m at a lake), drawn in the bed's colours wherever it covers most of a cell's footprint, so far off it thins away.
+- **Wet band:** where sand meets the sea a darker wet band 2.2 m wide, drawn in the bed's colours wherever it covers most of a cell's footprint, so far off it thins away. At a lake (phase 2b) it is the ground up to 5 cm above the water, so it follows how gently the shore slopes: 0.5 m at most on a gentle shore, a few centimetres on a steep bank, where it vanishes.
 - **Foam line:** a broken foam line in the water (the `foam` material) runs up toward the shore and back over 9 s (6 s, and fainter, at a lake). It covers a cell by the share of its footprint the line covers, so thin foam fades with distance instead of breaking into dashes.
 - **Swell:** the open sea has a gentle swell running onshore, faded like the ripples as a cell's footprint passes its length.
 - **Beaches** are narrower than in phase 1, about 16 m (34 m before).
@@ -357,6 +391,8 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 17. **Never let an object's cost scale with its whole screen box.** Cull exactly and work per plane, as the conifer pass does. The first build's market stalls cost 2 ms because they did not.
 18. **Never show frames at uneven delays, or move the camera by a wobbling clock.** A frame shows the camera as it was when it was asked for. If some frames reach the screen a refresh later than others, turning stalls and then jumps. So every frame is shown the same number of refreshes after it was asked for, at a steady rate, a late frame is dropped rather than shown late, and time moves in whole display refreshes (`src/app/pace.js`). `tools/smooth.mjs` measures it.
 19. **Never judge terrain from the overhead map.** Height noise that looks gentle on a map is usually far too steep at eye level. The generated world is judged by the sky test (`tools/world-check.mjs`: at eye level the median frame is at least 35% sky, and under one view in ten has less than 15%) and by standing in it.
+20. **Never simulate the weather** (phase 2b). Every part of it, the mix of kinds, the wetness of the ground and the clouds' drift, is worked out from the seed, the day and the hour, so a frozen clock repeats exactly and every thread draws the same picture.
+21. **Never let anything on screen but the picture into a tool's frames** (phase 2b). The tools run with the menu, the hint and the start card suppressed from the first frame (`tools/lib/serve.mjs`).
 
 ---
 
@@ -380,4 +416,6 @@ Also accepted from phase 0c: the forest-floor material, and narrower crowns in d
 | Distance (5) | **aerial**: aerial perspective, the far-land rules and the backdrop (sections 5 and 5b) | `?air=p1`: haze by distance alone, no backdrop |
 | Night (6) | **moon**: the moon's phases, moonlight and starlight, dawn, the low sun raking (section 5) | `?night=p1`: one dark night, dusk's colours at dawn |
 
-The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`).
+The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`), and again in phase 2b after the five look fixes, with the weather held at fair (`docs/phase2b.md`).
+
+**Phase 2b's weather** is automatic by default (the forecast); the menu (Esc, World) holds any one kind.

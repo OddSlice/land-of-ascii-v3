@@ -11,10 +11,10 @@ Measured figures come from the default world (seed 3), built by `src/world/gen/w
 | Size | 2048 × 2048 cells, one metre each, no wrapping | Large enough for many minutes of walking with the edges out of sight, and small enough to build in under 4 s and keep under 300 MB. |
 | Sea level | 20 m above the datum | The datum sits under the deepest sea bed, so no height is negative. |
 | View distance | 1,500 m | Across the lowland to the range. Beyond it, the sea plane is drawn to the horizon, so the coast never ends at an edge, and past the north and east edges the backdrop stands (below). |
-| Mountains | close the north and east; about 300 m above the sea at the top, snow from 235 m | A backdrop you walk toward, not terrain you walk through. The range front lies about 430 m in from those edges. Past it the peaks climb between 70 and 390 m in, steeper toward the back (phase 2a: as far as the sky test allows), and even out into a shoulder about 205 m high at the edge. The backdrop goes on beyond. |
+| Mountains | close the north and east; about 300 m above the sea at the top, snow from 235 m (phase 2b: judged lower by how far a point stands above the ground within 160 m round it, so crests just over the line stay bare) | A backdrop you walk toward, not terrain you walk through. The range front lies about 430 m in from those edges. Past it the peaks climb between 70 and 390 m in, steeper toward the back (phase 2a: as far as the sky test allows), and even out into a shoulder about 205 m high at the edge. The backdrop goes on beyond. |
 | Sea | closes the south and west; the shore lies about 240 m in | Beaches on low, gentle ground within about 16 m of the sea (34 m in phase 1); low cliffs along some stretches. |
 
-Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). Its highest point is 252 m above the sea, against 244 m in phase 1. Seeds 1, 2, 4 and 5 reach 317, 300, 326 and 291 m (302, 287, 314 and 284 in phase 1). 2% of it is snow and 7% bare rock.
+Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). Its highest point is 252 m above the sea, against 244 m in phase 1. Seeds 1, 2, 4 and 5 reach 317, 300, 326 and 291 m (302, 287, 314 and 284 in phase 1). 1.25% of it is snow (2.6% in phase 2a: the crests just over the snow line are bare now, phase 2b) and 7% bare rock.
 
 ## The backdrop (phase 2a)
 
