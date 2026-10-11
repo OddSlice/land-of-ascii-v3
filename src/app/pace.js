@@ -14,7 +14,9 @@
 //   should be, as a video player drops a frame.
 // The view then moves on by the same time from frame to frame, at a steady
 // frame rate: the display's own when the workers keep up, half of it when
-// they cannot, never a mix.
+// they cannot, down to an eighth on a slow machine, never a mix. (Up to
+// phase 2b it stopped at half: workers slower than two refreshes then had
+// most frames dropped, 15 frames a second where a third, 40, was in reach.)
 //
 // `every` is the fewest refreshes the workers keep up with on average (with
 // frames overlapping, a slow one is absorbed by the next); frames that wait
@@ -25,9 +27,9 @@
 // `lag` follows `every`, and is not measured: every change of it is itself a
 // small jump or stall. It is the 16.7 ms a 60 Hz display takes for one
 // refresh: two refreshes on a fast display (over 90 Hz), one on a 60 Hz one;
-// one more when frames are asked for every second refresh. A frame that
+// one more for each refresh more between frames. A frame that
 // comes back later than that is dropped (above).
-const MAX_EVERY = 2;
+const MAX_EVERY = 8;
 
 const quantile = (list, q) => { const s = [...list].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * q))]; };
 
@@ -61,7 +63,7 @@ export class Pacer {
   }
 
   // The lag: two refreshes on a fast display, one on a 60 Hz one, one more
-  // when frames are asked for every second refresh.
+  // for each refresh more between frames.
   get minLag() { return (this.refresh < 11 ? 2 : 1) + (this.every - 1); }
 
   // Has the refresh of a frame asked for in refresh `tag` passed?

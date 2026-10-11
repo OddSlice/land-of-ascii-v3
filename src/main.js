@@ -157,24 +157,23 @@ const canvas = $('view');
 const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
 const hud = new Hud($('hud'));
-hud.setMode(display.hud);
+hud.setMode(QUIET ? 'none' : display.hud);
 const ref = new RefView($('ref'));
 const lookPanel = new LookPanel($('look'));
 const map = WORLD ? new MapView(world) : null;
 
-// glyph atlases for all four densities, built once
+// glyph atlases for all four densities, built once (and one more for each
+// new cell size a larger window asks for)
 const dpr = Math.max(1, Math.round((window.devicePixelRatio || 1) * 100) / 100);
 const atlases = new Map();
-for (let p = 0; p < TARGETS.length; p++) {
-  const cw = cellWidth(p, dpr);
-  if (!atlases.has(cw)) atlases.set(cw, buildAtlas(cw, cw * 2));
-}
+const atlasFor = (cw) => { if (!atlases.has(cw)) atlases.set(cw, buildAtlas(cw, cw * 2)); return atlases.get(cw); };
+for (let p = 0; p < TARGETS.length; p++) atlasFor(cellWidth(p, dpr));
 
 let grid = null;
 function relayout() {
   const w = Math.max(64, innerWidth - ref.width());
-  grid = layout(state.preset, w, innerHeight, dpr);
-  presenter.resize(grid.cols, grid.rows, atlases.get(grid.cw), dpr);
+  grid = layout(state.preset, w, innerHeight, dpr, innerWidth * innerHeight);
+  presenter.resize(grid.cols, grid.rows, atlasFor(grid.cw), dpr);
   full = new Uint8Array(grid.cells * CELL_STRIDE);
 }
 let full = null;
