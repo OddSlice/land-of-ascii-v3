@@ -6,8 +6,8 @@ Written 11 Oct 2026. Phase 2b adds weather to the world; a menu on Escape that e
 
 | Key or option | Does |
 |---|---|
-| Esc | the menu: every key explained, the Display options, the World (seed, time, weather) and, collapsed, the Advanced tools of earlier phases. Esc again, Resume, or a click beside it closes it. |
-| H | full statistics on or off (by default the screen shows none) |
+| Esc | the menu: every key explained, the Display options, the World (seed, time, weather) and the Advanced tools of earlier phases, each a tab (section 7: laid out again after phase 2b). Esc again, Resume, or a click beside it closes it. |
+| H | full statistics on or off (by default one compact line since after phase 2b, section 7) |
 | everything else | as before: WASD, Shift, F, Space, arrows, 1 2 3 4, T, C, G, R, M, L with 5 to 0, X, − +, and `?seed`, `?day`, `?density`, `?threads`, `?lab`, `?stress` |
 
 ---
@@ -69,6 +69,8 @@ The rules are in `docs/art-bible.md`, section 5c.
 
 ## 2. The menu
 
+*(The pictures show the menu as laid out again after phase 2b, with the statistics on by default: section 7.)*
+
 ![The menu's four sections](../shots/phase2b/menu.jpg)
 
 ![The screen: start card, hint, clean](../shots/phase2b/screen.jpg)
@@ -87,7 +89,7 @@ The rules are in `docs/art-bible.md`, section 5c.
 
 **Built** as plain HTML over the canvas, vanilla JavaScript and CSS (`src/app/menu.js`, `src/app/settings.js`), in the game's monospace with the art bible's colours (the map's cream for headings, the torch orange for what is chosen and for the focus ring). Every control works by mouse and by keyboard alone; Tab stays inside the menu; every control has a visible focus, a pointer cursor and hover feedback; transitions run 150 to 300 ms. It fits 1024 × 640 without scrolling sideways.
 
-**The screen is almost free of text.** By default no statistics show, only a small hint that Escape opens the menu, fading after four seconds. Full statistics show when chosen in Display or with H. The first visit shows a start card: the title, "click to explore", and four keys.
+**The screen is almost free of text.** By default no statistics show (one compact line since after phase 2b, section 7), only a small hint that Escape opens the menu, fading after four seconds. Full statistics show when chosen in Display or with H. The first visit shows a start card: the title, "click to explore", and four keys.
 
 **For the tools:** `lab.menu` opens, closes and reads the menu; `lab.setQuiet` suppresses the menu, the hint and the start card, and `tools/lib/serve.mjs` (and the walk recorder) set that before the page starts, so no tool's picture or measurement changes because of them.
 
@@ -283,3 +285,35 @@ Choices made within the brief that Martin may want to change; each is a number i
 - **The lake's wet band** is capped at the 0.5 m accepted in phase 2a, so it narrows on steeper shores but never widens past what was accepted.
 - **The menu:** a click beside it closes it without taking the mouse (so it is never left captured); leaving the tab while the mouse is captured opens it and pauses the game; Escape closes it but cannot take the mouse back (browsers refuse that on Escape), so Resume does. The time speeds offered are stopped, real time, an hour a minute (as T), an hour in 15 s and an hour in 4 s. Mouse sensitivity runs from 0.25× to 3×.
 - **The clouds' drift on the weather's wind** counts game time, a game hour as a real minute (the clock's own pace), so with the clock running at that pace they move at the weather's wind; with the clock stopped they drift at fair's speed.
+
+## 7. After phase 2b: big screens, the statistics, the menu laid out again
+
+Martin's Windows 11 test machine gave 22 frames a second full screen on a 4K screen, and was fine in a smaller window; he asked for the frame rate and a few statistics on by default, and for the menu to be easier to find one's way in, with icons.
+
+**Big screens.** Each detail level was a cell *size*, chosen so a 1440 × 900 window holds its number of cells; a bigger window held more. Full screen on 4K at Windows' usual 150% scaling, "fine" drew 115,200 cells, not about 40,000 as the menu says (at 100%, 259,200). Now a window bigger than 1440 × 900 gets bigger cells, so the count stays near the level's number on any screen; a smaller window keeps the old cell size (fewer cells, faster), and every tool's picture (1440 × 900) is unchanged: the regression set is still 0.00%. `src/app/grid.js`.
+
+**The frame pacer** asked for a frame at most every second refresh. Workers slower than that lost most frames: on a 120 Hz screen, frames of 17 to 27 ms came out at 12 to 15 a second, where a steady 30 or 40 was in reach. It now goes down to every eighth refresh when it must, and only then (`MAX_EVERY` in `src/app/pace.js`); a machine that keeps up sees no change.
+
+Measured on the Mac in headed Chromium at the lake (the slowest of the eight views), 8 workers unless said:
+
+| | cells | frame (slowest worker) | frames a second |
+|---|---|---|---|
+| 4K at 150%, before | 115,200 | 17.3 ms | 14.7 |
+| 4K at 150%, now | 41,472 | 7.7 ms | 60 |
+| 4K at 200% (a Mac), before | 64,800 | 11.4 ms | 60 |
+| 4K at 200%, now | 41,472 | 7.7 ms | 60 |
+| 2 workers (a slow machine), pacer before | 40,320 | 27.4 ms | 12.1 |
+| 2 workers, pacer now | 40,320 | 27.4 ms | 29.1 |
+| 1 worker, pacer before | 40,320 | 53.3 ms | 9.3 |
+| 1 worker, pacer now | 40,320 | 53.9 ms | 12.9 |
+
+**The statistics** are on by default: one line top left with the frame rate, the time a frame takes the slowest worker, the cell count, the time and the weather ("compact"; "off" and "full" are the other choices, and H still shows full statistics). Choices kept in a browser before this change had them off by default, so their statistics choice is dropped once and the rest kept. The tools' pictures carry none unless a tool asks.
+
+**The menu, laid out again** (`src/app/menu.js`, `src/app/icons.js`, the styles in `src/index.html`), in the same monospace and colours:
+- **A rail on the left** names the game, says where and when you are (the seed, the day, the time, the weather) and holds the four sections as tabs with icons: Controls, Display, World, Advanced. One section shows at a time, so nothing scrolls past its heading. Resume, the one filled button, sits at the foot of the rail with its key, Esc.
+- **Controls:** each key drawn as a keycap, right of what it does, in five groups with icons, in two columns.
+- **Display and World:** each setting a row with its name and a line of plain words; one-of-a-few choices as joined buttons, on and off as switches. World opens with the clock and the day, then the time of day and the weather with an icon for each, then the seed.
+- **The keyboard:** the arrow keys move between the tabs; Tab goes from the tab into its section, then to Resume, and stays inside the menu. On a narrow window the rail becomes a bar across the top.
+- **The icons** are drawn for the game on a 24-unit grid in one stroke weight, no emoji or Unicode symbols. The start card and the hint draw their keys as keycaps too.
+
+The menu check (`tools/menu-check.mjs`) now passes 29 of 29: the tabs and every section's controls by keyboard, the statistics on from the start, the choices kept from before the change, and a 4K screen at 100% and 150% keeping about 40,000 cells (41,472).
