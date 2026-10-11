@@ -165,15 +165,17 @@ export function shapeLand(seed, N, { basins = [], hills = [], rises = [], step =
       const det = ridged(x / 130, z / 130, S + 35, 3);
       const crag = ridged(x / 70 + 3.3, z / 70, S + 36, 2);
       const foot = 45 * smoothstep(0, 170, g);
-      const m = smoothstep(50, 380, g);
-      const peaks = (SCALE.range.top + 20) * Math.pow(m, 1.25) * (0.3 + 0.7 * rv) * (0.8 + 0.2 * det) * (0.88 + 0.12 * fbm(x / 700, z / 700, S + 32, 2))
+      const m = smoothstep(SCALE.range.climb[0], SCALE.range.climb[1], g);
+      // (phase 2a: steeper toward the back, so the range stands higher behind
+      // its front while the ground nearest the lowland stays as it was)
+      const peaks = (SCALE.range.top + SCALE.range.rise) * Math.pow(m, SCALE.range.steep) * (0.3 + 0.7 * rv) * (0.8 + 0.2 * det) * (0.88 + 0.12 * fbm(x / 700, z / 700, S + 32, 2))
         + 26 * m * (det - 0.45) + 12 * m * m * (crag - 0.45);
       const atShore = smoothstep(40, 380, c);
       let up = (foot + peaks) * atShore;
       // toward the north and east edges the range evens out into a high
       // shoulder, so what lies past the edge reads as more high ground
       const e = smoothstep(150, 10, rd) * atShore;
-      if (e > 0) up += (SCALE.range.top - 110 + 40 * fbm(x / 500, z / 500, S + 33, 2) - (h - SEA + up)) * e;
+      if (e > 0) up += (SCALE.range.top - SCALE.range.shoulder + 40 * fbm(x / 500, z / 500, S + 33, 2) - (h - SEA + up)) * e;
       h += up;
       wf *= 1 - e;
     }

@@ -6,7 +6,7 @@
 // 90 east.
 import { SCALE } from '../scale.js';
 import { KIND } from './water.js';
-import { heightAt, clearLine } from './sites.js';
+import { heightAt, clearLine, brow } from './sites.js';
 
 const TAU = Math.PI * 2;
 const deg = (r) => r * 180 / Math.PI;
@@ -197,7 +197,9 @@ export function worldCameras(world, { seaDist, shore }) {
     }
     const v = pick ? pick.v : sites.viewpoints[0];
     const yaw = pick ? deg(Math.atan2(L.x - v.x, L.z - v.z)) : v.yaw;
-    cams.push({ name: 'ridge-top vista', x: v.x, z: v.z, yaw, pitch: -6, time: 'day' });
+    // (at the brow of the viewpoint's hill, for the way it looks)
+    const b = brow(H, N, kind, v.x, v.z, yaw);
+    cams.push({ name: 'ridge-top vista', x: b.x, z: b.z, yaw, pitch: -6, time: 'day' });
   }
 
   // 8. the road approaching the fort: 140 m back along the road that ends

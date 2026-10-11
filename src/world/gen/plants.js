@@ -39,6 +39,9 @@ export function forestField(N, H, kind, wetDist, frame, seed, rivers) {
       // treeline; the open lowland holds less, so its meadows stay wide
       f += 0.34 * smoothstep(0, 160, P.g) * smoothstep(treeline, treeline - 50, h);
       f -= 0.14 * smoothstep(-60, -260, P.g);
+      // (phase 2a) and the foot of the range stays open, so from the lowland
+      // just in front of it the mountains are seen over meadow
+      f -= 0.16 * smoothstep(-220, -80, P.g) * smoothstep(60, 0, P.g);
       ff[c] = f;
     }
   }
@@ -67,6 +70,52 @@ function latticePoint(gx, gz, seed) {
   return [(gx + 0.15 + 0.7 * hash2(gx, gz, seed + 712)) * CELL, (gz + 0.15 + 0.7 * hash2(gx, gz, seed + 713)) * CELL];
 }
 
+// Copses (phase 2a): small clumps of five to thirty conifers scattered over
+// the open lowland, so the middle of the map has things to walk toward. On
+// dry, gentle meadow, well clear of the stands (whose edges stay clear), the
+// water, the shore and the range, spaced apart; each a jittered clump.
+export function copses(N, H, kind, wetDist, frame, F, thr, seed) {
+  const C = SCALE.copses, NN = N + 1, P = {};
+  const out = [];
+  for (let t = 0; t < 3000 && out.length < C.count; t++) {
+    const x = 150 + (N - 300) * hash2(t, 1, seed + 731), z = 150 + (N - 300) * hash2(t, 2, seed + 731);
+    frame.at(x, z, P);
+    if (P.g > -150 || P.c < 140) continue;
+    const j = Math.round(z) * NN + Math.round(x);
+    if (kind[j] !== KIND.NONE || wetDist[j] < 14) continue;
+    const sx = (H[j + 3] - H[j - 3]) / 6, sz = (H[j + 3 * NN] - H[j - 3 * NN]) / 6;
+    if (Math.hypot(sx, sz) > 0.12) continue;
+    // out in the open: no stand anywhere near
+    let open = true;
+    for (let a = 0; a < 8 && open; a++) {
+      const f = fieldAt(F, x + Math.cos(a * 0.785) * 45, z + Math.sin(a * 0.785) * 45);
+      if (f === f && f > thr - 0.1) open = false;
+    }
+    const f0 = fieldAt(F, x, z);
+    if (!open || (f0 === f0 && f0 > thr - 0.1)) continue;
+    if (out.some((c) => Math.hypot(c.x - x, c.z - z) < C.apart)) continue;
+    const n = C.trees[0] + Math.floor((C.trees[1] - C.trees[0] + 1) * Math.pow(hash2(t, 3, seed + 731), 1.6));
+    out.push({ x, z, n, r: 3 + 2.4 * Math.sqrt(n), seed: t });
+  }
+  return out;
+}
+
+// The trees of a copse: the n lattice points (C.spacing apart, jittered)
+// nearest its middle, the clump's outline ragged.
+function copseTrees(c, seed) {
+  const S = SCALE.copses.spacing, R = Math.ceil(c.r / S) + 2, pts = [];
+  for (let gz = -R; gz <= R; gz++) {
+    for (let gx = -R; gx <= R; gx++) {
+      const h = (q) => hash2(c.seed * 97 + gx + 50, gz + 50, seed + 741 + q);
+      const x = c.x + (gx + 0.7 * (h(1) - 0.5)) * S, z = c.z + (gz + 0.7 * (h(2) - 0.5)) * S;
+      const d = Math.hypot(x - c.x, z - c.z) * (0.75 + 0.5 * h(3));
+      pts.push({ x, z, d, id: (gz + 50) * 101 + gx + 50 });
+    }
+  }
+  pts.sort((a, b) => a.d - b.d || a.id - b.id);
+  return pts.slice(0, c.n);
+}
+
 // The threshold that gives about `target` trees.
 export function chooseThreshold(F, N, seed, target = SCALE.trees.target) {
   const m = Math.floor(N / CELL), fs = new Float32Array(m * m);
@@ -89,9 +138,18 @@ export function chooseThreshold(F, N, seed, target = SCALE.trees.target) {
 
 // The trees and bushes. `clear(x, z)` is true where nothing may stand (roads,
 // sites, the wall).
-export function plant(terrain, F, thr, seed, clear, wetDist, kind) {
+export function plant(terrain, F, thr, seed, clear, wetDist, kind, clumps = []) {
   const N = terrain.N, NN = terrain.NN, m = Math.floor(N / CELL);
   const trees = [];
+  // the copses first (phase 2a)
+  for (const c of clumps) {
+    for (const p of copseTrees(c, seed)) {
+      const j = Math.round(p.z) * NN + Math.round(p.x);
+      if (kind[j] !== KIND.NONE || wetDist[j] < 3 || clear(p.x, p.z)) continue;
+      const h = (q) => hash2(c.seed * 131 + p.id, q, seed + 751);
+      trees.push(conifer(p.x, p.z, groundAt(terrain, p.x, p.z) - 0.3, seed * 7 + 900000 + c.seed * 400 + p.id % 400, 1 + 0.15 * h(1), 1));
+    }
+  }
   for (let gz = 1; gz < m - 1; gz++) {
     for (let gx = 1; gx < m - 1; gx++) {
       const [x, z] = latticePoint(gx, gz, seed);

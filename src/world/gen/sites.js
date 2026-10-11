@@ -195,6 +195,38 @@ export function chooseViewpoints(ctx, avoid) {
   return out;
 }
 
+// The brow of a hill (phase 2a): near (x0, z0), on dry, walkable ground no
+// more than `drop` metres lower, the spot where the ground falls away
+// soonest in the direction `yawDeg` looks (the steepest the ground ahead
+// rises to, as seen from the eye there, is the least), so the hill's own
+// slope does not fill the view. Returns { x, z, h, ahead } (ahead: that
+// steepest rise, as a slope).
+export function brow(H, N, kind, x0, z0, yawDeg, reach = 90, drop = 18) {
+  const NN = N + 1, a = yawDeg * Math.PI / 180, dx = Math.sin(a), dz = Math.cos(a);
+  const h0 = heightAt(H, N, x0, z0);
+  let best = null;
+  for (let r = 0; r <= reach; r += 6) {
+    for (let q = 0; q < (r ? 16 : 1); q++) {
+      const x = x0 + r * Math.cos(q * Math.PI / 8), z = z0 + r * Math.sin(q * Math.PI / 8);
+      if (x < 8 || z < 8 || x > N - 8 || z > N - 8 || kind[Math.round(z) * NN + Math.round(x)] !== KIND.NONE) continue;
+      const h = heightAt(H, N, x, z);
+      if (h < h0 - drop) continue;
+      const sl = Math.hypot(heightAt(H, N, x + 2, z) - heightAt(H, N, x - 2, z), heightAt(H, N, x, z + 2) - heightAt(H, N, x, z - 2)) / 4;
+      if (sl > 0.6) continue;
+      const eye = h + SCALE.eye;
+      let ahead = -Infinity;
+      for (let t = 6; t <= 320; t += 6) {
+        const s = (heightAt(H, N, x + dx * t, z + dz * t) - eye) / t;
+        if (s > ahead) ahead = s;
+      }
+      // (falling away matters most; then staying high and near the hilltop)
+      const score = -ahead * 100 + (h - h0) * 0.04 - r * 0.01;
+      if (!best || score > best.score) best = { x: Math.round(x * 2) / 2, z: Math.round(z * 2) / 2, h, ahead, score };
+    }
+  }
+  return best || { x: x0, z: z0, h: h0, ahead: 0 };
+}
+
 // Is the line between two points clear of the ground and of the forest
 // (where the forest field is past the threshold, trees count as 15 m tall)?
 function clearView(ctx, x0, z0, y0, x1, z1, y1) {
