@@ -1,8 +1,9 @@
 import { moonLit } from '../world/sky.js';
 
-// The statistics on screen (phase 2b: by default none). `mode` is the menu's
-// Display choice: 'none', 'minimal' (the time, the weather and the frame
-// rate) or 'full' (frame rate, the time spent marching, resolving and
+// The statistics on screen. `mode` is the menu's Display choice: 'none',
+// 'minimal' (the default since after phase 2b, shown as "compact": the frame
+// rate, the time a frame takes the slowest worker, the cell count, the time
+// and the weather, on one line) or 'full' (frame rate, the time spent marching, resolving and
 // drawing, the cell count, the time of day, under the night rule 'moon' the
 // day count and how much of the moon is lit, the weather; in the generated
 // world its seed and whether the workers share one copy of it; in the stress
@@ -38,7 +39,8 @@ export class Hud {
       const legend = w && w.map ? 'map: # fort site · o village sites · * viewpoints · + spawn · @ you (M closes)\n' : '';
       const weather = s.weather ? `, ${s.weather}` : '';
       if (show === 'minimal') {
-        text = `${time} ${s.timeName}${weather}   ${Math.round(s.fps || 0)} fps${mode}\n${legend}`;
+        const work = s.march + s.resolve;
+        text = `${String(Math.round(s.fps || 0)).padStart(3)} fps · ${isNaN(work) ? '–' : work.toFixed(1)} ms · ${s.cells.toLocaleString('en-US')} cells · ${time} ${s.timeName}${weather}${mode}\n${legend}`;
       } else {
         text =
           `${f(s.fps)} fps${s.pace > 1 ? ` (every ${s.pace === 2 ? '2nd' : s.pace === 3 ? '3rd' : `${s.pace}th`} refresh)` : ''}   march ${f(s.march)} ms   resolve ${f(s.resolve)} ms   draw ${f(s.draw)} ms\n` +

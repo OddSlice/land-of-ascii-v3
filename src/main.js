@@ -473,9 +473,15 @@ const game = {
       return ok;
     } catch { return false; }
   },
-  clockLine() {
-    const moon = state.look.night === 'moon' ? `, moon ${Math.round(100 * moonLit(state.hour, state.day))}% lit` : '';
-    return `${clockText()} (${keyName(state.hour)}), day ${state.day}${moon}; the clock is ${state.running ? 'running' : 'stopped'}`;
+  // Where the clock and the sky stand, for the menu: `preset` names the time
+  // of day only while the clock stands exactly on it.
+  now() {
+    return {
+      clock: clockText(), timeName: keyName(state.hour), day: state.day, running: state.running,
+      preset: ['dawn', 'day', 'dusk', 'night'].find((k) => Math.abs(state.hour - LOOK.hours[k]) < 1e-9) || null,
+      moon: state.look.night === 'moon' ? Math.round(100 * moonLit(state.hour, state.day)) : null,
+      weather: WORLD || state.weather !== 'fair' ? weatherName() : 'fair',
+    };
   },
   weatherLine() {
     if (!WORLD && state.weather === 'fair') return 'The Look Lab and the stress scene keep fair weather unless one is held here.';
@@ -602,6 +608,8 @@ Object.assign(lab, {
   setQuiet(on) {
     QUIET = !!on;
     if (QUIET) { closeMenu(false); if (card.up) { card.up = false; card.el.classList.remove('shown', 'on'); } hideHint(); }
+    // (the tools' pictures carry no statistics unless they ask: lab.setHud)
+    hud.setMode(QUIET ? 'none' : display.hud);
   },
   // The menu, for the tools: open it, close it, read what it shows.
   menu: {

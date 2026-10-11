@@ -6,7 +6,11 @@
 const KEY = 'land-of-ascii-v3.display';
 const SEEN = 'land-of-ascii-v3.seen';
 
-export const DISPLAY_DEFAULTS = { density: 2, glyphs: true, hud: 'none', sensitivity: 1, invert: false };
+// (the statistics are on by default since after phase 2b: the frame rate, the
+// frame time, the cells, the time and the weather on one line; choices kept
+// before then, version 1, had them off by default, so their `hud` is dropped)
+export const DISPLAY_DEFAULTS = { density: 2, glyphs: true, hud: 'minimal', sensitivity: 1, invert: false };
+const VERSION = 2;
 const HUDS = ['none', 'minimal', 'full'];
 
 function read(key) {
@@ -24,7 +28,7 @@ export function loadDisplay() {
   if (s && typeof s === 'object') {
     if (Number.isInteger(s.density) && s.density >= 0 && s.density <= 3) d.density = s.density;
     if (typeof s.glyphs === 'boolean') d.glyphs = s.glyphs;
-    if (HUDS.includes(s.hud)) d.hud = s.hud;
+    if (HUDS.includes(s.hud) && s.v === VERSION) d.hud = s.hud;
     if (typeof s.sensitivity === 'number' && s.sensitivity >= 0.25 && s.sensitivity <= 3) d.sensitivity = s.sensitivity;
     if (typeof s.invert === 'boolean') d.invert = s.invert;
   }
@@ -32,7 +36,7 @@ export function loadDisplay() {
 }
 
 export function saveDisplay(d) {
-  write(KEY, JSON.stringify({ density: d.density, glyphs: d.glyphs, hud: d.hud, sensitivity: d.sensitivity, invert: d.invert }));
+  write(KEY, JSON.stringify({ v: VERSION, density: d.density, glyphs: d.glyphs, hud: d.hud, sensitivity: d.sensitivity, invert: d.invert }));
 }
 
 // Whether the start card has been seen (it shows on the first visit only).

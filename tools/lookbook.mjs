@@ -535,7 +535,8 @@ async function phase2b() {
 
     // 1. the four views under each kind of weather, by day and at night (mist
     // lies only round dawn, so its day frame is at 07:00)
-    {
+    // (--only menu: part 4 alone)
+    if (a.only !== 'menu') {
       const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed: 3 });
       await lab.page.evaluate(() => window.lab.setHud(false));
       const CAMS = [[0, 'spawn view'], [1, 'main lake shore'], [3, 'forest edge across meadow'], [5, 'the coast']];
@@ -567,7 +568,7 @@ async function phase2b() {
     }
 
     // 3. the five fixes, before (the build in --ref) and after
-    if (ref) {
+    if (ref && a.only !== 'menu') {
       const FIX = [
         { file: 'fix-1-dusk-silhouette', title: 'Fix 1: the far range at dusk, a dark silhouette instead of a pale lit face', cam: 0, hour: 'dusk', crop: [0, 0.2, 1, 0.45] },
         { file: 'fix-2-warm-far-rock', title: 'Fix 2: far lit rock stays warm tan (spawn view, 14:00)', cam: 0, hour: 'day', crop: [0, 0.25, 0.7, 0.3] },
@@ -601,16 +602,16 @@ async function phase2b() {
       const hint = await pageShot(page);
       await page.waitForTimeout(4800);
       const clean = await pageShot(page);
-      writeDataURL(path.join(OUT, 'screen.jpg'), await compose([card, hint, clean], ['the start card (first visit only)', 'the hint, for four seconds', 'the clean screen'], 'The game screen: almost free of text', 3, 0.42));
+      writeDataURL(path.join(OUT, 'screen.jpg'), await compose([card, hint, clean], ['the start card (first visit only)', 'the hint, for four seconds', 'the screen: the compact statistics only'], 'The game screen', 3, 0.42));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(450);
       const secs = [];
-      for (const id of ['controls', 'display', 'world', 'advanced']) {
-        await page.click(`#menu nav button:text("${id}")`);
+      for (const id of ['Controls', 'Display', 'World', 'Advanced']) {
+        await page.click(`#menu [role="tab"]:has-text("${id}")`);
         await page.waitForTimeout(700);
         secs.push(await pageShot(page));
       }
-      writeDataURL(path.join(OUT, 'menu.jpg'), await compose(secs, ['Controls', 'Display', 'World', 'Advanced (opened)'], 'The menu (Esc): its four sections, over the world, dimmed and still drawn', 2, 0.5));
+      writeDataURL(path.join(OUT, 'menu.jpg'), await compose(secs, ['Controls', 'Display', 'World', 'Advanced'], 'The menu (Esc): its four sections, over the world, dimmed and still drawn', 2, 0.5));
       for (const [k, id] of ['controls', 'display', 'world', 'advanced'].entries()) writeDataURL(path.join(OUT, `menu-${id}.jpg`), await compose([secs[k]], [id], `The menu: ${id}`, 1, 0.75));
       await lab.check();
       await lab.ctx.close();

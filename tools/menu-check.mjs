@@ -1,9 +1,11 @@
-// The menu check (phase 2b): opens the built page as a first-time visitor
-// would (no tool quiet), and with the keyboard alone
-//  1. dismisses the start card (Escape on it never opens the menu);
-//  2. opens the menu with Escape and walks every control with Tab, checking
-//     that focus stays inside the menu and comes back round (with the
-//     Advanced section opened from the keyboard too);
+// The menu check (phase 2b; the tabs and the statistics after it): opens the
+// built page as a first-time visitor would (no tool quiet), and with the
+// keyboard alone
+//  1. dismisses the start card (Escape on it never opens the menu), with the
+//     compact statistics on screen from the start;
+//  2. opens the menu with Escape and walks every control of every section
+//     with Tab, checking that focus stays inside the menu and comes back
+//     round, and that the arrow keys move between the sections' tabs;
 //  3. changes each Display option from the keyboard and checks it took
 //     effect (the grid, the glyphs, the statistics, the mouse);
 //  4. checks the menu holds the clock and movement while open, takes no game
@@ -12,7 +14,11 @@
 //  5. reloads and checks the Display choices came back while the seed, the
 //     time and the weather did not (a plain visit opens the default world);
 //  6. opens it at 1024 x 640 and checks nothing scrolls sideways;
-//  7. runs once more with localStorage throwing on every call.
+//  7. runs once more with localStorage throwing on every call;
+//  8. opens with choices kept before the statistics were on by default and
+//     checks they show (the rest of the choices kept);
+//  9. opens full screen on 4K screens (at 100% and 150%) and checks the cell
+//     count stays near the detail level's promise.
 //   node tools/menu-check.mjs [--browser chromium]
 import { launch } from './lib/browser.mjs';
 import { serve, args, openLab } from './lib/serve.mjs';
@@ -49,7 +55,7 @@ try {
   await page.waitForTimeout(400);
   let s = await st(page);
   check('the start card shows on a first visit', s.m.card);
-  check('nothing else is on the screen (no statistics)', s.hudText === '', JSON.stringify(s.hudText));
+  check('the compact statistics show from the start: one line with the frame rate', s.m.hud === 'minimal' && s.hudText.split('\n').filter(Boolean).length === 1 && /fps/.test(s.hudText), JSON.stringify(s.hudText.trim()));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   s = await st(page);
@@ -82,13 +88,25 @@ try {
   await page.keyboard.press('Shift+Tab');
   const back = await focusName(page);
   check('Shift+Tab from the first control goes to the last', back === w.seen[w.seen.length - 1], back);
-  await tabTo(page, /^Advanced/);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(200);
+  // the tabs: the arrow keys move between them, and each section's controls are all reached
+  await tabTo(page, /^Controls$/);
+  const names = [], tabsSeen = [];
+  let allReached = true;
+  for (let i = 0; i < 4; i++) {
+    s = await st(page);
+    tabsSeen.push(s.m.tab);
+    w = await walk();
+    if (!(w.seen.length === s.m.controls && w.outside === 0)) allReached = false;
+    names.push(`[${s.m.tab}] ${w.seen.join(' | ')}`);
+    await tabTo(page, new RegExp(`^${s.m.tab[0].toUpperCase()}${s.m.tab.slice(1)}$`));
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+  }
   s = await st(page);
-  w = await walk();
-  check('Enter opens the Advanced section, and Tab reaches its controls too', s.m.advanced && w.seen.length === s.m.controls && w.outside === 0, `${w.seen.length} reached of ${s.m.controls}`);
-  const names = w.seen;
+  check('the arrow keys move between the four sections, round again', tabsSeen.join(' ') === 'controls display world advanced' && s.m.tab === 'controls', tabsSeen.join(' '));
+  check('in every section Tab reaches all its controls and stays inside', allReached);
+  await page.keyboard.press('ArrowDown');           // to Display, for the options below
+  await page.waitForTimeout(150);
 
   // ---- the Display options, from the keyboard ----
   const before = await st(page);
@@ -101,12 +119,12 @@ try {
   await tabTo(page, /^glyphs/); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
   s = await st(page);
   check('glyphs: off takes effect', s.glyphs === false);
-  await tabTo(page, /^full statistics$/); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  await tabTo(page, /^off$/); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  s = await st(page);
+  check('statistics: off takes effect', s.m.hud === 'none' && s.hudText === '', JSON.stringify(s.hudText.trim()));
+  await tabTo(page, /^full$/); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
   s = await st(page);
   check('statistics: full takes effect', s.m.hud === 'full' && s.hudText.split('\n').filter(Boolean).length >= 4, `${s.hudText.split('\n').filter(Boolean).length} lines`);
-  await tabTo(page, /^time, weather, frame rate$/); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
-  s = await st(page);
-  check('statistics: minimal takes effect', s.m.hud === 'minimal' && s.hudText.split('\n').filter(Boolean).length === 1, JSON.stringify(s.hudText.trim()));
   await tabTo(page, /^mouse sensitivity/);
   for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
   s = await st(page);
@@ -146,7 +164,7 @@ try {
   await page.waitForTimeout(500);
   s = await st(page);
   check('after a reload the start card stays away (seen once)', !s.m.card);
-  check('after a reload the Display choices are back', s.preset === 1 && s.glyphs === false && s.m.hud === 'minimal' && Math.abs(s.sensitivity - 1.5) < 1e-9 && s.invert === true,
+  check('after a reload the Display choices are back', s.preset === 1 && s.glyphs === false && s.m.hud === 'full' && Math.abs(s.sensitivity - 1.5) < 1e-9 && s.invert === true,
     `density ${s.preset + 1}, glyphs ${s.glyphs}, statistics ${s.m.hud}, sensitivity ${s.sensitivity}, invert ${s.invert}`);
   check('after a reload the seed, the time and the weather are the default ones', s.hour === 14 && s.weather === 'auto' && (await page.evaluate(() => window.lab.seed)) === 3, `hour ${s.hour}, weather ${s.weather}`);
   await lab.check();
@@ -157,7 +175,7 @@ try {
   await small.page.keyboard.press('Enter'); await small.page.waitForTimeout(200);
   await small.page.keyboard.press('Escape'); await small.page.waitForTimeout(400);
   const fit = await small.page.evaluate(() => {
-    const b = document.querySelector('#menu .body'), p = document.querySelector('#menu .panel'), r = p.getBoundingClientRect();
+    const b = document.querySelector('#menu .pane'), p = document.querySelector('#menu .panel'), r = p.getBoundingClientRect();
     return { body: b.scrollWidth <= b.clientWidth, page: document.documentElement.scrollWidth <= innerWidth, inside: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, w: Math.round(r.width) };
   });
   check('at 1024 x 640 the menu fits with no sideways scrolling', fit.body && fit.page && fit.inside, JSON.stringify(fit));
@@ -179,14 +197,47 @@ try {
   await p2.keyboard.press('Enter'); await p2.waitForTimeout(200);
   await p2.keyboard.press('Escape'); await p2.waitForTimeout(400);
   const ok2 = await p2.evaluate(() => window.lab.menu.read().open);
-  await p2.click('#menu button:text("coarse")'); await p2.waitForTimeout(200);
+  await p2.click('#menu [role="tab"]:has-text("Display")'); await p2.waitForTimeout(200);
+  await p2.click('#menu button:has-text("coarse")'); await p2.waitForTimeout(200);
   const pre = await p2.evaluate(() => window.lab.state().preset);
   check('with localStorage throwing, the game and the menu still work', ok2 && pre === 0 && !errs.length && !(await p2.evaluate(() => window.lab.errors.length)), errs.join(' '));
   await ctx.close();
 
+  // ---- choices kept before the statistics were on by default ----
+  const ctx3 = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  await ctx3.addInitScript(() => {
+    try {
+      if (!sessionStorage.getItem('menu-check')) {
+        sessionStorage.setItem('menu-check', '1');
+        localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ density: 1, glyphs: true, hud: 'none', sensitivity: 1.25, invert: false }));
+        localStorage.setItem('land-of-ascii-v3.seen', '1');
+      }
+    } catch { /* no storage */ }
+  });
+  const p3 = await ctx3.newPage();
+  await p3.goto(`${url}/index.html?threads=4`);
+  await p3.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
+  await p3.evaluate(() => window.lab.ready);
+  await p3.waitForTimeout(500);
+  s = await st(p3);
+  check('choices kept before the change: the statistics show, the rest are kept', s.m.hud === 'minimal' && /fps/.test(s.hudText) && s.preset === 1 && Math.abs(s.sensitivity - 1.25) < 1e-9,
+    `statistics ${s.m.hud}, density ${s.preset + 1}, sensitivity ${s.sensitivity}`);
+  await ctx3.close();
+
+  // ---- 4K screens, full screen: the cell count stays near the promise ----
+  const big = [];
+  for (const [w, hh, dpr] of [[3840, 2160, 1], [2560, 1440, 1.5]]) {
+    const L = await openLab(browser, url, { built: true, scene: 'world', threads: 4, width: w, height: hh, dpr });
+    const g = await L.page.evaluate(() => { const x = window.lab.state(); return { cells: x.cells, cols: x.cols, rows: x.rows, cw: x.cw }; });
+    big.push({ screen: `${w * dpr}x${hh * dpr} at ${dpr * 100}%`, ...g });
+    await L.check();
+    await L.ctx.close();
+  }
+  check('a 4K screen full screen keeps about 40,000 cells (fine)', big.every((b) => b.cells > 34000 && b.cells < 46000), big.map((b) => `${b.screen}: ${b.cols} x ${b.rows} = ${b.cells} (${b.cw} px cells)`).join('; '));
+
   console.log(`menu check: ${results.filter((r) => r.ok).length} of ${results.length} passed\n`);
   for (const r of results) console.log(`${r.ok ? 'pass' : 'FAIL'}  ${r.name}${r.detail ? `  (${r.detail})` : ''}`);
-  console.log(`\ncontrols reached by Tab with Advanced open (${names.length}):\n  ${names.join(' | ')}`);
+  console.log(`\ncontrols reached by Tab, section by section:\n  ${names.join('\n  ')}`);
 } finally {
   await browser.close();
   server.close();
