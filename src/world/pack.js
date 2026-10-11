@@ -30,6 +30,8 @@ export function packWorld(world, Shared = null) {
   put('ground', T.ground);
   if (T.form) put('form', T.form);
   if (T.shore) put('shore', T.shore);
+  if (T.farCode) put('farCode', T.farCode);
+  if (T.shoreSq) put('shoreSq', T.shoreSq);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
   for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code']) put(k, T[k]);
   for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
@@ -82,7 +84,7 @@ export function unpackWorld(packed) {
   const terrain = {
     N, NN, ground: a.ground, levels, wWater: a.wWater, wRoad: a.wRoad, wSand: a.wSand, wRock: a.wRock, wSnow: a.wSnow,
     wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH,
-    form: a.form || null, shore: a.shore || null,
+    form: a.form || null, shore: a.shore || null, farCode: a.farCode || null, shoreSq: a.shoreSq || null,
   };
   for (const k of FILTERED) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
   const trees = [], tab = a.trees, tiers = a.tiers;

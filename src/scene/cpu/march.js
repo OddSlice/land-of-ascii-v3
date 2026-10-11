@@ -258,8 +258,10 @@ export class Marcher {
       const low = rs.find(0);
       if (low >= n) break;
       // (under the far rule, on until nothing ahead can reach even the
-      // lowest open row's lower neighbour, so the skyline in it is exact)
-      if (this.clearAhead(fringe ? sigB[rs.ord[off + low]] : sig[off + low], ey, d1)) break;
+      // lowest open row's lower neighbour, or the skyline found so far if
+      // that is higher, so the skyline within the open row is exact)
+      if (fringe) { const sb = sigB[rs.ord[off + low]]; if (this.clearAhead(sMax > sb ? sMax : sb, ey, d1)) break; }
+      else if (this.clearAhead(sig[off + low], ey, d1)) break;
       if (i === this.lastOut) {
         // past the edge of the map: nothing more to hit
         while (e < ev.n) { this.spanCell(rs, e); e++; }

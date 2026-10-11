@@ -58,6 +58,25 @@ export function shoreLine(N, kind) {
   return out;
 }
 
+// The 8 m squares (N/8 a side) where the foam line can be at all (1): not
+// those whose nodes (edges included) all lie more than 10 m out in the water,
+// nor those whose nodes all lie above the shore (or by a river). Anywhere in
+// those the interpolated distance stays out of the foam's reach, so the march
+// need not look for foam there: exact.
+export function shoreSquares(N, shore) {
+  const NN = N + 1, n8 = N >> 3, out = new Uint8Array(n8 * n8), lo = 128 - 10 * 8;
+  for (let cz = 0; cz < n8; cz++) for (let cx = 0; cx < n8; cx++) {
+    let deep = true, land = true;
+    for (let k = cz * 8; k <= cz * 8 + 8; k++) for (let i = cx * 8; i <= cx * 8 + 8; i++) {
+      const v = shore[k * NN + i];
+      if (v >= lo) deep = false;
+      if (v <= 132) land = false;
+    }
+    out[cz * n8 + cx] = deep || land ? 0 : 1;
+  }
+  return out;
+}
+
 // Gullies on the range (phase 2a, the far rule): where rain gathers on steep
 // ground past the range front, from the flow accumulation on the 4 m grid,
 // widened into bands 10 to 20 m across so they still read from the valley.

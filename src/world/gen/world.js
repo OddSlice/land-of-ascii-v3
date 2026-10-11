@@ -18,9 +18,9 @@ import { CG, KIND, coarsen, flood, accumulate, findLakes, pickRivers, wetFine, d
 import { forestField, chooseThreshold, plant, copses, fieldAt } from './plants.js';
 import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt, brow } from './sites.js';
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, STEEP } from './roads.js';
-import { materials, detail, gullies, shoreLine } from './ground.js';
+import { materials, detail, gullies, shoreLine, shoreSquares } from './ground.js';
 import { worldCameras } from './cameras.js';
-import { makeLevels, materialCode, weightLevels } from '../terrain.js';
+import { makeLevels, materialCode, weightLevels, farCode } from '../terrain.js';
 import { floorField } from '../objects.js';
 import { buildSpans } from '../spans.js';
 import { buildClouds, worldCloudList } from '../sky.js';
@@ -210,10 +210,12 @@ export function* generateWorld(seed) {
   // (filtered copies for the coarser levels: thin water, roads and sand fade
   // with distance; snow and rock end at a clean line far away)
   for (const k of FILTERED) terrain[`${k}L`] = weightLevels(terrain[k], N);
+  terrain.farCode = farCode(terrain, FILTERED);
   // the range's gullies, on the 4 m grid (the far rule)
   terrain.form = gullies(co, acc, gOf);
   // the waterline of the sea and the lakes (the coast's wet band and foam)
   terrain.shore = shoreLine(N, kind);
+  terrain.shoreSq = shoreSquares(N, terrain.shore);
   lap('ground');
   yield { stage: STAGES[8], p: 0.9 };
   terrain.levels = makeLevels(surface, N, false);

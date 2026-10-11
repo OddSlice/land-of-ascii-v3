@@ -28,6 +28,34 @@ export function materialCode(T) {
   return code;
 }
 
+// Far from the eye, the march decides a cell's material from the filtered
+// weights of the level it is on (water, road, sand, snow, rock), blended
+// toward the next, and for snow and rock the fine weights too. Where all of
+// them are nothing anywhere in an 8 m square, at every level, only meadow or
+// forest floor can be there: farCode marks those squares (1), so the march
+// can skip the rest. Exact: it marks only squares where every weight it
+// would have read is 0. 8 m squares, N/8 a side.
+export function farCode(T, filtered) {
+  const N = T.N, n8 = N >> 3, out = new Uint8Array(n8 * n8);
+  const zero = (A, n, s, x0, z0) => {
+    const nn = n + 1, i0 = Math.floor(x0 / s), i1 = Math.min(n, Math.ceil((x0 + 8) / s)), k0 = Math.floor(z0 / s), k1 = Math.min(n, Math.ceil((z0 + 8) / s));
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) if (A[k * nn + i]) return false;
+    return true;
+  };
+  for (let cz = 0; cz < n8; cz++) {
+    for (let cx = 0; cx < n8; cx++) {
+      const x0 = cx * 8, z0 = cz * 8;
+      let ok = zero(T.wSnow, N, 1, x0, z0) && zero(T.wRock, N, 1, x0, z0);
+      for (let L = 1; ok && L < LEVELS; L++) {
+        const n = N >> L, s = 1 << L;
+        for (const k of filtered) if (!zero(T[`${k}L`][L], n, s, x0, z0)) { ok = false; break; }
+      }
+      out[cz * n8 + cx] = ok ? 1 : 0;
+    }
+  }
+  return out;
+}
+
 // Normalised distance from the lake's centre: 1 at its edge, wobbly.
 export function lakeDist(x, z) {
   const dx = x - LAKE.x, dz = z - LAKE.z;

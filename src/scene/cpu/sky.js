@@ -4,7 +4,7 @@
 // the way the reference footage does. Stars are projected from fixed
 // directions onto the cell they fall in, so they never blink as you turn.
 import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
-import { lineAt, crossLine, profileAt, leanAt } from '../../world/backdrop.js';
+import { lineAt, crossLine, profileAt, leanWindow, leanBlend } from '../../world/backdrop.js';
 import { SCALE } from '../../world/scale.js';
 import { LOOK, ruleOf } from '../../look.js';
 import { clusterAt } from '../../world/sky.js';
@@ -51,7 +51,11 @@ export class SkyPass {
     const bd = this.bd, np = rays.np, K = bd.layers.length;
     if (!this.bT || this.bT.length < np * K) {
       const n = (np + 64) * K;
-      this.bT = new Float64Array(n); this.bU = new Float64Array(n); this.bH = new Float64Array(n); this.bDH = new Float64Array(n);
+      this.bT = new Float64Array(n); this.bU = new Float64Array(n); this.bH = new Float64Array(n);
+      // (and what shading needs that depends only on where the plane meets
+      // the ridgeline: the way out and along, the snow and tree lines, the
+      // face's lean at each smoothing window)
+      this.bP = new Float64Array(n * 4); this.bLine = new Float64Array(n); this.bTree = new Float64Array(n); this.bLean = new Float64Array(n * 4);
       this.bTop = new Float64Array(np + 64); this.bTopK = new Int8Array(np + 64);
     }
     const X = this.X, Pr = this.Pr;
@@ -65,6 +69,11 @@ export class SkyPass {
         profileAt(Ly, bd.step, X[1], Pr);
         this.bH[q] = Pr[0];
         if (Pr[0] <= SCALE.sea + 3) continue;
+        const u = X[1], P = lineAt(bd, Ly.D, u, this.Pl);
+        this.bP[q * 4] = P[2]; this.bP[q * 4 + 1] = P[3]; this.bP[q * 4 + 2] = P[4]; this.bP[q * 4 + 3] = P[5];
+        this.bLine[q] = SCALE.sea + Ly.snow + 45 * fbm(u / 700, k * 3.1, SEED + 142, 2);
+        this.bTree[q] = SCALE.sea + Ly.tree + 30 * vnoise(u / 500, k * 3.3, SEED + 144);
+        for (let wi = 0; wi < 4; wi++) this.bLean[q * 4 + wi] = leanWindow(Ly, bd.step, u, wi);
         const st = (Pr[0] - v.ey) / X[0];
         if (st > top) { top = st; tk = k; }
       }
@@ -90,27 +99,26 @@ export class SkyPass {
   backdropShade(m, ci, slot, p, k, s, ey, dist, rowAngle) {
     const bd = this.bd, K = bd.layers.length, q = p * K + k, Ly = bd.layers[k];
     const t = this.bT[q], u = this.bU[q], H = this.bH[q], y = ey + s * t;
-    const P = lineAt(bd, Ly.D, u, this.Pl);
-    const FAR = LOOK.far, C = SCALE.backdrop, sea = SCALE.sea;
+    const FAR = LOOK.far, C = SCALE.backdrop;
     const g = smooth(0.6, 0.88, vnoise(u / 75, y / 320, SEED + 141 + k));
     // snow caps the peaks: above the line, the more of a peak the taller it
     // stands over it, so the snow line follows the peaks instead of cutting
     // them all at one height; it runs down the gullies
-    const line = sea + Ly.snow + 45 * fbm(u / 700, k * 3.1, SEED + 142, 2);
+    const line = this.bLine[q];
     const snowY = line + Math.max(0, H - line) * C.cap - 40 * g;
     // (strata finer than a couple of rows fade, as on the map's own range)
     const strata = 1 - smooth(FAR.strata * 0.15, FAR.strata * 0.55, dist * rowAngle);
     let mat, tone;
     if (y > snowY) { mat = MAT.SNOW; tone = 0.25 * (vnoise(u / 60, y / 40, SEED + 143) * 2 - 1); }
-    else if (y < sea + Ly.tree + 30 * vnoise(u / 500, k * 3.3, SEED + 144)) {
+    else if (y < this.bTree[q]) {
       const wood = vnoise(u / 90, y / 60, SEED + 145) > 0.42;
       mat = wood ? MAT.CONIFER : MAT.GRASS;
       tone = 0.6 * (vnoise(u / 25, y / 30, SEED + 146) * 2 - 1);
     } else { mat = MAT.ROCK; tone = FAR.bands * strata * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(u / 400, k * 2.7, SEED + 147)); }
     // the face's normal: leaning back from the map at C.face, turned along
     // the line by the ridgeline's slope near the crest
-    const lean = C.lean * leanAt(Ly, bd.step, u, H - y);
-    let nx = -lean * P[4] - C.face * P[2], nz = -lean * P[5] - C.face * P[3], ny = 1;
+    const lean = C.lean * leanBlend(this.bLean, q * 4, H - y), q4 = q * 4, P = this.bP;
+    let nx = -lean * P[q4 + 2] - C.face * P[q4], nz = -lean * P[q4 + 3] - C.face * P[q4 + 1], ny = 1;
     const nl = Math.sqrt(nx * nx + ny * ny + nz * nz); nx /= nl; ny /= nl; nz /= nl;
     const L = this.light.L;
     let lam = nx * L[0] + ny * L[1] + nz * L[2];

@@ -101,6 +101,8 @@ export function makePalette(hour, day = 0, night = 'p1') {
   const mats = MAT_NAMES.map((n) => LOOK.materials[n]);
   cachePal = {
     k, lit, shade, dirFade, night, illum,
+    // the air's two shares by tau, as tables (aerial perspective)
+    airT: airTables(k),
     // the flat ground's share of direct light (the far rule's pivot)
     flat: Math.max(0.035, L[1]),
     ambient: k.light.ambient, direct: k.light.direct * dirFade,
@@ -155,20 +157,46 @@ const sky3 = [0, 0, 0];
 // d metres, in metres of air as dense as at LOOK.air.base. Air thins with
 // height as exp(-(y - base) / height), plus a thin share the same everywhere.
 const AIR = LOOK.air, FAR = LOOK.far;
-function airOf(y0, mu, d) {
-  let base = Math.exp(-(y0 - AIR.base) / AIR.height);
-  if (base > 1.5) base = 1.5;
-  const x = mu * d / AIR.height;
-  const th = x > -1e-4 && x < 1e-4 ? base * d : base * d * (1 - Math.exp(-x)) / x;
-  return th + AIR.uniform * d;
+// (1 - e^-x) / x, from a table between -8 and 8 (64 steps a unit), exactly beyond
+const XT = new Float64Array(1025);
+for (let i = 0; i <= 1024; i++) { const x = i / 64 - 8; XT[i] = Math.abs(x) < 1e-9 ? 1 : (1 - Math.exp(-x)) / x; }
+function grow(x) {
+  if (x <= -8 || x >= 8) return (1 - Math.exp(-x)) / x;
+  const f = (x + 8) * 64, i = f | 0, t = f - i;
+  return XT[i] + (XT[i + 1] - XT[i]) * t;
+}
+// the density at a height, from a table every half metre up to 1,200 m above the base
+const DT = new Float64Array(2402);
+for (let i = 0; i < 2402; i++) { const b = Math.exp(-(i / 2 - 1 - 0) / AIR.height); DT[i] = b > 1.5 ? 1.5 : b; }
+const densityAt = (y0) => {
+  const f = (y0 - AIR.base + 1) * 2;
+  if (f <= 0 || f >= 2401) { const b = Math.exp(-(y0 - AIR.base) / AIR.height); return b > 1.5 ? 1.5 : b; }
+  const i = f | 0;
+  return DT[i] + (DT[i + 1] - DT[i]) * (f - i);
+};
+// (`base`: the density at y0, when the caller already has it)
+function airOf(y0, mu, d, base = densityAt(y0)) {
+  return base * d * grow(mu * d / AIR.height) + AIR.uniform * d;
+}
+
+// The two shares of a keyframe's air by tau, from tables 8 m apart out to
+// 12 km (made with each palette), exactly beyond them.
+const TAU_STEP = 8, TAU_N = 1536;
+function airTables(k) {
+  const A = k.air, hl = new Float64Array(TAU_N + 1), hc = new Float64Array(TAU_N + 1);
+  for (let i = 0; i <= TAU_N; i++) { const t = i * TAU_STEP; hl[i] = A.lum * (1 - Math.exp(-t / A.dist)); hc[i] = A.chroma * (1 - Math.exp(-t / A.distC)); }
+  return { hl, hc, A };
 }
 
 // Mix a colour toward the horizon tone by `tau` metres of air: colour
 // shifts by the keyframe's `chroma` share, light and dark close up only by
 // its `lum` share. Fills rec.r/g/b and returns the light share (for glyphs).
 function airMix(pal, r, g, b, tau) {
-  const A = pal.k.air, H = pal.k.haze.colour;
-  const hl = A.lum * (1 - Math.exp(-tau / A.dist)), hc = A.chroma * (1 - Math.exp(-tau / A.distC));
+  const H = pal.k.haze.colour, T = pal.airT;
+  let hl, hc;
+  const f = tau / TAU_STEP;
+  if (f < TAU_N) { const i = f | 0, t = f - i; hl = T.hl[i] + (T.hl[i + 1] - T.hl[i]) * t; hc = T.hc[i] + (T.hc[i + 1] - T.hc[i]) * t; }
+  else { hl = T.A.lum * (1 - Math.exp(-tau / T.A.dist)); hc = T.A.chroma * (1 - Math.exp(-tau / T.A.distC)); }
   const dy = (hl - hc) * ((0.3 * H[0] + 0.59 * H[1] + 0.11 * H[2]) - (0.3 * r + 0.59 * g + 0.11 * b));
   rec.r = r + (H[0] - r) * hc + dy; rec.g = g + (H[1] - g) * hc + dy; rec.b = b + (H[2] - b) * hc + dy;
   return hl;
@@ -366,10 +394,11 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame) {
   airOn = viewed && (look && look.air ? look.air : LOOK.choices.air.default) === 'aerial';
   // every cell's ray, from the frame by the contract's own formula: its
   // elevation (as a sine) and the eye's height
-  let ey = 0, tx = 0, ty = 0, cp = 1, sp = 0, W = 1;
+  let ey = 0, tx = 0, ty = 0, cp = 1, sp = 0, W = 1, base0 = 1;
   if (airOn) {
     const cam = frame.cam;
     ey = cam.y; ty = Math.tan(frame.fovY / 2); tx = ty * frame.aspect; cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch); W = frame.cols;
+    base0 = densityAt(ey);
   }
   const [ifr, ifg, ifb] = pal.inkFloor;
   const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
@@ -384,15 +413,15 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame) {
       const m = hits[o];
       let mu = 0;
       if (airOn) {
+        // (the sine of the ray's elevation: its slope over the length of its direction)
         const a = (2 * (cx + 0.5) / W - 1) * tx;
-        const sg = up / Math.sqrt(a * a + bRow * bRow);
-        mu = sg / Math.sqrt(1 + sg * sg);
+        mu = up / Math.sqrt(a * a + bRow * bRow + up * up);
       }
       const mirrorFlame = m === MAT.WATER && hits[o + REC] === MAT.FLAME;
       let gm = m;
       if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) gm = waterColour(pal, hits, o, ey, mu);
       else if (hits[o + REC] !== MAT_NONE) gm = fringeColour(pal, hits, o, ey, mu);
-      else recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, (hits[o + 6] | (hits[o + 7] << 8)) / 10) : -1);
+      else recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, (hits[o + 6] | (hits[o + 7] << 8)) / 10, base0) : -1);
       if (m === MAT.FLAME || mirrorFlame) {
         // a flame held at its minimum size, or any flame by day: blended
         // with what is behind it once every other cell is done

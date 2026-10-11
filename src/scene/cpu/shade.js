@@ -129,8 +129,16 @@ const methods = {
       const u = x < 0 ? 0 : x > N - 1e-6 ? N - 1e-6 : x, w = z < 0 ? 0 : z > N - 1e-6 ? N - 1e-6 : z;
       code = T.code[(w | 0) * N + (u | 0)];
     }
+    // (far away, a square where every weight read below is nothing: meadow
+    // or forest floor only, as the full chain would find)
+    let open = 0;
+    if (thin && T.farCode) {
+      const u = x < 0 ? 0 : x > N - 1e-6 ? N - 1e-6 : x, w = z < 0 ? 0 : z > N - 1e-6 ? N - 1e-6 : z;
+      open = T.farCode[(w >> 3) * (N >> 3) + (u >> 3)];
+    }
     if (code === 1) mat = MAT.GRASS;
     else if (code === 2) mat = MAT.FLOOR;
+    else if (open) mat = T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter ? MAT.FLOOR : MAT.GRASS;
     else if ((thin ? this.thinW(T.wWaterL, lv, L, beta, x, z) : bilU8(T.wWater, x, z, N, NN)) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && (thin ? this.thinW(T.wRoadL, lv, L, beta, x, z) : bilU8(T.wRoad, x, z, N, NN)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
     else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
@@ -274,6 +282,12 @@ const methods = {
   // and back (a pure function of position and time), as the share of the
   // cell's footprint it covers, so far off it fades instead of breaking up.
   foamAt(A, x, z, sea, fp) {
+    // (only near a shore at all: out in open water there is none)
+    const T = this.world.terrain, N = this.N;
+    if (T.shoreSq) {
+      const u = x < 0 ? 0 : x > N - 1e-6 ? N - 1e-6 : x, w = z < 0 ? 0 : z > N - 1e-6 ? N - 1e-6 : z;
+      if (!T.shoreSq[(w >> 3) * (N >> 3) + (u >> 3)]) return 0;
+    }
     const sd = this.shoreAt(A, x, z);
     const P = sea ? COAST.foam.sea : COAST.foam.lake;
     if (sd > 0.2 || sd < -(P.reach + P.swing + P.width + fp)) return 0;

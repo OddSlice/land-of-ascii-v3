@@ -149,15 +149,20 @@ export function profileAt(Ly, step, u, out) {
   return out;
 }
 
-// The face's lean along the line at arc length u, `depth` metres below the
-// crest: the slope of the line smoothed over a window that widens with depth.
-export function leanAt(Ly, step, u, depth) {
-  const W = SCALE.backdrop.windows, nW = W.length;
-  let lv = Math.log(Math.max(1, depth) / W[0]) / Math.log(W[1] / W[0]);
-  lv = lv < 0 ? 0 : lv > nW - 1 ? nW - 1 : lv;
-  const l0 = lv | 0, l1 = Math.min(nW - 1, l0 + 1), t = lv - l0;
-  const f = Math.max(0, Math.min(Ly.n - 1.001, u / step)), i = f | 0, a = f - i;
-  const A = Ly.dh[l0], B2 = Ly.dh[l1];
-  const v0 = A[i] + (A[i + 1] - A[i]) * a, v1 = B2[i] + (B2[i + 1] - B2[i]) * a;
-  return v0 + (v1 - v0) * t;
+// The face's lean along the line: the line's slope at arc length u,
+// smoothed over window `wi` (SCALE.backdrop.windows).
+export function leanWindow(Ly, step, u, wi) {
+  const f = Math.max(0, Math.min(Ly.n - 1.001, u / step)), i = f | 0, a = f - i, A = Ly.dh[wi];
+  return A[i] + (A[i + 1] - A[i]) * a;
+}
+
+// The lean `depth` metres below the crest, from the windows' values at u
+// (in L from offset o): the window widens with depth (each three times the
+// last), so a sharp crest spreads into broad flanks below it.
+const LW = SCALE.backdrop.windows, LW0 = LW[0], LLOG = Math.log(LW[1] / LW[0]);
+export function leanBlend(L, o, depth) {
+  let lv = Math.log(Math.max(1, depth) / LW0) / LLOG;
+  lv = lv < 0 ? 0 : lv > LW.length - 1 ? LW.length - 1 : lv;
+  const l0 = lv | 0, l1 = l0 + 1 < LW.length ? l0 + 1 : l0, t = lv - l0;
+  return L[o + l0] + (L[o + l1] - L[o + l0]) * t;
 }
