@@ -22,11 +22,21 @@ export const MAT = {
   BED: 17,                         // the silt of a lake or river bed
   FLOOR: 18,                       // the needle-strewn ground under a stand of trees
   FOAM: 19,                        // foam floating at the waterline (phase 2a; only ever in R2)
+  // phase 3a: the building kit's materials (stone in blocks is STONE)
+  TIMBER: 20,                      // posts, beams, floorboards
+  PLASTER: 21,                     // the infill of a timber frame
+  ROOF: 22,                        // shingle roofs
+  YARD: 23,                        // the packed earth of a courtyard (ground)
+  WINDOW: 24,                      // a window: a dark opening by day, lit at night (emissive)
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;
 // Not a material: an empty record (a cell with no water has no R1 or R2).
 export const MAT_NONE = 255;
+// Not a material (phase 3a): R2 of a cell that is not water, under a roof or
+// inside walls: R2[1] is how much of the sky's soft light reaches it there
+// (0..255), through the doorways, windows and open tops of its room.
+export const MAT_SHELTER = 254;
 
 // ---- HitBuffer: 24 bytes per cell = three records of 8 bytes ------------------
 // R0 (bytes 0..7)    what the cell's own ray hit.
@@ -43,6 +53,13 @@ export const MAT_NONE = 255;
 //                    covers (255 = all), `dist` the path to the bed as above
 //                    (0: none marched); resolve draws the water with a sandy
 //                    bed under it and the foam over it by that share.
+// R2 (bytes 16..23)  also (phase 3a), for a cell that is NOT water whose R0
+//                    is a surface inside a building (a room, the gate's
+//                    passage): MAT_SHELTER, with [1] the share of the sky's
+//                    soft light that reaches it (the ambient light is taken
+//                    times it), so an interior is lit by its doorways,
+//                    windows and torches, not by a general glow. Any other
+//                    value in R2 of a cell that is not water means nothing.
 // R1 (bytes 8..15)   also (phase 2a), for a cell that is NOT water: MAT_NONE,
 //                    or, where a skyline covers only part of the cell (the
 //                    land in R0 rising into it from below), what lies behind

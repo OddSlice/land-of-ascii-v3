@@ -3,13 +3,14 @@
 // mirrored ones (R1). A direct ray that meets water also writes the surface
 // (R0), marches its refracted ray down to the bed (R2) and leaves a mirrored
 // row for reflect.js.
-import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
+import { MAT, MAT_NONE, MAT_SHELTER, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
 import { rippleSlope, swellSlope, ringSlope, waterRays, RING_TILT } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
+import { zoneAt, ZONE_ALL } from '../../world/kit.js';
 
 const MEADOW = LOOK.meadow, FAR = LOOK.far, COAST = LOOK.coast;
 const CALM_K = LOOK.weather.rain.calm[1];
@@ -36,6 +37,9 @@ const methods = {
     // something drawn over water (a tree in front of a lake): its mirror and
     // bed are no longer the cell's, and it takes no more reflections
     if (slot === 0 && mat !== MAT.WATER && h[o] === MAT.WATER) { h[o + REC] = MAT_NONE; h[o + 2 * REC] = MAT_NONE; this.rays.rdepth[ci] = -1; }
+    // (phase 3a) a surface inside a building that something now stands in
+    // front of: its shelter is no longer the cell's
+    else if (slot === 0 && h[o + 2 * REC] === MAT_SHELTER) h[o + 2 * REC] = MAT_NONE;
     h[o] = mat;
     h[o + 1] = light <= 0 ? 0 : light >= 1 ? 255 : (light * 255 + 0.5) | 0;
     h[o + 2] = shadow <= 0 ? 0 : shadow >= 1 ? 255 : (shadow * 255 + 0.5) | 0;
@@ -65,7 +69,10 @@ const methods = {
     this.tg = { G, n, cells: cells.map((c) => Int16Array.from(c)) };
   },
 
-  glowAt(x, y, z, nx, ny, nz) {
+  // (phase 3a) `zone`: the light zones of the surface (see world/kit.js); a
+  // torch lights it only if its mask shares one. `strict`: a building's
+  // surface, lit only from the side it faces (no wrap round the side).
+  glowAt(x, y, z, nx, ny, nz, zone = ZONE_ALL, strict = false) {
     const ts = this.torches, tg = this.tg;
     let gx = Math.floor(x / tg.G), gz = Math.floor(z / tg.G);
     gx = gx < 0 ? 0 : gx >= tg.n ? tg.n - 1 : gx;
@@ -74,16 +81,20 @@ const methods = {
     let sum = 0;
     for (let k = 0; k < list.length; k++) {
       const t = ts[list[k]];
+      if ((t.mask & zone) === 0) continue;
       const lx = t.x - x, ly = t.y - y, lz = t.z - z;
       const d2 = lx * lx + ly * ly + lz * lz;
       if (d2 >= TORCH_RANGE * TORCH_RANGE) continue;
       const d = Math.sqrt(d2);
       const f = 1 - d / TORCH_RANGE;
       const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
-      sum += f * f * (0.35 + 0.65 * Math.max(0, c)) * t.power;
+      sum += f * f * (strict ? (c > 0 ? c : 0) : 0.35 + 0.65 * Math.max(0, c)) * t.power;
     }
     return sum;
   },
+
+  // The light zones of a point on the ground or an outdoor thing at (x, z).
+  zoneOf(x, z) { return this.world.kit ? zoneAt(this.world.kit, x, z) : ZONE_ALL; },
 
   // Distance written for a hit: from the eye for a direct ray, from the water
   // for a mirrored one.
@@ -142,6 +153,8 @@ const methods = {
     else if (open) mat = T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter ? MAT.FLOOR : MAT.GRASS;
     else if ((thin ? this.thinW(T.wWaterL, lv, L, beta, x, z) : bilU8(T.wWater, x, z, N, NN)) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && (thin ? this.thinW(T.wRoadL, lv, L, beta, x, z) : bilU8(T.wRoad, x, z, N, NN)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
+    // (phase 3a) a courtyard's packed earth
+    else if (T.wYard && (thin ? this.thinW(T.wYardL, lv, L, beta, x, z) : bilU8(T.wYard, x, z, N, NN)) > 0.5 + 0.2 * jitter) mat = MAT.YARD;
     else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
     else if (this.weight(T.wSnow, T.wSnowL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
     else if (this.weight(T.wRock, T.wRockL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
@@ -187,7 +200,7 @@ const methods = {
       // (judged by the cell's footprint along the view, where rows are tall)
       if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
     }
-    const glow = this.glowAt(x, y, z, nx, ny, nz);
+    const glow = this.glowAt(x, y, z, nx, ny, nz, this.zoneOf(x, z));
     this.write(ci, into >= 0 ? into : rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
     return true;
   },

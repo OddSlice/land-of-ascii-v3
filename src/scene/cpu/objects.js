@@ -23,13 +23,15 @@ import { hash2 } from '../../world/noise.js';
 import { MAX_RIPPLE, RING_TILT, MAX_SWELL } from './water.js';
 import { TIER } from '../../world/objects.js';
 import { LOOK } from '../../look.js';
+import { installBuildings } from './build.js';
+import { PT, PF, P as KP, P_STRIDE, reachOf } from '../../world/kit.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const P = [0, 0, 0];
 const CS = new Float64Array(24);          // a box's corners in view space
 const NEAR = 0.01;
 const BUCKET = 64;
-const TREE = 0, BUSH = 1, TORCH = 2;
+const TREE = 0, BUSH = 1, TORCH = 2, PRIM = 3;
 const TA = LOOK.trees.A, TB = LOOK.trees.B, TF = LOOK.trees.trunkFade, TL = LOOK.trees.tierLight;
 
 // How far a treatment's tiers can reach from the trunk: the lean, the shift
@@ -62,6 +64,16 @@ export class ObjectPass {
     trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: Math.max(t.reachA, t.reachB), y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
     bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6, grow: 1, up: 0 }));
     torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i, grow: 2.3, up: 1 }));
+    // (phase 3a) the building kit's shapes, each an object of its own
+    this.kit = world.kit || null;
+    if (this.kit) {
+      const S = this.kit.prims;
+      for (let i = 0; i < this.kit.np; i++) {
+        const q = i * P_STRIDE, t = S[q + KP.TYPE], pane = t === PT.PANE;
+        list.push({ kind: PRIM, o: q, x: S[q + KP.CX], z: S[q + KP.CZ], R: reachOf(S, q) + 0.05, y0: S[q + KP.Y0] - 0.05, y1: S[q + KP.Y1] + 0.05,
+          grow: pane ? 2.3 : (S[q + KP.FLAGS] & PF.GROW ? 1.5 : 0), up: pane ? 1 : 0 });
+      }
+    }
     this.list = list;
     // buckets
     const nb = Math.ceil(world.N / BUCKET);
@@ -91,9 +103,21 @@ export class ObjectPass {
     this.objCap = world.openEdge ? LOOK.water.objectsCap : Infinity;
     this.objFar = world.openEdge ? LOOK.water.objectsFar : world.viewDist;
     this.stats = { buckets: 0, candidates: 0, tested: 0, culled: 0 };
+    this.only = -1; this.skip = -1;
   }
 
-  run(v, rays, m, frame, torches) {
+  // (phase 3a) The building kit's shapes, drawn before the march, so it
+  // marches no ground behind them (their direct view; their reflections come
+  // with everything else in run()).
+  buildings(v, rays, m, frame, torches) {
+    if (!this.kit) return;
+    this.setup(v, rays, m, frame, torches);
+    this.only = PRIM;
+    this.pass(false);
+    this.only = -1;
+  }
+
+  setup(v, rays, m, frame, torches) {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
     // (under rain trees are mirrored only in nearer water, phase 2b)
     const wp = weatherParams(frame.weather);
@@ -101,7 +125,16 @@ export class ObjectPass {
     this.objCap = this.world.openEdge ? LOOK.water.objectsCap * mk : Infinity;
     this.objFar = this.world.openEdge ? LOOK.water.objectsFar * mk : this.world.viewDist;
     this.treat = frame.look && frame.look.tree === 'B' ? 'B' : 'A';
+    this.wp = wp;
+  }
+
+  run(v, rays, m, frame, torches) {
+    this.setup(v, rays, m, frame, torches);
+    const wp = this.wp;
+    // (the buildings' direct view was drawn before the march)
+    this.skip = this.kit ? PRIM : -1;
     this.pass(false);
+    this.skip = -1;
     // reflections, if this stripe sees water within reach of them (objects
     // are mirrored only in water nearer than LOOK.water.objectsCap): one pass
     // for each group of water levels (a lake and a far mountain tarn would
@@ -270,6 +303,7 @@ export class ObjectPass {
       if (!mirror) st.buckets++;
       for (let k = 0; k < bk.items.length; k++) {
         const i = bk.items[k], it = list[i];
+        if (!mirror && (it.kind === this.skip || (this.only >= 0 && it.kind !== this.only))) continue;
         const dist = Math.hypot(it.x - v.ex, it.z - v.ez);
         if (dist - it.R > (mirror ? this.objFar : view)) continue;
         const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = this.reachOf(it) + gr, gy = it.up * gr;
@@ -311,11 +345,29 @@ export class ObjectPass {
     const near = dist - (this.reachOf(it) + it.grow * minR);
     const sw = rays.sw, jlo = rays.jlo, c0 = rays.c0;
     const depth = mirror ? rays.rdepth : rays.depth;
-    const o = it.o, tree = it.kind === TREE;
+    const o = it.o, tree = it.kind === TREE, prim = it.kind === PRIM;
     this.cp.tiersOf = null;
+    if (prim) this.primDist = dist;
     let drew = false;
     for (let cx = bb[0]; cx <= bb[1]; cx++) {
       let lastP = -1, ya = bb[2], yb = bb[3];
+      // (a shape: in a column of one plane, only the rows its footprint's
+      // crossing can reach, found by the rows' slopes, which fall down the column)
+      if (prim && !mirror) {
+        const q = cx - c0, pa = rays.plane[ya * sw + q], pb = rays.plane[yb * sw + q];
+        if (pa === pb) {
+          const p = pa - jlo;
+          this.primPlane(it, rays.pdx[p], rays.pdz[p], minR, rowH);
+          if (this.kp.miss) continue;
+          lastP = p;
+          const sg = rays.sigma, sHi = this.kp.sHi, sLo = this.kp.sLo;
+          let lo = ya, hi = yb;
+          while (lo < hi) { const mid = (lo + hi) >> 1; if (sg[mid * sw + q] > sHi) lo = mid + 1; else hi = mid; }
+          ya = lo; lo = ya; hi = yb;
+          while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (sg[mid * sw + q] < sLo) hi = mid - 1; else lo = mid; }
+          yb = lo;
+        }
+      }
       if (mirror) {
         // only the rows of this column that hold water
         const q = cx - c0;
@@ -334,6 +386,9 @@ export class ObjectPass {
           if (p !== lastP) { this.coniferPlane(o, dx, dz, minR, far, rowH); lastP = p; }
           // a plane that passes wide of the tree misses it in every row
           if (this.cp.miss) continue;
+        } else if (prim) {
+          if (p !== lastP) { this.primPlane(it, dx, dz, minR, rowH); lastP = p; }
+          if (this.kp.miss || d <= this.kp.tA) continue;
         }
         let ey, s, after;
         if (mirror) {
@@ -342,12 +397,14 @@ export class ObjectPass {
         let ok;
         if (tree) {
           ok = this.coniferRay(o, s, ey);
-        } else if (it.kind === BUSH) ok = this.bush(o, dx, dz, s, minR, far, ey);
+        } else if (prim) ok = this.primRay(s, ey, after);
+        else if (it.kind === BUSH) ok = this.bush(o, dx, dz, s, minR, far, ey);
         else ok = this.torchHit(o, dx, dz, s, minR, this.torches[it.ti].power, ey);
         if (!ok || hit.D <= after) continue;
         if (hit.D >= depth[ci]) continue;
         depth[ci] = hit.D;
-        this.shade(ci, dx, dz, s, ey, mirror ? 1 : 0, after);
+        if (prim) this.primShade(ci, dx, dz, s, ey, mirror ? 1 : 0, after);
+        else this.shade(ci, dx, dz, s, ey, mirror ? 1 : 0, after);
         drew = true;
       }
     }
@@ -371,7 +428,7 @@ export class ObjectPass {
     else if (hit.mat === MAT.TRUNK) lam *= hit.lamK;
     const shadow = light.shadowAt(x + hit.nx * 0.7, y + 0.15, z + hit.nz * 0.7);
     const cloud = light.cloudAt(x, z);
-    const glow = m.glowAt(x, y, z, hit.nx, hit.ny, hit.nz);
+    const glow = m.glowAt(x, y, z, hit.nx, hit.ny, hit.nz, m.zoneOf(x, z));
     const tone = hit.mat === MAT.CONIFER ? this.foliageTone() : hit.mat === MAT.TRUNK ? hit.tone : hit.f * 2 - 1;
     m.write(ci, slot, hit.mat, lam, shadow, cloud, glow, tone, leg);
   }
@@ -643,3 +700,5 @@ export class ObjectPass {
     return true;
   }
 }
+
+installBuildings(ObjectPass);

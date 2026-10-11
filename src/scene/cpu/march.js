@@ -128,8 +128,12 @@ export class Marcher {
     return s >= 0 ? ey + s * d > top : ey + s * this.aheadN * 8 > top;
   }
 
-  // March every plane of a stripe. `hits` is the stripe's HitBuffer.
-  run(v, rays, hits, frame, torches) {
+  // March every plane of a stripe. `hits` is the stripe's HitBuffer. (Phase
+  // 3a: begin() first, then the buildings are drawn (ObjectPass.buildings),
+  // then march(); run() does all three without buildings.)
+  run(v, rays, hits, frame, torches) { this.begin(v, rays, hits, frame, torches); this.march(); }
+
+  begin(v, rays, hits, frame, torches) {
     this.v = v; this.rays = rays; this.hits = hits; this.torches = torches; this.t = frame.t;
     this.wp = weatherParams(frame.weather);
     if (!this.tg) this.buildTorchGrid(torches);
@@ -149,6 +153,10 @@ export class Marcher {
     // (under rain reflections show less, phase 2b)
     if (this.wp.rain > 0) this.reflectCap *= 1 - (1 - LOOK.weather.rain.mirror.terrain) * this.wp.rain;
     this.startStripe();
+  }
+
+  march() {
+    const rays = this.rays, v = this.v;
     const rs = this.direct;
     rs.sig = rays.osig; rs.ord = rays.order; rs.act = null; rs.ey = v.ey; rs.slot = 0;
     for (let p = 0; p < rays.np; p++) {
@@ -243,6 +251,11 @@ export class Marcher {
     // to as seen from the eye) and where, so the cell just above it can fade
     const fringe = this.farRule, sigB = this.rays.sigB;
     let sMax = -Infinity, sD = 0, sL = 0, sBeta = 0;
+    // (phase 3a) rows a building has already met (rays.depth): open until the
+    // march passes it, then closed, so no ground is marched behind a wall
+    const depth = this.rays.depth;
+    let nextLim = Infinity;
+    for (let r = 0; r < n; r++) { const dd = depth[rs.ord[off + r]]; if (dd < nextLim) nextLim = dd; }
     for (let i = 0; this.crossing(i); i++) {
       const d1 = this.cd[i], h1 = this.ch[i], L = this.cl[i], beta = this.cb[i];
       if (fringe) { const st = (h1 - ey) / d1; if (st > sMax) { sMax = st; sD = d1; sL = L; sBeta = beta; } }
@@ -259,6 +272,13 @@ export class Marcher {
       }
       this.ramp(rs, d0, h0, d1, h1, L, beta);
       d0 = d1; h0 = h1;
+      if (d1 > nextLim) {
+        nextLim = Infinity;
+        for (let r = rs.find(0); r < n; r = rs.find(r + 1)) {
+          const dd = depth[rs.ord[off + r]];
+          if (dd < d1) rs.nxt[r] = r + 1; else if (dd < nextLim) nextLim = dd;
+        }
+      }
       const low = rs.find(0);
       if (low >= n) break;
       // (under the far rule, on until nothing ahead can reach even the
@@ -279,6 +299,7 @@ export class Marcher {
       for (let r = rs.find(0); r < n; r = rs.find(r + 1)) {
         const ci = rs.ord[off + r], s = sig[off + r], sb = sigB[ci];
         if (sb >= sMax) break;
+        if (depth[ci] !== Infinity) continue;
         if (s > sMax && this.ground(rs, r, ci, sD, sMax, sL, sBeta, 2)) this.rays.fringe[ci] = (sMax - sb) / (s - sb);
       }
     }
@@ -306,7 +327,10 @@ export class Marcher {
       }
       let D = s - k !== 0 ? (h0 - ey - k * d0) / (s - k) : d1;
       if (!(D >= lo)) D = lo; else if (D > d1) D = d1;
-      this.ground(rs, r, rs.ord[off + r], D, s, L, beta);
+      // (phase 3a: a building already nearer on this row keeps the cell)
+      const ci = rs.ord[off + r];
+      if (act === null && D >= this.rays.depth[ci]) { rs.nxt[r] = r + 1; r = rs.find(r + 1); continue; }
+      this.ground(rs, r, ci, D, s, L, beta);
       rs.nxt[r] = r + 1;
       r = rs.find(r + 1);
     }
@@ -391,8 +415,9 @@ export class Marcher {
         ny = -1;
       }
       if (D >= 0 && act !== null && D < act[r]) D = -1;
+      if (D >= 0 && act === null && D >= this.rays.depth[rs.ord[off + r]]) { rs.nxt[r] = r + 1; r = rs.find(r + 1); continue; }
       if (D >= 0) {
-        this.wall(rs, r, rs.ord[off + r], D, s2, nx, ny, nz, sp.mat[s]);
+        this.wall(rs, r, rs.ord[off + r], D, s2, nx, ny, nz, ny === 1 && sp.mat2 ? sp.mat2[s] : sp.mat[s]);
         rs.nxt[r] = r + 1;
       }
       r = rs.find(r + 1);

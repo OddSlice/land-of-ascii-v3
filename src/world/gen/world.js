@@ -7,10 +7,16 @@
 //     runs, so the main lake's hollow can sit on it; then on the 1 m grid
 //  2. rain, lakes and rivers (water.js), carved into the 1 m grid
 //  3. where forests can grow (plants.js)
-//  4. the sites: fort, villages, the spawn (sites.js); the wall's ground levelled
+//  4. the sites: fort, villages, the spawn (sites.js); the old wall's ground levelled
 //  5. roads from the spawn to the fort and each village (roads.js)
-//  6. trees and bushes; what the ground is made of; the drawing levels
+//  5b. (phase 3a) the fort, from the building kit (fort.js): planned on its
+//     site with its gate toward the road, its ground levelled and banked,
+//     the road's last stretch led straight in through the gate
+//  6. trees and bushes (cleared from the fort); what the ground is made of;
+//     the drawing levels
 //  7. the cameras the tools use, found from the data (cameras.js)
+// (The search for the roads, and everything before it, are as in phase 2b,
+// so the world away from the fort is the same to the byte.)
 import { SCALE } from '../scale.js';
 import { hash2, smoothstep } from '../noise.js';
 import { makeFrame, knolls, shapeLand } from './land.js';
@@ -19,15 +25,18 @@ import { forestField, chooseThreshold, plant, copses, fieldAt } from './plants.j
 import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt, brow } from './sites.js';
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, STEEP } from './roads.js';
 import { materials, detail, gullies, shoreLine, shoreSquares } from './ground.js';
-import { worldCameras } from './cameras.js';
+import { worldCameras, fortCameras } from './cameras.js';
 import { makeLevels, materialCode, weightLevels, farCode } from '../terrain.js';
 import { floorField } from '../objects.js';
-import { buildSpans } from '../spans.js';
+import { emptySpans } from '../spans.js';
+import { planFort, levelFort, levelApproach, routeIntoFort, yardWeight, inPoly, polyDist } from './fort.js';
+import { KitBuilder, compileKit } from '../kit.js';
+import { buildStructure } from '../kit-pieces.js';
 import { buildClouds, worldCloudList } from '../sky.js';
 
 const SEA = SCALE.sea;
 // the weights kept filtered for the coarser levels (see pack.js)
-export const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock'];
+export const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock', 'wYard'];
 
 // The seed the page opens on, chosen for its first view (docs/phase1.md);
 // ?seed= gives any other.
@@ -118,7 +127,8 @@ export function* generateWorld(seed) {
   if (!spawns.length) throw new Error(`seed ${seed}: no spawn`);
   const G0 = roadGrid(N, H, wet.pre, kind, level, wetDist, F, thr);
   const spawn = spawns.find((s) => leaves(G0, s.x, s.z, 200)) || spawns[0];
-  const fortSite = chooseFort(ctx, [spawn]);
+  // (phase 3a: one the spawn can see)
+  const fortSite = chooseFort(ctx, [spawn], globalThis.FORT_SEE_OFF ? null : { x: spawn.x, z: spawn.z, y: H[spawn.z * NN + spawn.x] + SCALE.eye });
   if (!fortSite) throw new Error(`seed ${seed}: no fort site (rejected: ${JSON.stringify(ctx.why)}; lake at ${Math.round(lake.x)}, ${Math.round(lake.z)}, ${lake.area} m2)`);
   // the wall along x, its gate in the middle, the ground levelled round it
   const W = SCALE.wall;
@@ -173,6 +183,73 @@ export function* generateWorld(seed) {
   for (let j = 0; j < cells; j++) surfNow[j] = kind[j] !== KIND.NONE ? level[j] : H[j];
   const roads = paths.map((p, q) => ({ ...roadLine(p.path, G.nn, N, surfNow, (j) => kind[j] === KIND.RIVER), id: q, to: p.to, steep: p.steep }));
   joinRoads(roads);
+  // ---- 5b. the fort (phase 3a) ----------------------------------------------------------
+  // planned with its gate toward where its road reaches its surroundings;
+  // the road's last stretch replaced by one straight in through the gate,
+  // cut in at the nearest point of the old road (clear of the fort's
+  // surroundings) from which the new stretch keeps clear of the walls and
+  // rises or falls no steeper than 8% (the old road beyond it was graded
+  // along its own, longer way); else the platform is moved toward the road.
+  const fortRoad = roads.findIndex((rd) => rd.to === 'fort');
+  const rf = roads[fortRoad];
+  let qa = 0;
+  while (qa < rf.n - 1 && Math.hypot(rf.x[qa] - fortSite.x, rf.z[qa] - fortSite.z) <= 62) qa++;
+  const fortArgs = { H, N, kind, wetDist, site: fortSite, arrive: [rf.x[qa], rf.z[qa]], seed };
+  let plan = planFort(fortArgs);
+  const oldRoads = roads.slice();
+  const GRADE = 0.08;
+  const cutsFor = (pl) => {
+    const out = [];
+    let q = 0;
+    while (q < rf.n - 1 && polyDist(pl.poly, rf.x[q], rf.z[q]) < SCALE.kit.wall.thick / 2 + 12) q++;
+    for (; q < rf.n - 1 && Math.hypot(rf.x[q] - fortSite.x, rf.z[q] - fortSite.z) <= 180; q += 4) {
+      const copy = roads.slice(), r = routeIntoFort(copy, fortRoad, pl, q);
+      if (!r.clear) continue;
+      out.push({ r, copy });
+      if (r.slope <= GRADE) break;
+    }
+    return out;
+  };
+  const cands = cutsFor(plan);
+  let pick = cands.find((c) => c.r.slope <= GRADE) || null;
+  if (!pick && cands.length) {
+    // too steep from every cut: the platform is brought toward the road's
+    // height (by up to 2.5 m, and never lower than a metre over water near
+    // it), from the nearest cut that this makes gentle enough, else from the
+    // one that needs the least (so the old road is kept wherever it can be)
+    const over = (c) => Math.abs(c.r.rise) - GRADE * c.r.run;
+    const c = cands.find((k) => over(k) <= 2.5) || cands.reduce((a, b) => (over(b) < over(a) ? b : a));
+    let wetTop = -Infinity;
+    const R = 60, cx = Math.round(fortSite.x), cz = Math.round(fortSite.z);
+    for (let z = Math.max(0, cz - R); z <= Math.min(N, cz + R); z++) for (let x = Math.max(0, cx - R); x <= Math.min(N, cx + R); x++) {
+      const j = z * NN + x;
+      if (kind[j] !== KIND.NONE) wetTop = Math.max(wetTop, level[j]);
+    }
+    let base = plan.base + Math.sign(c.r.rise) * Math.min(over(c), 2.5);
+    base = Math.round(Math.max(base, wetTop + 1) * 10) / 10;
+    const moved = planFort({ ...fortArgs, base });
+    const copy = roads.slice(), r = routeIntoFort(copy, fortRoad, moved, c.r.q0);
+    if (r.clear) { plan = moved; pick = { r, copy }; }
+  }
+  if (!pick && cands.length) pick = cands.reduce((a, b) => (b.r.slope < a.r.slope ? b : a));
+  if (!pick) { const copy = roads.slice(); pick = { r: routeIntoFort(copy, fortRoad, plan, qa), copy }; }
+  const route = pick.r;
+  roads.splice(0, roads.length, ...pick.copy);
+  const reach = Math.round(Math.hypot(rf.x[route.q0] - fortSite.x, rf.z[route.q0] - fortSite.z));
+  // (what the fort replaced, for the tools: phase 2b's road ends, every 2 m)
+  const replaced = [];
+  oldRoads.forEach((rd, o) => {
+    if (roads[o] === rd) return;
+    const keep = roads[o];
+    for (let q = 0; q < rd.n; q += 2) {
+      const x = rd.x[q], z = rd.z[q];
+      let on = false;
+      for (let p = 0; p < keep.n && !on; p += 3) if (Math.abs(keep.x[p] - x) < 1 && Math.abs(keep.z[p] - z) < 1) on = true;
+      if (!on) replaced.push([Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
+    }
+  });
+  levelFort(H, N, kind, plan);
+  levelApproach(H, N, kind, roads[fortRoad], route.m);
   lap('roads');
   yield { stage: STAGES[6], p: 0.66 };
   const roadDist = layRoads(N, H, kind, level, roads);
@@ -188,7 +265,12 @@ export function* generateWorld(seed) {
     for (const v of villages) if (Math.hypot(v.x - x, v.z - z) < 60) return true;
     return false;
   };
-  const { trees, bushes } = plant(terrain, F, thr, seed, clear, wetDist, kind, clumps);
+  let { trees, bushes } = plant(terrain, F, thr, seed, clear, wetDist, kind, clumps);
+  // (none in the fort or the margin round it; taken out after planting, so
+  // every other tree and bush is as it was)
+  const cleared = plan.cleared;
+  trees = trees.filter((t) => !inPoly(cleared, t.x, t.z));
+  bushes = bushes.filter((b) => !inPoly(cleared, b.x, b.z));
   lap('plants');
   yield { stage: STAGES[7], p: 0.74 };
 
@@ -205,6 +287,8 @@ export function* generateWorld(seed) {
     if (surface[j] > maxH) maxH = surface[j];
   }
   Object.assign(terrain, { wWater, wRoad, wSand, wRock, wSnow, tone: det.tone, fine: det.fine, toneK: det.toneK, maxH });
+  // the courtyard's packed earth (phase 3a)
+  terrain.wYard = yardWeight(N, plan);
   terrain.wFloor = floorField(terrain, trees);
   terrain.code = materialCode(terrain);
   // (filtered copies for the coarser levels: thin water, roads and sand fade
@@ -219,20 +303,33 @@ export function* generateWorld(seed) {
   lap('ground');
   yield { stage: STAGES[8], p: 0.9 };
   terrain.levels = makeLevels(surface, N, false);
-  const spans = buildSpans(N, { ...wall, base: wallGround - 2, top: wallGround + W.height, merlon: 1.5, merlonW: 2, merlonGap: 2 },
-    { x0: gateX - W.gate / 2, x1: gateX + W.gate / 2, cx: gateX, r: W.gate / 2, jamb: 2.8, ground: wallGround });
-  const viewpoints = chooseViewpoints(ctx, [fort, ...villages]);
+  // (phase 3a) no spans: the fort is the kit's shapes
+  const spans = emptySpans();
+  const kb = new KitBuilder();
+  buildStructure(kb, plan.desc);
+  const kit = compileKit(kb);
+  // the fort as the sites record it (the tools walk it)
+  const fortSiteOld = fort;
+  const fortRec = {
+    x: fortSite.x, z: fortSite.z, score: fortSite.score, prom: fortSite.prom, dl: fortSite.dl,
+    gate: { x: plan.gate.x, z: plan.gate.z, out: plan.gate.out }, front: plan.front, inner: plan.inner, ground: plan.ground, base: plan.base,
+    poly: plan.poly, yard: plan.yard, towers: plan.towers, keep: plan.keep, stairs: plan.stairs, houses: plan.houses, well: plan.well, edges: plan.edges,
+    reach, cut: route.q0, replaced,
+  };
+  const viewpoints = chooseViewpoints(ctx, [fortSiteOld, ...villages]);
   // each viewpoint stands at the brow of its hill, looking its way (phase 2a)
   for (const v of viewpoints) { const b = brow(ground, N, kind, v.x, v.z, v.yaw); v.x = b.x; v.z = b.z; v.h = b.h; }
   const world = {
     kind: 'world', seed, N, NN, center: [N / 2, N / 2], viewDist: SCALE.viewDist, openEdge: true, sea: SEA,
-    terrain, spans, objects: { trees, bushes, torches: [], water: SEA },
+    terrain, spans, kit, fortDesc: plan.desc, objects: { trees, bushes, torches: kit.torches.map((t) => ({ ...t })), water: SEA },
     clouds: buildClouds(0, worldCloudList(seed, N)),
-    sites: { fort, villages, viewpoints, spawn, lake: { x: lake.x, z: lake.z, level: lake.level, area: lake.area } },
+    sites: { fort: fortRec, villages, viewpoints, spawn, lake: { x: lake.x, z: lake.z, level: lake.level, area: lake.area } },
     roads, lakes: lk.lakes, rivers: wet.rivers, shapes: { hills, basins, rises },
     kindMap: kind, levelMap: level,
   };
   world.cameras = worldCameras(world, { F, thr, seaDist, freshDist, shore });
+  // (phase 3a) and the fort's four
+  world.cameras.push(...fortCameras(world));
   // the first view faces the lake; where the road from the spawn leaves
   // within 70 degrees of that, it aims between the two, so the road leads
   // into the picture

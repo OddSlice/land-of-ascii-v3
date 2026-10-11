@@ -11,7 +11,7 @@ export const LEVELS = 4;           // level L has nodes every 2^L metres
 // make (the choice comes out the same either way).
 export function materialCode(T) {
   const { N, NN } = T;
-  const others = [T.wWater, T.wRoad, T.wSand, T.wSnow, T.wRock].filter(Boolean);
+  const others = [T.wWater, T.wRoad, T.wSand, T.wSnow, T.wRock, T.wYard].filter(Boolean);
   const code = new Uint8Array(N * N);
   for (let k = 0; k < N; k++) {
     for (let i = 0; i < N; i++) {

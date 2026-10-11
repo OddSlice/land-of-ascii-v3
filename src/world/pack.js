@@ -6,12 +6,14 @@
 // world object the renderer and the page use: views onto the same memory,
 // nothing copied.
 import { TIER } from './objects.js';
-import { buildSpans } from './spans.js';
+import { emptySpans } from './spans.js';
+import { KitBuilder, compileKit } from './kit.js';
+import { buildStructure } from './kit-pieces.js';
 import { buildClouds, worldCloudList } from './sky.js';
 import { LEVELS } from './terrain.js';
 
 // the weights kept filtered for the coarser levels (as gen/world.js makes them)
-const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock'];
+const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock', 'wYard'];
 
 const TREE_F = 15;        // numbers per tree in the tree table
 const BUSH_F = 6;
@@ -33,7 +35,7 @@ export function packWorld(world, Shared = null) {
   if (T.farCode) put('farCode', T.farCode);
   if (T.shoreSq) put('shoreSq', T.shoreSq);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
-  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code']) put(k, T[k]);
+  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard']) put(k, T[k]);
   for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
   // trees: a table of numbers, and their tiers (both treatments) in one pool
   const trees = world.objects.trees;
@@ -51,12 +53,11 @@ export function packWorld(world, Shared = null) {
   const bushes = world.objects.bushes, btab = new Float64Array(bushes.length * BUSH_F);
   bushes.forEach((b, q) => btab.set([b.x, b.z, b.base, b.rx, b.ry, b.seed], q * BUSH_F));
   put('bushes', btab);
-  const sp = world.spans;
   const meta = {
     kind: 'world', seed: world.seed, N: world.N, NN: world.NN, viewDist: world.viewDist, sea: world.sea, center: world.center,
     toneK: T.toneK, maxH: T.maxH, pool,
-    wall: { x0: sp.box.x0, x1: sp.box.x1, z0: sp.box.z0, z1: sp.box.z1, base: sp.y0[0], top: sp.y1[0] },
-    gate: { ...sp.gate },
+    // (phase 3a) the fort, as the kit's description: every thread compiles it again
+    fortDesc: world.fortDesc,
     sites: world.sites, cameras: world.cameras, start: world.start,
     roads: world.roads.map((r) => ({ id: r.id, to: r.to, n: r.n, x: Array.from(r.x), z: Array.from(r.z), y: Array.from(r.y) })),
     rivers: world.rivers.map((r) => ({ n: r.n, x: Array.from(r.x), z: Array.from(r.z), level: Array.from(r.level), hw: Array.from(r.hw), lake: Array.from(r.lake) })),
@@ -83,7 +84,7 @@ export function unpackWorld(packed) {
   for (let L = 0, n = N; L < LEVELS; L++, n >>= 1) levels.push({ n, size: 1 << L, H: a[`level${L}`], nx: null, nz: null });
   const terrain = {
     N, NN, ground: a.ground, levels, wWater: a.wWater, wRoad: a.wRoad, wSand: a.wSand, wRock: a.wRock, wSnow: a.wSnow,
-    wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH,
+    wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH, wYard: a.wYard,
     form: a.form || null, shore: a.shore || null, farCode: a.farCode || null, shoreSq: a.shoreSq || null,
   };
   for (const k of FILTERED) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
@@ -101,11 +102,14 @@ export function unpackWorld(packed) {
     const o = q * BUSH_F;
     bushes.push({ x: bt[o], z: bt[o + 1], base: bt[o + 2], rx: bt[o + 3], ry: bt[o + 4], seed: bt[o + 5] });
   }
-  const spans = buildSpans(N, { ...m.wall, merlon: 1.5, merlonW: 2, merlonGap: 2 }, m.gate);
+  const spans = emptySpans();
+  const kb = new KitBuilder();
+  buildStructure(kb, m.fortDesc);
+  const kit = compileKit(kb);
   const f32 = (r, keys) => { const o = { ...r }; for (const k of keys) o[k] = Float32Array.from(r[k]); return o; };
   return {
     kind: 'world', seed: m.seed, N, NN, center: m.center, viewDist: m.viewDist, openEdge: true, sea: m.sea,
-    terrain, spans, objects: { trees, bushes, torches: [], water: m.sea },
+    terrain, spans, kit, fortDesc: m.fortDesc, objects: { trees, bushes, torches: kit.torches.map((t) => ({ ...t })), water: m.sea },
     clouds: buildClouds(0, worldCloudList(m.seed, N)),
     sites: m.sites, cameras: m.cameras, start: m.start,
     roads: m.roads.map((r) => f32(r, ['x', 'z', 'y'])),

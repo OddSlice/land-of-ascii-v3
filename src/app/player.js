@@ -20,8 +20,12 @@ import { EYE } from '../world/layout.js';
 import { groundAt } from '../world/objects.js';
 import { archY, spanAt, SPAN_ARCH, SPAN_MERLON } from '../world/spans.js';
 import { SCALE } from '../world/scale.js';
+import { supportAt as kitSupport, bodyBlocked } from '../world/kit.js';
 
 const WALK = 4.5, RUN = 8, RADIUS = 0.3, STEP = 0.6, HEAD = 1.8, GRAVITY = 18;
+// (phase 3a) points round the body's edge: on a building's edge you stand
+// on whatever any part of you is over, and step off only once clear of it
+const RING8 = Array.from({ length: 8 }, (_, k) => [Math.cos(k * Math.PI / 4) * (RADIUS - 0.02), Math.sin(k * Math.PI / 4) * (RADIUS - 0.02)]);
 
 export class Player {
   constructor(world, { rules = 'lab' } = {}) {
@@ -39,6 +43,8 @@ export class Player {
       this.tb.cells[gz * n + gx].push(t);
     }
     this.surface = { ground: world.terrain.levels[0].H, N: world.terrain.N, NN: world.terrain.NN };
+    // (phase 3a) the building kit's shapes: walked on and blocking exactly as drawn
+    this.kit = world.kit && world.kit.np ? world.kit : null;
   }
 
   get eye() { return this.feet + EYE; }
@@ -56,17 +62,32 @@ export class Player {
   }
 
   // The highest thing to stand on at (x, z) that is not above the feet by
-  // more than a step: the ground, or the top of a span.
-  supportAt(x, z, feet) {
+  // more than a step (or `reach`): the ground, or the top of a span or a
+  // building's shape (`ring`: under any part of the body, not only its
+  // middle).
+  supportAt(x, z, feet, ring = false, reach = STEP) {
     let y = groundAt(this.world.terrain, x, z);
     const sp = this.world.spans, N = this.world.N;
     const ix = Math.floor(x), iz = Math.floor(z);
     if (ix >= 0 && iz >= 0 && ix < N && iz < N) {
       const s = spanAt(sp, ix, iz);
       const top = s >= 0 ? sp.y1[s] + (sp.flags[s] & SPAN_MERLON ? sp.merlon : 0) : 0;
-      if (s >= 0 && top <= feet + STEP) y = Math.max(y, top);
+      if (s >= 0 && top <= feet + reach) y = Math.max(y, top);
+    }
+    if (this.kit) {
+      let k = kitSupport(this.kit, x, z, feet + reach);
+      if (ring) for (const [cx, cz] of RING8) { const kk = kitSupport(this.kit, x + cx, z + cz, feet + reach); if (kk > k) k = kk; }
+      if (k > y) y = k;
     }
     return y;
+  }
+
+  // What the feet rest on where they stand (under any part of the body),
+  // unless rising onto it would put the head into something: then what is
+  // under the body no higher than the feet are.
+  standOn(x, z, feet) {
+    const g = this.supportAt(x, z, feet, true);
+    return g > feet + 1e-3 && this.blocked(x, z, g) ? this.supportAt(x, z, feet, true, 1e-3) : g;
   }
 
   // Where the feet rest at (x, z): on the ground, or swimming in deep water.
@@ -96,6 +117,7 @@ export class Player {
         if (y0 < hi && top > lo) return true;
       }
     }
+    if (this.kit && bodyBlocked(this.kit, x, z, lo, hi, RADIUS)) return true;
     const { B, n, cells } = this.tb;
     const gx = Math.floor(x / B), gz = Math.floor(z / B);
     for (let a = gz - 1; a <= gz + 1; a++) {
@@ -134,7 +156,7 @@ export class Player {
       for (let i = 0; i < steps; i++) this.tryMove(mx / steps, mz / steps);
     }
     // gravity and stepping
-    const ground = this.supportAt(this.x, this.z, this.feet);
+    const ground = this.standOn(this.x, this.z, this.feet);
     if (this.feet > ground + 1e-3) {
       this.vy -= GRAVITY * dt;
       this.feet += this.vy * dt;
@@ -217,7 +239,7 @@ export class Player {
     }
     // standing, sliding, falling or floating
     const d2 = this.depthAt(this.x, this.z), wl = groundAt(this.surface, this.x, this.z);
-    const ground = this.supportAt(this.x, this.z, this.feet);
+    const ground = this.standOn(this.x, this.z, this.feet);
     // past chest depth you float, the eye just above the surface (where the
     // bottom is not yet that deep, the feet stay on it)
     const rest = d2 > SCALE.chest ? Math.max(ground, wl + SCALE.swimEye - EYE) : ground;
@@ -233,7 +255,7 @@ export class Player {
     this.feet = ground; this.vy = 0;
     // too steep to stand on: slide down it
     const sl = this.slopeAt(this.x, this.z);
-    if (sl.s > SCALE.slide && ground >= groundAt(this.world.terrain, this.x, this.z) - 1e-3) {
+    if (sl.s > SCALE.slide && Math.abs(ground - groundAt(this.world.terrain, this.x, this.z)) < 1e-3) {
       const dl = Math.hypot(sl.dx, sl.dz) || 1, step = SCALE.slideSpeed * dt;
       const nx = this.x + sl.dx / dl * step, nz = this.z + sl.dz / dl * step;
       if (!this.blocked(nx, nz, this.feet - 1)) { this.x = nx; this.z = nz; this.feet = this.supportAt(nx, nz, this.feet); }
@@ -260,10 +282,18 @@ export class Player {
       // ground steeper than 45 degrees cannot be walked up (a span's step can)
       const onGround = g <= groundAt(this.world.terrain, nx, nz) + 1e-3;
       if (onGround ? rise > SCALE.climb * run + 1e-3 : rise > STEP) continue;
-      if (this.blocked(nx, nz, Math.max(g, this.feet))) continue;
-      this.x = nx; this.z = nz;
+      // (and where it would come down, if it steps off something: phase 3a)
+      if (this.blocked(nx, nz, Math.max(g, this.feet)) || (g < this.feet - 0.05 && this.blocked(nx, nz, g))) continue;
       // follow the ground down; a drop steeper than this is a fall instead
       const follow = rise > 0 || -rise < Math.max(0.15, 2 * run);
+      // (nor onto the edge of something a step up that the head has no room
+      // to rise onto, with nothing under the body at its own height: it
+      // would fall with that thing inside it)
+      if (this.kit) {
+        const fa = follow ? g : this.feet, gr = this.supportAt(nx, nz, fa, true);
+        if (gr > fa + 1e-3 && this.blocked(nx, nz, gr) && this.supportAt(nx, nz, fa, true, 1e-3) < fa - 0.05) continue;
+      }
+      this.x = nx; this.z = nz;
       if (follow) this.feet = g;
       return Math.hypot(run, follow ? rise : 0) / al;
     }

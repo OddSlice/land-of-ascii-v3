@@ -1,0 +1,416 @@
+// The building kit (phase 3a): structures as exact shapes.
+//
+// A structure is described as data, a list of pieces (src/world/kit-pieces.js
+// turns each into shapes); compileKit() turns the shapes of every structure in
+// a world into flat tables that the renderer (src/scene/cpu/build.js), the
+// shadows, the walking and the tools all read. The same description always
+// compiles to the same tables, in any thread.
+//
+// The shapes, each turned about the vertical by its own angle, so a building
+// can stand at any angle and is never locked to the grid:
+// - BOX: an upright box (a wall, a tower, a floor, a step);
+// - CYL: an upright cylinder (a round tower, a well);
+// - PRISM: a gable roof, its ridge along the box's length;
+// - STAIR: a flight of steps rising along the box's length, solid beneath;
+// - PANE: a window's light, emissive, held at two rows like a flame.
+// A shape can have openings cut out of it (holes): an upright box (a
+// doorway, a room inside a tower), an upright cylinder (a round tower's
+// inside) or an arch (a box with a half-round top: the gate's passage). A
+// shape's top can be crenellated: a band along its top, cut into merlons and
+// gaps along its length (or round it, for a cylinder).
+//
+// Local frame of a shape or hole turned by angle a: its u axis runs along
+// (cos a, sin a) in world (x, z), its w axis along (-sin a, cos a); u is the
+// length, w the depth.
+
+// shape types
+export const PT = { BOX: 1, CYL: 2, PRISM: 3, STAIR: 4, PANE: 5 };
+// hole types
+export const HT = { BOX: 1, CYL: 2, ARCH: 3 };
+// shape flags
+export const PF = {
+  CRENEL: 1,            // the top band is crenellated
+  GROW: 2,              // held at least two cells across far away (thin parts)
+  INSIDE: 4,            // every surface of it is inside its room (a floor, a stair in a tower)
+  WALK: 8,              // its top can be walked on (for the tools)
+};
+// what a surface's texture is
+export const TX = { PLAIN: 0, MASONRY: 1, FRAME: 2, SHINGLE: 3, BOARDS: 4, FLAGS: 5 };
+
+// shape table: P_STRIDE numbers per shape
+export const P_STRIDE = 28;
+export const P = {
+  TYPE: 0, CX: 1, CZ: 2, CA: 3, SA: 4, HX: 5, HZ: 6, Y0: 7, Y1: 8,
+  MAT: 9, FLAGS: 10,
+  MH: 11,               // crenel band height
+  PER: 12,              // crenel period (metres along u; for a cylinder, merlons round it)
+  MW: 13,               // the share of a period a merlon takes
+  PH: 14,               // crenel phase (metres, or turns for a cylinder)
+  RISE: 15, RUN: 16,    // a stair's step (counted up from BASE; its solid reaches down to Y0)
+  H0: 17, HN: 18,       // its holes: first index and count
+  ROOM: 19,             // the room its surfaces are inside (-1: outside)
+  SEED: 20, TEX: 21,
+  BASE: 22,             // the height masonry courses count from
+  MAT2: 23, TEX2: 24,   // a roof's gable ends; a wall's top
+  ZONE: 25,             // which side its outer surfaces face (see zoneBits)
+  POWER: 26,            // a pane's brightness
+};
+// hole table
+export const H_STRIDE = 14;
+export const H = {
+  TYPE: 0, CX: 1, CZ: 2, CA: 3, SA: 4, HX: 5, HZ: 6, Y0: 7, Y1: 8,
+  R: 9,                 // an arch's radius (its top is a half circle of it)
+  ROOM: 10,             // the room its surfaces are inside (-1: outside)
+  CLOSE: 11,            // 1: closes when narrower than about two cells
+  DEPTH: 12,            // an opening's reveal: the depth of the wall it goes through (0: a room, not an opening)
+};
+
+// Light zones: which torches light a surface. Bit 0 outside, bit 1 a yard,
+// bit 2 + r room r. A torch lights only surfaces sharing a bit with its mask.
+export const ZONE_OUT = 1, ZONE_YARD = 2;
+export const roomBit = (r) => (r >= 0 && r < 29 ? 1 << (2 + r) : 0);
+export const ZONE_ALL = 0x7fffffff;
+
+// ---- building up a kit -------------------------------------------------------
+
+export class KitBuilder {
+  constructor() {
+    this.prims = [];
+    this.holes = [];
+    this.rooms = [];
+    this.torches = [];
+    this.yards = [];       // polygons [[x, z], ...] that are yards (for light zones)
+    this.cleared = [];     // polygons trees must keep out of
+  }
+
+  // A shape. `o`: { type, x, z, a (radians), hx, hz, y0, y1, mat, flags, ...,
+  // holes: [{ type, x, z, a, hx, hz, y0, y1, r, room, close }] } (hole
+  // positions in world space).
+  add(o) {
+    const h0 = this.holes.length;
+    for (const h of o.holes || []) this.holes.push(h);
+    const id = this.prims.length;
+    this.prims.push({ ...o, h0, hn: this.holes.length - h0, id });
+    return id;
+  }
+
+  // A room: `open` rooms (a passage) also take the light of torches outside.
+  // Openings: [{ x, y, z, nx, ny, nz, area }], each facing into the room.
+  room(openings, open = false) {
+    this.rooms.push({ openings, open });
+    return this.rooms.length - 1;
+  }
+
+  // A torch: on a post (`mount: 'post'`) or on a bracket from a wall (`nx`,
+  // `nz`: the wall's outward normal), its flame at height `y`; `mask`: which
+  // zones it lights.
+  torch(t) { this.torches.push(t); }
+}
+
+// ---- compiling ---------------------------------------------------------------
+
+const GRID = 4;           // metres per square of the walking and lookup index
+
+export function compileKit(b) {
+  const np = b.prims.length, nh = b.holes.length;
+  const prims = new Float64Array(np * P_STRIDE);
+  const holes = new Float64Array(nh * H_STRIDE);
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, top = -Infinity;
+  b.prims.forEach((o, i) => {
+    const q = i * P_STRIDE, a = o.a || 0;
+    prims[q + P.TYPE] = o.type; prims[q + P.CX] = o.x; prims[q + P.CZ] = o.z;
+    prims[q + P.CA] = Math.cos(a); prims[q + P.SA] = Math.sin(a);
+    prims[q + P.HX] = o.hx; prims[q + P.HZ] = o.type === PT.CYL ? o.hx : o.hz;
+    prims[q + P.Y0] = o.y0; prims[q + P.Y1] = o.y1;
+    prims[q + P.MAT] = o.mat; prims[q + P.FLAGS] = o.flags || 0;
+    prims[q + P.MH] = o.mh || 0; prims[q + P.PER] = o.per || 0; prims[q + P.MW] = o.mw || 0; prims[q + P.PH] = o.ph || 0;
+    prims[q + P.RISE] = o.rise || 0; prims[q + P.RUN] = o.run || 0;
+    prims[q + P.H0] = o.h0; prims[q + P.HN] = o.hn;
+    prims[q + P.ROOM] = o.room !== undefined ? o.room : -1;
+    prims[q + P.SEED] = o.seed || i; prims[q + P.TEX] = o.tex || 0;
+    prims[q + P.BASE] = o.base !== undefined ? o.base : o.y0;
+    prims[q + P.MAT2] = o.mat2 !== undefined ? o.mat2 : o.mat; prims[q + P.TEX2] = o.tex2 !== undefined ? o.tex2 : (o.tex || 0);
+    prims[q + P.ZONE] = o.zone !== undefined ? o.zone : -1;
+    prims[q + P.POWER] = o.power || 0;
+    const R = reachOf(prims, q);
+    x0 = Math.min(x0, o.x - R); x1 = Math.max(x1, o.x + R); z0 = Math.min(z0, o.z - R); z1 = Math.max(z1, o.z + R);
+    top = Math.max(top, o.y1);
+  });
+  b.holes.forEach((h, i) => {
+    const q = i * H_STRIDE, a = h.a || 0;
+    holes[q + H.TYPE] = h.type; holes[q + H.CX] = h.x; holes[q + H.CZ] = h.z;
+    holes[q + H.CA] = Math.cos(a); holes[q + H.SA] = Math.sin(a);
+    holes[q + H.HX] = h.hx; holes[q + H.HZ] = h.type === HT.CYL ? h.hx : h.hz;
+    holes[q + H.Y0] = h.y0; holes[q + H.Y1] = h.y1;
+    holes[q + H.R] = h.type === HT.ARCH ? h.hx : 0;
+    holes[q + H.ROOM] = h.room !== undefined ? h.room : -1;
+    holes[q + H.CLOSE] = h.close ? 1 : 0;
+    holes[q + H.DEPTH] = h.depth || 0;
+  });
+  const kit = {
+    prims, holes, np, nh,
+    rooms: b.rooms.map((r) => ({ open: r.open, ops: Float64Array.from(r.openings.flatMap((o) => [o.x, o.y, o.z, o.nx, o.ny, o.nz, o.area])) })),
+    torches: b.torches.map((t) => ({ ...t })),
+    yards: b.yards.map((p) => p.map((v) => [v[0], v[1]])),
+    cleared: b.cleared.map((p) => p.map((v) => [v[0], v[1]])),
+    box: np ? { x0, x1, z0, z1, top } : { x0: 0, x1: 0, z0: 0, z1: 0, top: -Infinity },
+  };
+  indexKit(kit);
+  return kit;
+}
+
+// The description, as plain data, for a world's packed form; the kit is
+// compiled again from it in each thread.
+export function kitData(b) {
+  return { prims: b.prims, holes: b.holes, rooms: b.rooms, torches: b.torches, yards: b.yards, cleared: b.cleared };
+}
+export function kitFromData(d) {
+  const b = new KitBuilder();
+  b.prims = d.prims; b.holes = d.holes; b.rooms = d.rooms; b.torches = d.torches; b.yards = d.yards; b.cleared = d.cleared || [];
+  return compileKit(b);
+}
+
+// How far a shape reaches from its centre, horizontally.
+export function reachOf(prims, q) {
+  const t = prims[q + P.TYPE], hx = prims[q + P.HX], hz = prims[q + P.HZ];
+  return t === PT.CYL ? hx : Math.sqrt(hx * hx + hz * hz);
+}
+
+// A lookup of the shapes over GRID-metre squares, for walking and the tools.
+function indexKit(kit) {
+  const { box } = kit;
+  if (!kit.np) { kit.grid = null; return; }
+  const gx0 = Math.floor((box.x0 - 1) / GRID), gz0 = Math.floor((box.z0 - 1) / GRID);
+  const gw = Math.floor((box.x1 + 1) / GRID) - gx0 + 1, gh = Math.floor((box.z1 + 1) / GRID) - gz0 + 1;
+  const cells = Array.from({ length: gw * gh }, () => []);
+  for (let i = 0; i < kit.np; i++) {
+    const q = i * P_STRIDE, R = reachOf(kit.prims, q) + 0.5, x = kit.prims[q + P.CX], z = kit.prims[q + P.CZ];
+    for (let gz = Math.floor((z - R) / GRID); gz <= Math.floor((z + R) / GRID); gz++) {
+      for (let gx = Math.floor((x - R) / GRID); gx <= Math.floor((x + R) / GRID); gx++) cells[(gz - gz0) * gw + gx - gx0].push(i);
+    }
+  }
+  kit.grid = { gx0, gz0, gw, gh, cells: cells.map((c) => Int32Array.from(c)) };
+}
+
+// The shapes whose footprint can reach (x, z) (within `pad` metres).
+function near(kit, x, z, out, pad = 0) {
+  out.length = 0;
+  const g = kit.grid;
+  if (!g) return out;
+  const b = kit.box;
+  if (x < b.x0 - pad || x > b.x1 + pad || z < b.z0 - pad || z > b.z1 + pad) return out;
+  for (let gz = Math.floor((z - pad) / GRID); gz <= Math.floor((z + pad) / GRID); gz++) {
+    for (let gx = Math.floor((x - pad) / GRID); gx <= Math.floor((x + pad) / GRID); gx++) {
+      const cx = gx - g.gx0, cz = gz - g.gz0;
+      if (cx < 0 || cz < 0 || cx >= g.gw || cz >= g.gh) continue;
+      for (const i of g.cells[cz * g.gw + cx]) if (!out.includes(i)) out.push(i);
+    }
+  }
+  return out;
+}
+
+// ---- point tests ----------------------------------------------------------------
+
+// The top of shape q at local (u, w) (its crenels as they really are), or
+// -Infinity if (u, w) is outside its footprint.
+function topAt(kit, q, u, w) {
+  const S = kit.prims, t = S[q + P.TYPE], hx = S[q + P.HX], hz = S[q + P.HZ];
+  if (t === PT.CYL) { if (u * u + w * w > hx * hx) return -Infinity; }
+  else if (u < -hx || u > hx || w < -hz || w > hz) return -Infinity;
+  const y1 = S[q + P.Y1];
+  if (t === PT.PRISM) return y1 - (y1 - S[q + P.Y0]) * Math.abs(w) / hz;
+  if (t === PT.STAIR) {
+    // (steps count up from the stair's base, its solid going down to y0)
+    const k = Math.max(0, Math.min(Math.floor((u + hx) / S[q + P.RUN]), Math.round(2 * hx / S[q + P.RUN]) - 1));
+    return S[q + P.BASE] + (k + 1) * S[q + P.RISE];
+  }
+  if (S[q + P.FLAGS] & PF.CRENEL) return inMerlon(S, q, u, w) ? y1 : y1 - S[q + P.MH];
+  return y1;
+}
+
+export function inMerlon(S, q, u, w) {
+  const per = S[q + P.PER], mw = S[q + P.MW], ph = S[q + P.PH];
+  let f;
+  if (S[q + P.TYPE] === PT.CYL) f = (Math.atan2(w, u) / (2 * Math.PI) + 0.5) * per + ph;
+  else f = (u + ph) / per;
+  f -= Math.floor(f);
+  return f < mw;
+}
+
+// Is world point (x, y, z) inside the hole h's opening?
+function inHole(kit, h, x, y, z) {
+  const Hs = kit.holes, o = h * H_STRIDE, t = Hs[o + H.TYPE];
+  const dx = x - Hs[o + H.CX], dz = z - Hs[o + H.CZ], ca = Hs[o + H.CA], sa = Hs[o + H.SA];
+  const u = dx * ca + dz * sa, w = -dx * sa + dz * ca, hx = Hs[o + H.HX], hz = Hs[o + H.HZ];
+  if (y < Hs[o + H.Y0] || y > Hs[o + H.Y1]) return false;
+  if (t === HT.CYL) return u * u + w * w < hx * hx;
+  if (u <= -hx || u >= hx || w <= -hz || w >= hz) return false;
+  if (t === HT.ARCH) {
+    const r = Hs[o + H.R], ys = Hs[o + H.Y1] - r;
+    if (y > ys) return u * u + (y - ys) * (y - ys) < r * r;
+  }
+  return true;
+}
+
+// Is world point (x, y, z) inside the solid of shape i (not in its openings)?
+export function inPrim(kit, i, x, y, z) {
+  const S = kit.prims, q = i * P_STRIDE, t = S[q + P.TYPE];
+  if (t === PT.PANE) return false;
+  if (y < S[q + P.Y0]) return false;
+  const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
+  const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
+  if (y > topAt(kit, q, u, w)) return false;
+  for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) if (inHole(kit, h, x, y, z)) return false;
+  return true;
+}
+
+const NEAR_TMP = [];
+
+// Is world point (x, y, z) inside any shape's solid?
+export function solidAt(kit, x, y, z) {
+  const list = near(kit, x, z, NEAR_TMP);
+  for (const i of list) if (inPrim(kit, i, x, y, z)) return true;
+  return false;
+}
+
+// The highest surface at (x, z) that one could stand on, no higher than
+// `maxY` (-Infinity if none): a shape's top, a step, a crenel's floor, the
+// sill of an opening.
+export function supportAt(kit, x, z, maxY) {
+  const list = near(kit, x, z, NEAR_TMP).slice();
+  let best = -Infinity;
+  const S = kit.prims, Hs = kit.holes;
+  const tryY = (y) => {
+    if (y > maxY || y <= best) return;
+    if (!solidAtList(kit, list, x, y - 0.02, z) || solidAtList(kit, list, x, y + 0.02, z)) return;
+    best = y;
+  };
+  for (const i of list) {
+    const q = i * P_STRIDE, t = S[q + P.TYPE];
+    if (t === PT.PANE) continue;
+    const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
+    const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
+    const top = topAt(kit, q, u, w);
+    if (top === -Infinity) continue;
+    tryY(top);
+    for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
+      const o = h * H_STRIDE;
+      tryY(Hs[o + H.Y0]);
+    }
+  }
+  return best;
+}
+
+function solidAtList(kit, list, x, y, z) {
+  for (const i of list) if (inPrim(kit, i, x, y, z)) return true;
+  return false;
+}
+
+// Would an upright body of radius r round (x, z), from height lo to hi,
+// overlap any shape's solid? Tested at 24 points round its edge and its
+// middle (a corner of stone, a doorway's jamb, can come no more than 4 cm
+// in between them; between 12 it could by 8), at lo, hi and every height
+// between where a shape or opening starts or ends, so a slab or a lintel
+// cannot slip between the samples.
+const RING = Array.from({ length: 24 }, (_, k) => [Math.cos(k * Math.PI / 12), Math.sin(k * Math.PI / 12)]);
+export function bodyBlocked(kit, x, z, lo, hi, r) {
+  const list = near(kit, x, z, NEAR_TMP, r + 0.1).slice();
+  if (!list.length) return false;
+  const S = kit.prims, Hs = kit.holes;
+  const ys = [lo, hi, (lo + hi) / 2];
+  const addY = (y) => { if (y > lo && y < hi) ys.push(y); };
+  for (const i of list) {
+    const q = i * P_STRIDE;
+    for (const y of [S[q + P.Y0], S[q + P.Y1], S[q + P.Y1] - S[q + P.MH]]) { addY(y + 0.01); addY(y - 0.01); }
+    if (S[q + P.TYPE] === PT.STAIR) {
+      const n = Math.round(2 * S[q + P.HX] / S[q + P.RUN]);
+      for (let k = 1; k <= n; k++) addY(S[q + P.BASE] + k * S[q + P.RISE] - 0.01);
+    }
+    for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
+      const o = h * H_STRIDE;
+      for (const y of [Hs[o + H.Y0], Hs[o + H.Y1], Hs[o + H.Y1] - Hs[o + H.R]]) { addY(y + 0.01); addY(y - 0.01); }
+    }
+  }
+  for (const y of ys) {
+    if (solidAtList(kit, list, x, y, z)) return true;
+    for (const [cx, cz] of RING) if (solidAtList(kit, list, x + cx * r, y, z + cz * r)) return true;
+  }
+  return false;
+}
+
+// ---- light zones and interior light ----------------------------------------------
+
+function inPoly(poly, x, z) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// The zone bits of an outside surface at (x, z): in a yard or outside.
+export function zoneAt(kit, x, z) {
+  if (!kit || !kit.yards.length) return ZONE_ALL;
+  const b = kit.box;
+  if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) return ZONE_OUT;
+  for (const p of kit.yards) if (inPoly(p, x, z)) return ZONE_YARD;
+  return ZONE_OUT;
+}
+
+export function inYard(kit, x, z) { for (const p of kit.yards) if (inPoly(p, x, z)) return true; return false; }
+export function inCleared(kit, x, z) { for (const p of kit.cleared) if (inPoly(p, x, z)) return true; return false; }
+
+// How much of the sky's soft light reaches a point inside room r: through
+// each opening, by its area over the square of the distance, as far as the
+// point faces it and lies before it (0..1).
+export function shelterOf(kit, r, x, y, z, nx, ny, nz) {
+  const R = kit.rooms[r];
+  if (!R) return 1;
+  const ops = R.ops;
+  let sum = 0;
+  for (let k = 0; k < ops.length; k += 7) {
+    const lx = ops[k] - x, ly = ops[k + 1] - y, lz = ops[k + 2] - z;
+    const d2 = lx * lx + ly * ly + lz * lz + 0.25, d = Math.sqrt(d2);
+    // the point must lie on the room's side of the opening
+    const before = -(lx * ops[k + 3] + ly * ops[k + 4] + lz * ops[k + 5]) / d;
+    if (before <= 0) continue;
+    const facing = (lx * nx + ly * ny + lz * nz) / d;
+    const f = 0.35 + 0.65 * (facing > 0 ? facing : 0);
+    sum += ops[k + 6] * before * f / (d2 * 0.9 + ops[k + 6]);
+  }
+  return sum > 1 ? 1 : sum;
+}
+
+// ---- shadows ------------------------------------------------------------------------
+
+// Raise occluder heights (a grid of node heights, NN a side) by the kit's
+// shapes: each node under a shape takes its top, unless an opening cuts
+// through that top there (a round tower's inside); crenels count as half.
+export function raiseOccluders(kit, occ, N, NN) {
+  if (!kit || !kit.np) return;
+  const b = kit.box, S = kit.prims, Hs = kit.holes;
+  for (let z = Math.max(0, Math.floor(b.z0)); z <= Math.min(N, Math.ceil(b.z1)); z++) {
+    for (let x = Math.max(0, Math.floor(b.x0)); x <= Math.min(N, Math.ceil(b.x1)); x++) {
+      const list = near(kit, x, z, NEAR_TMP);
+      let top = -Infinity;
+      for (const i of list) {
+        const q = i * P_STRIDE, t = S[q + P.TYPE];
+        if (t === PT.PANE) continue;
+        const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
+        const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
+        let y = topAt(kit, q, u, w);
+        if (y === -Infinity || y <= top) continue;
+        if (S[q + P.FLAGS] & PF.CRENEL) y = S[q + P.Y1] - S[q + P.MH] * (1 - S[q + P.MW]);
+        let cut = false;
+        for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
+          const o = h * H_STRIDE;
+          if (Hs[o + H.Y1] >= S[q + P.Y1] - 1e-6 && inHole(kit, h, x, Hs[o + H.Y1] - 1e-3, z)) { cut = true; break; }
+        }
+        if (!cut && y > top) top = y;
+      }
+      const j = z * NN + x;
+      if (top > occ[j]) occ[j] = top;
+    }
+  }
+}

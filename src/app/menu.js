@@ -191,7 +191,7 @@ export class Menu {
       h('h3', { class: 'part' }, 'fixed cameras'),
       h('div', { class: 'opts' }, g.cameras.map((cam, i) => h('button', { type: 'button', onclick: () => { g.camera(i); this.update(); } }, `${i + 1} ${cam.name}`))),
       h('h3', { class: 'part' }, 'scenes'),
-      h('div', { class: 'opts' }, [['world', 'the generated world'], ['lab', 'the Look Lab'], ['stress', 'the stress scene']].map(([s, t]) =>
+      h('div', { class: 'opts' }, [['world', 'the generated world'], ['lab', 'the Look Lab'], ['stress', 'the stress scene'], ['yard', 'the building yard']].map(([s, t]) =>
         h('button', { type: 'button', 'aria-pressed': String(g.scene === s), onclick: () => g.goScene(s) }, t))),
       h('h3', { class: 'part' }, 'workers'),
       h('p', { class: 'line' }, workers));

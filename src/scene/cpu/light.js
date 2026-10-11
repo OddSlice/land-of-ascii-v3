@@ -7,6 +7,7 @@ import { fbm } from '../../world/noise.js';
 import { spanAt } from '../../world/spans.js';
 import { SEED } from '../../world/layout.js';
 import { weatherParams } from '../../weather.js';
+import { raiseOccluders } from '../../world/kit.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
@@ -27,6 +28,8 @@ export function buildOccluders(world) {
       }
     }
   }
+  // (phase 3a) the building kit's shapes, by their tops
+  raiseOccluders(world.kit, occ, N, NN);
   for (const t of objects.trees) {
     const crownBase = t.tiers[0];
     const R = t.R;

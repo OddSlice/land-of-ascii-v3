@@ -1,12 +1,15 @@
 // Land of Ascii v3: boot, the main loop, and the debug handle (window.lab)
 // the tools use. The page opens on the generated world (phase 1), built from
-// a seed (?seed=, R for a new one). Two tools stay behind URL options:
-// ?lab=1 is the Look Lab's fixed valley (phases 0a-0c) and ?stress=1 (or X
-// from the lab) the stress scene, a big world for measuring the renderer.
+// a seed (?seed=, R for a new one). Three tools stay behind URL options:
+// ?lab=1 is the Look Lab's fixed valley (phases 0a-0c), ?stress=1 (or X
+// from the lab) the stress scene, a big world for measuring the renderer,
+// and ?yard=1 (phase 3a) the building yard, every piece of the building kit
+// standing alone (&proto=1 adds the prototypes the kit was chosen by).
 import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
+import { buildYard } from './world/yard.js';
 import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
 import { packWorld, unpackWorld, worldHash } from './world/pack.js';
@@ -38,8 +41,10 @@ const DEG = Math.PI / 180;
 const CLOCK_RATE = 1 / 60;      // T: one game hour per real minute
 
 const STRESS = params.get('stress') === '1';
-const LAB = !STRESS && params.get('lab') === '1';
-const WORLD = !STRESS && !LAB;
+const YARD = !STRESS && params.get('yard') === '1';
+const PROTO = YARD && params.get('proto') === '1';
+const LAB = !STRESS && !YARD && params.get('lab') === '1';
+const WORLD = !STRESS && !LAB && !YARD;
 const SEED = WORLD ? (params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED) : 0;
 // Shared memory needs the page to be cross-origin isolated (the Vercel copy
 // sends the headers). Without it (GitHub Pages, a file on disk) every worker
@@ -109,7 +114,8 @@ function worldProgress(stage, p) {
 }
 if (THREADS > 0 && !WORLD) {
   pool = new Pool(THREADS, fail, {
-    scene: STRESS ? 'stress' : 'default',
+    scene: STRESS ? 'stress' : YARD ? 'yard' : 'default',
+    init: YARD ? { proto: PROTO } : {},
     onProgress: (p) => { progress.workers = p; showProgress(); },
   });
   if (STRESS) pool.whenReady.then(() => { progress.workers = 1; });
@@ -142,6 +148,7 @@ async function makeWorld() {
     }
     return w;
   }
+  if (YARD) return buildYard({ proto: PROTO });
   if (!STRESS) return buildWorld();
   const gen = buildStressWorld({ render: THREADS === 0 });
   let r;
@@ -151,8 +158,8 @@ async function makeWorld() {
 }
 const worldBuild = { total: 0 };
 const world = await makeWorld();
-const CAMS = STRESS || WORLD ? world.cameras : CAMERAS;
-const player = new Player(world, { rules: WORLD ? 'world' : 'lab' });
+const CAMS = STRESS || WORLD || YARD ? world.cameras : CAMERAS;
+const player = new Player(world, { rules: WORLD || YARD ? 'world' : 'lab' });
 const canvas = $('view');
 const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
@@ -180,8 +187,9 @@ let full = null;
 ref.onResize = relayout;
 addEventListener('resize', relayout);
 
-function standAt(x, z, yawDeg, pitchDeg) {
-  player.place(x, z, yawDeg * DEG, pitchDeg * DEG);
+// (`eyeY`: a camera's own eye height, for a place under a roof or arch)
+function standAt(x, z, yawDeg, pitchDeg, eyeY) {
+  player.place(x, z, yawDeg * DEG, pitchDeg * DEG, eyeY !== undefined ? eyeY - EYE : undefined);
 }
 function setTime(name) {
   state.hour = LOOK.hours[name];
@@ -191,14 +199,16 @@ function useCamera(i) {
   const c = CAMS[i];
   state.held = false;
   state.cam = i; state.camName = c.name;
-  standAt(c.x, c.z, c.yaw, c.pitch);
+  standAt(c.x, c.z, c.yaw, c.pitch, c.y);
+  if (c.stand) player.feet = player.standOn(c.x, c.z, player.feet);
   setTime(c.time);
   if (ref.on && c.ref) ref.show(c);
 }
-const start = STRESS || WORLD ? world.start : START;
+const start = STRESS || WORLD || YARD ? world.start : START;
 standAt(start.x, start.z, start.yaw, start.pitch);
 if (STRESS) state.camName = 'stress: start';
 if (WORLD) { state.camName = 'spawn'; state.cam = -1; }
+if (YARD) { state.camName = CAMS[0].name; state.cam = 0; }
 
 const input = new Input(canvas, {
   time: setTime,
@@ -219,7 +229,7 @@ const input = new Input(canvas, {
     if (STRESS) { q.delete('stress'); q.set('lab', '1'); } else { q.delete('lab'); q.set('stress', '1'); }
     location.search = q.toString();
   },
-  toggleFly: () => { if (WORLD) player.toggleFly(); },
+  toggleFly: () => { if (WORLD || YARD) player.toggleFly(); },
   toggleMap: () => { if (map) map.toggle(); },
   toggleHud: () => hud.toggle(),
   toggleLook: () => lookPanel.toggle(),
@@ -440,7 +450,7 @@ function weatherName() {
 const reload = (q) => { location.search = q.toString(); };
 
 const game = {
-  scene: WORLD ? 'world' : STRESS ? 'stress' : 'lab',
+  scene: WORLD ? 'world' : STRESS ? 'stress' : YARD ? 'yard' : 'lab',
   seed: SEED,
   cameras: CAMS,
   get display() { return display; },
@@ -456,8 +466,8 @@ const game = {
   newWorld(seed) { const q = new URLSearchParams(location.search); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
   goScene(sc) {
     const q = new URLSearchParams(location.search);
-    q.delete('lab'); q.delete('stress');
-    if (sc === 'lab') q.set('lab', '1'); else if (sc === 'stress') q.set('stress', '1');
+    q.delete('lab'); q.delete('stress'); q.delete('yard'); q.delete('proto');
+    if (sc === 'lab') q.set('lab', '1'); else if (sc === 'stress') q.set('stress', '1'); else if (sc === 'yard') q.set('yard', '1');
     reload(q);
   },
   // A link to this exact world (its seed), to the clipboard.
@@ -575,7 +585,7 @@ Object.assign(lab, {
   ready,
   threads: THREADS,
   stress: STRESS,
-  scene: WORLD ? 'world' : STRESS ? 'stress' : 'lab',
+  scene: WORLD ? 'world' : STRESS ? 'stress' : YARD ? 'yard' : 'lab',
   seed: SEED,
   shared: SHARED,
   cameras: CAMS,
@@ -704,7 +714,7 @@ Object.assign(lab, {
   // The generated world's arrays, hashed (the same seed must give the same bytes on any thread).
   worldHash() { return packed ? worldHash(packed) : null; },
   // Fly (F) on or off.
-  setFly(on) { if (WORLD && player.flying !== !!on) player.toggleFly(); },
+  setFly(on) { if ((WORLD || YARD) && player.flying !== !!on) player.toggleFly(); },
   // The overhead map (M) on or off.
   setMap(on) { if (map && map.on !== !!on) map.toggle(); },
   // Turn to a yaw (degrees) without moving.

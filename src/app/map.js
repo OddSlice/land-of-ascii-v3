@@ -40,9 +40,12 @@ export class MapView {
       cells.set(this.markBg, o); cells[o + 3] = glyph; cells.set(colour, o + 4);
     };
     const s = this.world.sites, mk = hex(M.mark), you = hex(M.you);
-    // the fort site: its wall, end to end
-    const wl = s.fort.wall;
-    for (let x = wl.x0; x <= wl.x1; x += this.mw / 2) mark(x, (wl.z0 + wl.z1) / 2, MAP_GLYPH.fort, mk);
+    // the fort: its walls, all the way round
+    const poly = s.fort.poly;
+    poly.forEach((a, i) => {
+      const b = poly[(i + 1) % poly.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (this.mw / 2)));
+      for (let k = 0; k <= n; k++) mark(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, MAP_GLYPH.fort, mk);
+    });
     for (const v of s.villages) mark(v.x, v.z, MAP_GLYPH.village, mk);
     for (const v of s.viewpoints) mark(v.x, v.z, MAP_GLYPH.viewpoint, mk);
     mark(s.spawn.x, s.spawn.z, MAP_GLYPH.spawn, mk);

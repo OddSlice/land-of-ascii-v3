@@ -139,6 +139,12 @@ export const LOOK = {
     bed:     { glyphs: '.,:;',       ink: { lit: -0.20, dark: 0.40 }, tone: 0.10 },
     floor:   { glyphs: '.,:;+%',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.16 },
     foam:    { glyphs: '.:;=',       ink: { lit: -0.10, dark: 0.30 }, tone: 0 },
+    // phase 3a, the building kit (stone in blocks is `stone`, above)
+    timber:  { glyphs: '.-=#H',      ink: { lit: -0.26, dark: 0.46 }, tone: 0.16 },
+    plaster: { glyphs: '.,:;=',      ink: { lit: -0.16, dark: 0.36 }, tone: 0.08 },
+    roof:    { glyphs: ':^=#%',      ink: { lit: -0.26, dark: 0.48 }, tone: 0.16 },
+    yard:    { glyphs: '.,:-=',      ink: { lit: -0.24, dark: 0.46 }, tone: 0.10 },
+    window:  { glyphs: ':=#▓',       ink: { lit: 0.22, dark: 0.22 }, emissive: true },
   },
 
   // The coast (phase 2a, the generated world): a darker wet band where sand
@@ -250,6 +256,14 @@ export const LOOK = {
   // light. Under `flameMark` the cell keeps what is behind's glyph.
   flameFade: 1,
   flameMark: 0.35,
+
+  // Interiors (phase 3a): a surface inside a building (a room, the gate's
+  // passage) takes the sky's soft light only by the share its doorways,
+  // windows and open tops let in (its shelter, src/world/kit.js), and its
+  // colour darkens toward `dark` of itself where none reaches; a torch there
+  // lights it at least as strongly as `torch` (the keyframe's own when that is
+  // stronger), so by day too an interior reads by its openings and torches.
+  interior: { dark: 0.42, torch: 0.32 },
 
   // Ink floor: on near-black cells the glyph is lightened by at least this
   // colour times the ink amount, so night glyphs still carry light.
@@ -392,6 +406,11 @@ export const LOOK = {
       bed:    { lit: '#6b6148', shade: '#353026' },
       floor:  { lit: '#4c4a33', shade: '#22231b' },
       foam:   { lit: '#d6dad4', shade: '#7a8290' },
+      timber: { lit: '#6e573f', shade: '#30261e' },
+      plaster:{ lit: '#b3a994', shade: '#575450' },
+      roof:   { lit: '#6d625a', shade: '#2d2a2c' },
+      yard:   { lit: '#8a7a64', shade: '#403830' },
+      window: { lit: '#e2a65e', shade: '#24201d' }, windowStrength: 0,
       weather: { cast: '#8b9099', mist: '#b4b9bd', rain: '#c3c7cc' },
     },
     dusk: {
@@ -422,6 +441,11 @@ export const LOOK = {
       bed:    { lit: '#544a42', shade: '#2a2526' },
       floor:  { lit: '#34312d', shade: '#1b1a1b' },
       foam:   { lit: '#b8a8a8', shade: '#5a5262' },
+      timber: { lit: '#4f3d31', shade: '#231b18' },
+      plaster:{ lit: '#806d69', shade: '#423b3c' },
+      roof:   { lit: '#4d424f', shade: '#262022' },
+      yard:   { lit: '#735e59', shade: '#302a2a' },
+      window: { lit: '#eca45a', shade: '#1e1a1a' }, windowStrength: 0.8,
       weather: { cast: '#5d545c', mist: '#7c6e74', rain: '#93878c' },
     },
     night: {
@@ -452,6 +476,11 @@ export const LOOK = {
       bed:    { lit: '#24231f', shade: '#121210' },
       floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
       foam:   { lit: '#4a4e5a', shade: '#262830' },
+      timber: { lit: '#231e1a', shade: '#100e0c' },
+      plaster:{ lit: '#302d30', shade: '#171618' },
+      roof:   { lit: '#1d1c22', shade: '#0f0e0f' },
+      yard:   { lit: '#28272f', shade: '#141417' },
+      window: { lit: '#eeaa5e', shade: '#121112' }, windowStrength: 1,
       weather: { cast: '#1c1d25', mist: '#2a2c35', rain: '#3c404a' },
     },
   },
@@ -498,6 +527,11 @@ export const LOOK = {
       bed:    { lit: '#74684e', shade: '#363028' },
       floor:  { lit: '#54503a', shade: '#22231c' },
       foam:   { lit: '#efe2d6', shade: '#86808e' },
+      timber: { lit: '#745c43', shade: '#30261e' },
+      plaster:{ lit: '#bfaf97', shade: '#545150' },
+      roof:   { lit: '#7a6b65', shade: '#2f2c30' },
+      yard:   { lit: '#9b856d', shade: '#3d3631' },
+      window: { lit: '#e6a862', shade: '#22201f' }, windowStrength: 0.3,
       weather: { cast: '#8c8892', mist: '#c6bac4', rain: '#b2acb6' },
     },
     dusk: { ...K.dusk, light: { ambient: 0.22, direct: 0.95, cloudShadow: 0.25, castShadow: 0.82, far: 0.08 } },
@@ -529,6 +563,11 @@ export const LOOK = {
       bed:    { lit: '#2e2f2c', shade: '#161614' },
       floor:  { lit: '#26262a', shade: '#121214' },
       foam:   { lit: '#8a90a2', shade: '#383c48' },
+      timber: { lit: '#302b23', shade: '#14110f' },
+      plaster:{ lit: '#504f52', shade: '#201f22' },
+      roof:   { lit: '#363641', shade: '#151416' },
+      yard:   { lit: '#40424d', shade: '#1b1d21' },
+      window: { lit: '#eeaa5e', shade: '#131315' }, windowStrength: 1,
       weather: { cast: '#262a33', mist: '#3a4051', rain: '#4c5262' },
     },
     starlit: {
@@ -559,6 +598,11 @@ export const LOOK = {
       bed:    { lit: '#1f1f1d', shade: '#121210' },
       floor:  { lit: '#18191b', shade: '#0f0f11' },
       foam:   { lit: '#3a3e4a', shade: '#22242c' },
+      timber: { lit: '#1e1b18', shade: '#100e0c' },
+      plaster:{ lit: '#2b2b2e', shade: '#18191a' },
+      roof:   { lit: '#1c1e24', shade: '#111112' },
+      yard:   { lit: '#292a33', shade: '#191a1f' },
+      window: { lit: '#eeaa5e', shade: '#111113' }, windowStrength: 1,
       weather: { cast: '#181a21', mist: '#24262f', rain: '#32353e' },
     },
   };

@@ -10,7 +10,7 @@
 // It reads nothing but its own cell, except that a faint flame is blended
 // with the next cell up (or down) its own column; stripes never touch.
 import { LOOK } from './look.js';
-import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
+import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, MAT_SHELTER, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
 import { FAMILY, SHADE_STEPS, RAIN_GLYPHS } from './glyphs.js';
 import { weatherParams } from './weather.js';
 import { sunDir, moonDir, moonDirOn, moonLit } from './world/sky.js';
@@ -199,7 +199,7 @@ const sky3 = [0, 0, 0];
 // out of the eye at height y0, rising at mu (the sine of its elevation) for
 // d metres, in metres of air as dense as at LOOK.air.base. Air thins with
 // height as exp(-(y - base) / height), plus a thin share the same everywhere.
-const AIR = LOOK.air, FAR = LOOK.far;
+const AIR = LOOK.air, FAR = LOOK.far, INTERIOR = LOOK.interior;
 // (1 - e^-x) / x, from a table between -8 and 8 (64 steps a unit), exactly beyond
 const XT = new Float64Array(1025);
 for (let i = 0; i <= 1024; i++) { const x = i / 64 - 8; XT[i] = Math.abs(x) < 1e-9 ? 1 : (1 - Math.exp(-x)) / x; }
@@ -297,7 +297,7 @@ for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.SNOW, MAT.FLOOR]) 
 // already wet bed not at all), and the stripe's wetness: how much darker wet
 // ground is, how much sky it mirrors
 const WETM = new Float32Array(32);
-for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.STONE, MAT.FLOOR, MAT.TRUNK, MAT.WOOD]) WETM[m] = 1;
+for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.STONE, MAT.FLOOR, MAT.TRUNK, MAT.WOOD, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.YARD]) WETM[m] = 1;
 WETM[MAT.CONIFER] = 0.5; WETM[MAT.BUSH] = 0.5;
 let wetDark = 0, wetSheen = 0;
 // the rules of the stripe being resolved: air (aerial perspective and the
@@ -314,7 +314,9 @@ let grassHue = 0, blueShallows = false;
 // `mu`: for a direct view, the sine of the ray's elevation (wet ground
 // mirrors the sky at low angles); 2 for any other record. `y`: the height of
 // what was hit, where known (far lit ground high up keeps its colour).
-function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN) {
+// (`amb`, phase 3a: the share of the soft light that reaches a surface
+// inside a building, from its R2's MAT_SHELTER record)
+function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN, amb = 1) {
   const { lit, shade, k } = pal;
   const haze = k.haze, torch = k.torch;
   const m = hits[o];
@@ -343,6 +345,12 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN) {
       skyColour(pal, sh, (1 - cl) * Math.PI, sky3);
       rec.cover = cover; rec.skyR = sky3[0]; rec.skyG = sky3[1]; rec.skyB = sky3[2];
     }
+  } else if (m === MAT.WINDOW) {
+    // (phase 3a) a window: a dark opening by day, lit from within at night by
+    // the keyframe's `windowStrength`
+    const j = m * 3, f = pal.k.windowStrength * (0.85 + 0.15 * light);
+    r = shade[j] + (lit[j] - shade[j]) * f; g = shade[j + 1] + (lit[j + 1] - shade[j + 1]) * f; b = shade[j + 2] + (lit[j + 2] - shade[j + 2]) * f;
+    bright = f;
   } else if (m === MAT.SUN || m === MAT.MOON || m === MAT.FLAME) {
     const c = m === MAT.SUN ? k.sun : m === MAT.MOON ? k.moon : k.flame;
     // (under the night rule 'moon' the moon is as bright as its lit share)
@@ -360,7 +368,7 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN) {
     }
     // (at dusk far land loses its direct light: a silhouette, phase 2b)
     const dk = tau >= 0 && pal.farSun < 1 ? 1 - (1 - pal.farSun) * smooth(FAR.fade[0], FAR.fade[1], dist) : 1;
-    const L = pal.ambient + pal.direct * dk * light * (1 - pal.castK * sh) * (1 - pal.cloudK * cl);
+    const L = pal.ambient * amb + pal.direct * dk * light * (1 - pal.castK * sh) * (1 - pal.cloudK * cl);
     const t0 = L < 0 ? 0 : L > 1 ? 1 : L;
     const t = Math.pow(t0, pal.curve[m]);
     const j = m * 3;
@@ -381,7 +389,15 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN) {
         r += (to[0] - lit[j0]) * f; g += (to[1] - lit[j0 + 1]) * f; b += (to[2] - lit[j0 + 2]) * f;
       }
     }
-    const tg = gl * torch.strength;
+    // (inside a building, phase 3a: darker where little soft light reaches,
+    // and lit by its torches at least as strongly as LOOK.interior.torch)
+    let ts = torch.strength;
+    if (amb < 1) {
+      const kk = INTERIOR.dark + (1 - INTERIOR.dark) * amb;
+      r *= kk; g *= kk; b *= kk;
+      if (INTERIOR.torch > ts) ts += (INTERIOR.torch - ts) * (1 - amb);
+    }
+    const tg = gl * ts;
     r += torch.colour[0] * tg; g += torch.colour[1] * tg; b += torch.colour[2] * tg;
     // wet ground (phase 2b): darker, and seen low it mirrors a little sky
     if (wetDark > 0 && WETM[m] > 0) {
@@ -659,18 +675,22 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
         }
         ms = 1 - Math.exp(-mistK * tm);
       }
-      const mirrorFlame = m === MAT.WATER && hits[o + REC] === MAT.FLAME;
+      const mirrorFlame = m === MAT.WATER && (hits[o + REC] === MAT.FLAME || hits[o + REC] === MAT.WINDOW);
       let gm = m;
       if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) gm = waterColour(pal, hits, o, ey, mu);
       else if (hits[o + REC] !== MAT_NONE) gm = fringeColour(pal, hits, o, ey, mu);
       else {
         const d0 = (hits[o + 6] | (hits[o + 7] << 8)) / 10;
-        recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, d0, base0) : -1, airOn ? mu : 2, airOn ? ey + mu * d0 : NaN);
+        recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, d0, base0) : -1, airOn ? mu : 2, airOn ? ey + mu * d0 : NaN,
+          hits[o + 2 * REC] === MAT_SHELTER ? hits[o + 2 * REC + 1] / 255 : 1);
       }
-      if (m === MAT.FLAME || mirrorFlame) {
+      if (m === MAT.FLAME || m === MAT.WINDOW || mirrorFlame) {
         // a flame held at its minimum size, or any flame by day: blended
-        // with what is behind it once every other cell is done
-        const w = (flameF + (1 - flameF) * Math.pow(hits[o + (mirrorFlame ? REC : 0) + 5] / 255, flameP)) * flameK;
+        // with what is behind it once every other cell is done (a window,
+        // phase 3a: by how much of its drawn size it really is, its
+        // brightness already the keyframe's)
+        const lm = hits[o + (mirrorFlame ? REC : 0)], cov = Math.pow(hits[o + (mirrorFlame ? REC : 0) + 5] / 255, flameP);
+        const w = lm === MAT.WINDOW ? cov : (flameF + (1 - flameF) * cov) * flameK;
         if (w < 0.999) {
           if (nf >= faint.length) { const a = new Int32Array(nf * 2); a.set(faint); faint = a; const b = new Float32Array(nf * 2); b.set(faintW); faintW = b; }
           faint[nf] = mirrorFlame ? -1 - i : i; faintW[nf] = w; nf++;
@@ -731,7 +751,8 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
       const y = mirror ? cy + d : cy - d;
       if (y < 0 || y >= rows) break;
       const jj = y * sw + q, oj = jj * HIT_STRIDE;
-      const isFlame = hits[oj] === MAT.FLAME || (hits[oj] === MAT.WATER && hits[oj + REC] === MAT.FLAME);
+      const lj = hits[oj] === MAT.WATER ? hits[oj + REC] : hits[oj];
+      const isFlame = lj === MAT.FLAME || lj === MAT.WINDOW;
       if (!isFlame) { j = jj; break; }
     }
     const oc = i * CELL_STRIDE;

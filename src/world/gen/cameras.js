@@ -248,3 +248,56 @@ export function worldCameras(world, { seaDist, shore }) {
   }
   return cams;
 }
+
+// (phase 3a) The fort's four cameras, found from its plan: the fort from its
+// road, inside the gate's passage looking in, the courtyard, and the wall
+// walk looking out over the valley (from the run of wall that faces the
+// main lake most).
+// (`stand`: the eye's height is the floor's at the place, near enough; the
+// feet settle onto what is under them at once, so the road pressed into the
+// passage's floor cannot leave the eye falling for a few frames)
+export function fortCameras(world) {
+  const { sites, roads } = world, f = sites.fort, base = f.base, eye = SCALE.eye;
+  const K = SCALE.kit, o = f.gate.out;
+  const cams = [];
+  // the fort from its road, 75 m back from the gate's mouth along it
+  {
+    const rd = roads.find((r) => r.to === 'fort');
+    let q = 0, best = Infinity;
+    for (let i = 0; i < rd.n; i++) { const d = Math.hypot(rd.x[i] - f.front.x, rd.z[i] - f.front.z); if (d < best) { best = d; q = i; } }
+    let acc = 0;
+    while (q + 1 < rd.n && acc < 75) { acc += Math.hypot(rd.x[q + 1] - rd.x[q], rd.z[q + 1] - rd.z[q]); q++; }
+    cams.push({ name: 'the fort from the road', x: rd.x[q], z: rd.z[q], yaw: deg(Math.atan2(f.gate.x - rd.x[q], f.gate.z - rd.z[q])), pitch: 4, time: 'day' });
+  }
+  // inside the gate's passage, near its mouth, looking through it into the yard
+  {
+    const x = f.gate.x + o[0] * (K.gate.depth / 2 - 1.4), z = f.gate.z + o[1] * (K.gate.depth / 2 - 1.4);
+    cams.push({ name: 'inside the gate passage, looking in', x, z, y: base + eye, stand: true, yaw: deg(Math.atan2(-o[0], -o[1])), pitch: 1, time: 'day' });
+  }
+  // the courtyard: just inside, to one side of the way, toward the keep's door
+  {
+    const x = f.inner.x - o[0] * 4 + o[1] * 5, z = f.inner.z - o[1] * 4 - o[0] * 5;
+    cams.push({ name: 'the courtyard', x, z, y: base + eye, stand: true, yaw: deg(Math.atan2(f.keep.door.x - x, f.keep.door.z - z)), pitch: 6, time: 'day' });
+  }
+  // the wall walk over the valley
+  {
+    const L = sites.lake;
+    let best = null;
+    for (const e of f.edges) {
+      if (e.gate) continue;
+      const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2;
+      const dl = Math.hypot(L.x - mx, L.z - mz) || 1, face = (e.out[0] * (L.x - mx) + e.out[1] * (L.z - mz)) / dl;
+      if (!best || face > best.face) best = { e, mx, mz, face };
+    }
+    const { e, mx, mz } = best;
+    const d = [e.b[0] - e.a[0], e.b[1] - e.a[1]], dl = Math.hypot(d[0], d[1]);
+    // on the walk's inner half, a third of the way along, looking out over
+    // the parapet at an angle along the wall, the walk and its merlons
+    // leading off into the picture
+    const back = K.wall.thick / 2 - 0.5;
+    const x = mx - e.out[0] * back - d[0] / dl * dl * 0.22, z = mz - e.out[1] * back - d[1] / dl * dl * 0.22;
+    const look = [e.out[0] * 0.55 + d[0] / dl, e.out[1] * 0.55 + d[1] / dl];
+    cams.push({ name: 'the wall walk over the valley', x, z, y: base + K.wall.height + eye, stand: true, yaw: deg(Math.atan2(look[0], look[1])), pitch: -3, time: 'day' });
+  }
+  return cams;
+}

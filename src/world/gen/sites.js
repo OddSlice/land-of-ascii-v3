@@ -59,10 +59,13 @@ const range = (H, N, x, z, rx, rz) => {
 
 // The fort site: on a rise 100-450 m from the main lake, where the wall
 // (along x) can stand with modest levelling, with the lake in view.
-export function chooseFort(ctx, avoid) {
+export function chooseFort(ctx, avoid, see = null) {
+  // (phase 3a) seen from `see` (the spawn's eye: { x, z, y }) over the land
+  // and the forest, some of its towers' tops at least; if no site is, any
+  if (see) { const best = chooseFort({ ...ctx, see }, avoid); if (best) return best; }
   const { H, N, kind, wetDist, frame, F, thr, lake, shore } = ctx;
   const NN = N + 1, P = {}, W = SCALE.wall.length / 2;
-  const why = { wet: 0, dist: 0, frame: 0, forest: 0, prom: 0, spread: 0 };
+  const why = { wet: 0, dist: 0, frame: 0, forest: 0, prom: 0, spread: 0, hidden: 0 };
   ctx.why = why;
   const pick = shore.filter((_, q) => q % Math.max(1, Math.floor(shore.length / 24)) === 0);
   const lx = Math.round(lake.x / 8) * 8, lz = Math.round(lake.z / 8) * 8;
@@ -87,6 +90,7 @@ export function chooseFort(ctx, avoid) {
         if (prom < st.prom) { why.prom++; continue; }
         const spread = range(H, N, x, z, W + 6, 12);
         if (spread > st.spread) { why.spread++; continue; }
+        if (ctx.see && !seenFrom(ctx, ctx.see, x, z, h)) { why.hidden++; continue; }
         let seen = 0;
         for (const [sx, sz] of pick) if (clearLine(H, N, x, z, h + 7, sx, sz, lake.level + 0.3)) seen++;
         const score = Math.min(prom, 10) + 6 * seen / pick.length - Math.abs(dl - 220) / 60 - 0.4 * spread;
@@ -229,6 +233,14 @@ export function brow(H, N, kind, x0, z0, yawDeg, reach = 90, drop = 18) {
 
 // Is the line between two points clear of the ground and of the forest
 // (where the forest field is past the threshold, trees count as 15 m tall)?
+// (phase 3a) Would a fort at (x, z), on ground h, show from the eye `e`?
+// Some of it: the keep's top near its middle, or a tower's top round it.
+function seenFrom(ctx, e, x, z, h) {
+  if (clearView(ctx, e.x, e.z, e.y, x, z, h + 11)) return true;
+  for (let k = 0; k < 6; k++) if (clearView(ctx, e.x, e.z, e.y, x + Math.cos(k * Math.PI / 3) * 20, z + Math.sin(k * Math.PI / 3) * 20, h + 9)) return true;
+  return false;
+}
+
 function clearView(ctx, x0, z0, y0, x1, z1, y1) {
   const { H, N, F, thr } = ctx;
   const d = Math.hypot(x1 - x0, z1 - z0), steps = Math.max(2, Math.ceil(d / 8));

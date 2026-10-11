@@ -56,3 +56,29 @@ export function archY(x, gate) {
   const a = Math.abs(u) >= gate.r ? 0 : Math.sqrt(gate.r * gate.r - u * u);
   return gate.ground + gate.jamb + a;
 }
+
+// No spans at all (the generated world since phase 3a, whose buildings are
+// the kit's shapes; the building yard without its prototype).
+export function emptySpans() {
+  return {
+    idx: new Int16Array(0), bw: 0, y0: new Float32Array(0), y1: new Float32Array(0), flags: new Uint8Array(0), mat: new Uint8Array(0), mat2: null,
+    box: { x0: 0, x1: 0, z0: 0, z1: 0, top: -Infinity }, merlon: 0, merlonW: 1, gate: { ground: 0, cx: 0, r: 0, jamb: 0 }, N: 0,
+  };
+}
+
+// Spans from a list of cells { ix, iz, y0, y1, flags, mat, mat2 } (phase
+// 3a's prototype: pieces rasterised onto the 1 m grid, one span a cell; a
+// span's top may be another material, `mat2`).
+export function spansFromCells(cells, { merlon = 1, merlonW = 1.4, ground = 0 } = {}) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, top = -Infinity;
+  for (const c of cells) { x0 = Math.min(x0, c.ix); x1 = Math.max(x1, c.ix + 1); z0 = Math.min(z0, c.iz); z1 = Math.max(z1, c.iz + 1); top = Math.max(top, c.y1 + (c.flags & SPAN_MERLON ? merlon : 0)); }
+  const bw = x1 - x0;
+  const idx = new Int16Array(bw * (z1 - z0)).fill(-1);
+  cells.forEach((c, k) => { idx[(c.iz - z0) * bw + c.ix - x0] = k; });
+  return {
+    idx, bw,
+    y0: Float32Array.from(cells.map((c) => c.y0)), y1: Float32Array.from(cells.map((c) => c.y1)),
+    flags: Uint8Array.from(cells.map((c) => c.flags || 0)), mat: Uint8Array.from(cells.map((c) => c.mat)), mat2: Uint8Array.from(cells.map((c) => (c.mat2 !== undefined ? c.mat2 : c.mat))),
+    box: { x0, x1, z0, z1, top }, merlon, merlonW, gate: { ground, cx: 0, r: 0, jamb: 0 }, N: 0,
+  };
+}

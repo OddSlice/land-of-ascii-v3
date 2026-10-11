@@ -46,6 +46,42 @@ export const SCALE = {
   road: { width: 4, maxSlope: 0.12 },
   wall: { length: 120, thick: 3, height: 6, gate: 4 },
 
+  // the building kit (phase 3a; docs/scale.md): metres, heights above the
+  // ground a piece stands on
+  kit: {
+    // a curtain wall: the walk on top at `height`, `thick` through, its
+    // foundation `foot` below the ground; on the outer side a parapet
+    // `parapet` thick, its breastwork `breast` high above the walk and its
+    // merlons `merlon` higher again, `merlonW` long with gaps `crenelW` wide
+    wall: { height: 6.5, thick: 3.2, foot: 2, parapet: 0.6, breast: 1.0, merlon: 1.0, merlonW: 1.4, crenelW: 0.9 },
+    // the gate: a block across the wall, `length` along it and `depth`
+    // through it (the passage's depth); the passage `width` wide, its arch
+    // springing at `spring` (so its crown is at spring + width / 2)
+    gate: { width: 3.6, spring: 3.2, depth: 7.4, length: 10 },
+    // towers stand `above` higher than the walk; walls `wallT` thick; square
+    // towers `square` across (half: room beside a wall for the ground door),
+    // round ones of radius `round`
+    tower: { square: [4.4, 4.9], round: [3.7, 4.3], above: 3.0, wallT: 1.15 },
+    // the keep: `w` by `d` (half), `above` higher than the walk, its hall `hall` high
+    keep: { w: [6, 7.5], d: [5, 6], above: 6, wallT: 1.5, hall: 5 },
+    // doorways (an arch: half `width` round at the top), wide and high
+    // enough to walk through in comfort at an eye of 1.7 m
+    door: { width: 1.5, height: 2.7 },
+    walkDoor: { width: 1.5, height: 2.5 },
+    keepDoor: { width: 2.0, height: 3.3 },
+    // stone stairs up to the walk: `width` wide, steps `rise` high and `run` deep
+    stair: { width: 1.7, rise: 0.2, run: 0.28 },
+    // a tower's own stairs, steeper
+    towerStair: { width: 1.0, rise: 0.22, run: 0.25 },
+    // floors are `slab` thick; a room is at least `room` high
+    slab: 0.3, room: 2.6,
+    // a timber house: `w` by `d` (half), its eaves at `eave`, the roof
+    // rising `pitch` metres for each metre in, reaching `overhang` past the walls
+    house: { w: [3.3, 4.2], d: [2.4, 2.9], eave: 3.0, pitch: 0.95, overhang: 0.45, wallT: 0.3 },
+    well: { r: 1.0, height: 0.85, wallT: 0.3 },
+    window: { width: 0.7, height: 1.1, depth: 0.35 },
+  },
+
   // the backdrop (phase 2a): the range going on past the north and east
   // edges as receding ridgelines, never walkable. Each runs `dist` metres
   // outside the edges (rounding the corner on an arc), its heights above the

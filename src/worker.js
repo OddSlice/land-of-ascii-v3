@@ -8,6 +8,7 @@
 // Any error is sent back so the page can show it; nothing falls back silently.
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
+import { buildYard } from './world/yard.js';
 import { generateWorld } from './world/gen/world.js';
 import { packWorld, unpackWorld, transferList, isShared } from './world/pack.js';
 import { Light } from './scene/cpu/light.js';
@@ -33,7 +34,8 @@ self.onmessage = (e) => {
         }
         world = unpackWorld(msg.world);
         if (msg.shared) opts = { shared: msg.shadows };
-      } else world = buildWorld();
+      } else if (msg.scene === 'yard') world = buildYard({ proto: !!msg.proto });
+      else world = buildWorld();
       renderer = createStripeRenderer(world, opts);
       self.postMessage({ type: 'ready', id: msg.id, buildMs: world.buildMs });
     } else if (msg.type === 'frame') {
