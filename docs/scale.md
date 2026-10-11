@@ -10,11 +10,28 @@ Measured figures come from the default world (seed 3), built by `src/world/gen/w
 |---|---|---|
 | Size | 2048 × 2048 cells, one metre each, no wrapping | Large enough for many minutes of walking with the edges out of sight, and small enough to build in under 4 s and keep under 300 MB. |
 | Sea level | 20 m above the datum | The datum sits under the deepest sea bed, so no height is negative. |
-| View distance | 1,500 m | Across the lowland to the range. Beyond it, the sea plane is drawn to the horizon, so the coast never ends at an edge. |
-| Mountains | close the north and east; about 300 m above the sea at the top, snow from 235 m | A backdrop you walk toward, not terrain you walk through. The range front lies about 430 m in from those edges. |
-| Sea | closes the south and west; the shore lies about 240 m in | Beaches on low, gentle ground within about 34 m of the sea; low cliffs along some stretches. |
+| View distance | 1,500 m | Across the lowland to the range. Beyond it, the sea plane is drawn to the horizon, so the coast never ends at an edge, and past the north and east edges the backdrop stands (below). |
+| Mountains | close the north and east; about 300 m above the sea at the top, snow from 235 m | A backdrop you walk toward, not terrain you walk through. The range front lies about 430 m in from those edges. Past it the peaks climb between 70 and 390 m in, steeper toward the back (phase 2a: as far as the sky test allows), and even out into a shoulder about 205 m high at the edge. The backdrop goes on beyond. |
+| Sea | closes the south and west; the shore lies about 240 m in | Beaches on low, gentle ground within about 16 m of the sea (34 m in phase 1); low cliffs along some stretches. |
 
-Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). Its highest point is 244 m above the sea (seeds 1, 2, 4 and 5 reach 302, 287, 314 and 284 m); 2% of it is snow and 6% bare rock.
+Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). Its highest point is 252 m above the sea, against 244 m in phase 1. Seeds 1, 2, 4 and 5 reach 317, 300, 326 and 291 m (302, 287, 314 and 284 in phase 1). 2% of it is snow and 7% bare rock.
+
+## The backdrop (phase 2a)
+
+The range goes on past the north and east edges as three receding ridgelines: never walkable, never part of the height grid, drawn where a ray has met nothing on the map. Each runs at a set distance outside the edges and rounds the north-east corner on an arc; heights are above the sea.
+
+| Ridgeline | Outside the edges | Heights (saddles to peaks) | Peaks apart | Snow from | Trees below |
+|---|---|---|---|---|---|
+| 1 | 450 m | 200–580 m | about 1.1 km | 480 m | 210 m |
+| 2 | 1,400 m | 320–840 m | about 1.7 km | 620 m | 220 m |
+| 3 | 3,200 m | 440–980 m | about 2.6 km | 700 m | 230 m |
+
+- From the spawn, the far ridgeline stands about 4.5 km away. From the south coast it is about 5.5 km away.
+- Snow caps a peak above its line by 55% of its height over it, so taller peaks carry more and the snow line follows the peaks; it runs down the gullies.
+- The ridgelines stand only where the map's own edge beside them is mountainous: at full height where the edge, smoothed over 900 m along it, is 210 m above the sea, and nothing where it is 110 m.
+- The march runs the map's edge on past it as far as the first ridgeline wherever that ridgeline stands above it, so the two meet with no gap.
+- Seed 3's ridgelines reach 375, 698 and 659 m: the far one is lower there, where the map's edge beside it is less mountainous. Seeds 1, 2, 4 and 5 reach 431–513, 569–653 and 792–814 m.
+- They cost one test per ray against three heights, worked out once per column.
 
 ## The body
 
@@ -53,7 +70,8 @@ Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). It
 
 | | | |
 |---|---|---|
-| Trees | about 12,000 conifers, in stands on a jittered 5 m lattice | Seed 3 has 11,777 trees and 596 bushes. |
+| Trees | about 12,000 conifers, in stands on a jittered 5 m lattice, and (phase 2a) in copses | Seed 3 has 11,843 trees (417 of them in copses) and 503 bushes. |
+| Copses (phase 2a) | up to 32 small clumps of 5 to 30 conifers, 4.5 m apart, in the open lowland at least 140 m apart, clear of the stands, water, shore and range | Something to walk toward in the middle of the map. Seed 3 has 31 copses. |
 | Tree height | 11 to 24 m for most trees; a few emergent trees reach about 36 m | Seed 3 median 19.4 m. Mature spruce and fir height, so a stand edge stands well above the eye across a meadow. |
 | Roads | dirt, 4 m wide, flattened across their width; steepest 12% | A cart track. The path search refuses 4 m steps steeper than 7.5% and loosens only where it must (9, 11, 14, then 20%). The laid road is graded to 9.6% and never cut or banked more than 1.5 m. `world-check.mjs` measures each road along its length over 4 m. |
 | The wall | 120 m long, 3 m thick, 6 m high, with merlons 1.5 m high and a gate 4 m wide | The 0A wall, at the fort site. The gate faces the roads. |
@@ -63,4 +81,4 @@ Seed 3 is 23% sea, 3% lakes, 1% rivers and 73% land (41% lowland, 32% range). It
 - **Spawn:** on a road, on a low rise (9 m above the ground around it on seed 3), facing the main lake, with forest to one side and the range behind.
 - **Fort:** on a rise near the main lake (on seed 3, 172 m from it and 12 m above its surroundings).
 - **Villages:** three, on flat ground near water.
-- **Viewpoints:** four, on high ground with long views (on seed 3, 188 to 228 m above the sea).
+- **Viewpoints:** four, on high ground with long views, each moved (phase 2a) to the brow of its hill: within 90 m, no more than 18 m lower, where the ground falls away soonest in the direction it looks, so its own slope does not fill the view (on seed 3, 205, 195, 219 and 35 m above the sea).

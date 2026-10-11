@@ -1,6 +1,6 @@
 # Land of Ascii v3: the art bible
 
-Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look was locked. This is the set of rules every later phase has to obey. It records the rules the look follows (phases 0a and 0b), the ones phase 0c added, and the choices locked at the start of phase 1 (section 9).
+Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look was locked. This is the set of rules every later phase has to obey. It records the rules the look follows (phases 0a and 0b), the ones phase 0c added, the choices locked at the start of phase 1 (section 9), and phase 2a's new rules for haze, far land and night (sections 5 and 5b), which replaced phase 1's there.
 
 Three things hold it together:
 - **`src/look.js` is the only place** where colours, glyphs, ladders and strengths are set. Renderer code reads it and never hard-codes a colour.
@@ -45,6 +45,7 @@ A water cell carries three of these records: the surface, what the reflected ray
 | snow | `. - = + *` |
 | water | `. : - =` |
 | lake bed | `. , : ;` |
+| foam (phase 2a) | `. : ; =` |
 | wall stone | `: = # ▒ ▓ █` |
 | conifer | `: ^ * % # & ▒` |
 | trunk | `: | ! I #` |
@@ -66,7 +67,7 @@ How the rung is set:
 - blended by light in between;
 - on near-black cells it is lightened by at least the ink floor (`#2a2c34`), so night glyphs still show.
 
-**Haze fades glyph contrast** with the same distance as the colour (`glyphFade` 0.9), so distant land is calmer.
+**Haze fades glyph contrast** with the same share as it closes up light and dark (`glyphFade` 0.9), so distant land is calmer.
 
 **Cloud edges** are the one place a cell shows two things: the sky behind as the background and the cloud as a shade block (░ ▒ ▓) over it. The edge dissolves without a hard outline.
 
@@ -76,9 +77,11 @@ The atlas draws the shade blocks itself, because fonts get them wrong at small s
 
 ## 3. The palette
 
-Colours are named by their role. Three keyframes are blended by the height of the sun, so time can run between them:
+Colours are named by their role. Keyframes are blended by the height of the sun, so time can run between them:
 - day is full once the sun is above 16°;
 - night is full once it is 13° below the horizon.
+
+The table gives phase 1's three keyframes, which the night rule 'p1' still uses. Under the default night rule ('moon', phase 2a) twilight is dawn in the morning and dusk in the evening, and night is two keyframes blended by the moonlight: see section 5.
 
 The whole palette is muted and close in value, after the reference: lit and shadowed grass differ mainly in brightness.
 
@@ -142,9 +145,22 @@ Every colour is clamped after light, haze and ink:
 
 ---
 
-## 5. Haze, dusk and night
+## 5. Air, dusk, night and dawn
 
-**Haze.** The share of the haze colour mixed in at distance d is 1 − e^(−d / dist), times the keyframe's most. It mixes toward the horizon colour of the time of day, so distant ridges sit in the sky, not on it. Glyph contrast fades with it.
+### Aerial perspective (phase 2a; replaced phase 1's distance haze)
+
+**What it replaced, and why.** Phase 1 mixed every distant surface toward the horizon colour by distance alone: 1 − e^(−d / dist), up to 72% by day. At 1–1.5 km that took everything most of the way to the sky's colour, and took light and dark with it, so the range, the vista's valley and the far shore all read as pale, flat shapes. The reference keeps a far mountain's lit face and shadow side, its snow bright, and cools it without turning it the colour of the sky.
+
+**The rule now** (air 'aerial', the default):
+- **Air is thickest low down and thins with height:** its density at height y is e^(−(y − base) / height), with `base` the sea level and `height` 220 m, plus a thin share (`uniform` 0.05) that is the same everywhere, so far land still recedes.
+- **A ray's haze is the air it passes through** on its way, worked out in closed form from the eye's height, the ray's elevation and the distance. So looking down from a viewpoint cuts through less of it than looking along the valley floor, and a far mountain's upper slopes stand clearer than its foot.
+- **Two shares, not one.** Colour shifts toward the horizon tone by the keyframe's `chroma` share; light and dark close up only by its `lum` share, which stays well short of 1 (0.4 by day, 0.45–0.48 at dusk and dawn). So far colours cool and converge on the horizon tone, while lit and shaded sides, snow, rock, forest and water remain apart out to the view distance.
+- **The sea still meets the sky softly:** sea-level air is the thickest, and the far sea's mirror is the sky.
+- A reflection is hazed over its own leg up from the water, then the whole cell over the way to the water.
+- Clouds keep phase 1's haze rule.
+- The settings are each keyframe's `air` and `LOOK.air`.
+
+Phase 1's haze stays behind the air rule 'p1', for comparison.
 
 **Dusk** is purple and orange:
 - the sky is purple, with an orange glow round the low sun;
@@ -152,11 +168,43 @@ Every colour is clamped after light, haze and ink:
 - cloud tops catch the warm light;
 - cloud banks (option B) flatten and stretch (`cloudFlat`, `cloudStretch`).
 
-**Night is properly dark:**
-- the moon is the light (direct 0.42, ambient 0.22);
-- 900 fixed stars, projected so they never blink;
-- torches make small warm pools on the ground, walls and water (torchlight 0.55);
-- cloud shadows fade out once the light is low.
+### Night and dawn (phase 2a; replaced phase 1's single night)
+
+**What it replaced, and why.** Phase 1 had one night keyframe with a moon always nearly full, its light so weak (direct 0.42 on near-black colours) that at 23:00 the land was a black screen, and its morning used dusk's colours. In the world, with no torches, there was nothing to walk by.
+
+**The rule now** (night 'moon', the default):
+- **The moon has a phase** that follows the day count (a month of 29.53 days; day 0 a bright moon, about day 15 a dark one). Its place follows its phase: a new moon rides with the sun and is down all night; a full moon is opposite it and up all night. The disc is drawn as bright as its lit share, and not at all when new; its glitter on water is as strong.
+- **Night is two keyframes**, blended by how much moonlight there is (the lit share times how high the moon is):
+  - **moonlit:** enough to walk by. Open ground, water and snow carry a cool, readable light (direct 0.62, ambient 0.26) and soft moon shadows (cast shadow 0.55), through the same shadow sweep and worker-shared arrays as sunlight;
+  - **starlit:** under a dark moon, a faint floor (ambient 0.42 on lifted dark colours) so the land is never a black screen; the stars are brighter.
+- **The change from sun to moon never flashes.** Sunlight fades out as the sun sets (from 3.4° up to 2° below); moonlight fades in only as the twilight deepens (from 2° to 8.6° below) and as the moon rises. At the moment the light that shades the ground changes from one to the other, both are dark.
+- **Dawn has its own keyframe:** cooler blue above and rosier at the horizon than dusk, with a pale lilac morning mist and pink-gold cloud tops.
+- **The low sun rakes across the meadow at both ends of the day.** Dawn and dusk have less ambient light (0.22–0.24) and more direct (0.95–1.05) than phase 1's dusk, so slopes facing the low sun stand out from the flat ground.
+- 900 fixed stars, projected so they never blink; torches make small warm pools (torchlight 0.55); cloud shadows fade out once the light is low.
+- The colours are `LOOK.moonKeys`; the moon's settings `LOOK.moon`.
+
+Phase 1's night stays behind the night rule 'p1', for comparison.
+
+### 5b. Far land (phase 2a; new)
+
+Phase 1 had no rule of its own for far terrain: past a few hundred metres the ground's detail faded, and nothing took its place. Now (air 'aerial'):
+- **Large forms are strengthened as fine detail fades.** From 300 m (full by 900 m) the light a surface catches gains contrast about the flat ground's light (`far.form` 0.55), so a far mountain has a clear lit face and a dark shadow side.
+- **Rock shows strata and gullies as broad bands.**
+  - Gullies are where rain gathers on the range, found from the water's flow, widened to 10–20 m. They darken rock and snow (`far.gully` 0.55).
+  - Strata run along the height every 38 m.
+  - Both are fixed to the land.
+- **The snow line reads as a clear edge.** Past 250 m, snow and rock are decided from the coarser levels' filtered weights, so a snow line or a rock band ends in a clean line instead of breaking into cells. This is blended in over a band, so nothing pops.
+- **Forest reads as a dark textured mass:** the air keeps far stands dark, and each tree keeps its own tone and phase 0c's jagged top.
+- **A skyline's top cell fades instead of snapping.** The cell just above where the land meets the sky blends land and sky by how much of the cell the land covers, measured from the centre of the cell below to its own. As you turn, the skyline moves through cells smoothly instead of jumping a row. This is the same idea as the far treeline's single-cell tips, for the range.
+
+### The backdrop (phase 2a; new)
+
+Past the north and east edges the range goes on, out to several kilometres, as three receding ridgelines (600 m to 980 m high at the far one), with snow, rock and wooded lower slopes, lit by the same sun. Each ridgeline:
+- faces the map, leaning back;
+- turns along its line by its own peaks and saddles, so a peak has a lit flank and a shaded one;
+- gets haze by the same air as everything else.
+
+It is reflected in water and sits behind nearer clouds. It is never walkable and never part of the height grid. It stands only where the map's own edge is mountainous, and meets the map's mountains with no gap. Its sizes are in `docs/scale.md`.
 
 **Water** mirrors whatever the time of day gives it, by the Fresnel share:
 - the glitter path (the sun or moon caught by ripples) is broken by a sparkle fixed to the water;
@@ -220,7 +268,15 @@ Nothing else changes with the clock. **Every variation is a pure function of wor
 
 There is **no marsh**: it would need a material, colours and a ladder the bible does not have (wet ground between grass and water), so it waits for a phase that adds them here first.
 
-**The sea runs to the horizon.** Past the map's edge the edge's sea goes on, and past the view distance a ray that comes down to sea level over open sea meets a calm surface whose mirror is the sky. It never ends in a line.
+**The sea runs to the horizon.** Past the map's edge the edge's sea goes on, and past the view distance a ray that comes down to sea level over open sea meets a surface whose mirror is the sky. It never ends in a line.
+
+**The coast (phase 2a).** All of it is a pure function of world position and time, so a frozen clock repeats exactly:
+- **Wet band:** where sand meets the sea a darker wet band 2.2 m wide (0.4 m at a lake), drawn in the bed's colours wherever it covers most of a cell's footprint, so far off it thins away.
+- **Foam line:** a broken foam line in the water (the `foam` material) runs up toward the shore and back over 9 s (6 s, and fainter, at a lake). It covers a cell by the share of its footprint the line covers, so thin foam fades with distance instead of breaking into dashes.
+- **Swell:** the open sea has a gentle swell running onshore, faded like the ripples as a cell's footprint passes its length.
+- **Beaches** are narrower than in phase 1, about 16 m (34 m before).
+
+The settings are `LOOK.coast`.
 
 Shading:
 - terrain is lit by its interpolated normal;
@@ -316,5 +372,12 @@ Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates. They a
 | Shallows (0) | **blue, even blue** | The reference's near water is an even blue with no bed showing. |
 
 Also accepted from phase 0c: the forest-floor material, and narrower crowns in dense stands.
+
+**Phase 2a's rules** are the defaults too, with phase 1's kept beside them in the look panel and by URL for comparison:
+
+| Rule (key) | Default | Phase 1's, for comparison |
+|---|---|---|
+| Distance (5) | **aerial**: aerial perspective, the far-land rules and the backdrop (sections 5 and 5b) | `?air=p1`: haze by distance alone, no backdrop |
+| Night (6) | **moon**: the moon's phases, moonlight and starlight, dawn, the low sun raking (section 5) | `?night=p1`: one dark night, dusk's colours at dawn |
 
 The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`).
