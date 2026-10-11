@@ -644,6 +644,7 @@ Object.assign(lab, {
       pace: local ? 1 : pacer.every, lag: local ? 0 : pacer.lag, refresh: pacer.refresh,
       weather: state.weather, menu: menu.open, rate: state.running ? state.rate : 0,
       glyphs: presenter.glyphs, sensitivity: input.sensitivity, invert: input.invert,
+      stripes: pool && pool.edges ? Array.from(pool.edges) : null,
     };
   },
   // Resolves once a frame made after this call is on screen, with cast
