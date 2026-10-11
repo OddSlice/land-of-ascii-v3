@@ -14,9 +14,11 @@ A text-rendered explorer, rebuilt from the ground up. Every frame is a grid of m
 
 **Phase 2b, weather and the menu:** weather from a forecast that is a pure function of the seed, the day and the hour (clear, fair, overcast, rain and a morning mist that pools in the hollows and over the lakes, burning off as the sun climbs); rain streaks, rings on water and wet ground that dries; a menu on Escape with every control and option (since laid out as tabs with icons, with the frame rate and a few statistics on screen by default, and big screens drawn at the same cost as a 1440 × 900 window); five look fixes (a dark silhouette for the far range at dusk, warm far rock, no snow line along the crests, no specks in the dawn sky, a lake's wet band that follows its shore and a better coast camera).
 
+**Phase 3a, the building kit and the fort:** a kit of building pieces as data (curtain wall with its walk and crenellations, an arched gate passage, square and round towers with stairs inside, a keep with its hall, stairs to the walk, a timber house, a well, torches, lit windows), built from exact shapes that stand at any angle; the same shapes are drawn, cast shadows and are walked on. A fort built from it on every seed, on its rise by the lake and seen from the spawn: the road runs into its gate, and you can walk through the passage, round the courtyard, up onto the walls, into the towers and the keep; at night its torches and windows are lit. Every piece stands alone in the building yard (`?yard=1`).
+
 - Play: https://land-of-ascii-v3.vercel.app/ (shared memory). Also https://oddslice.github.io/land-of-ascii-v3/ (each worker its own copy, at most 4 workers).
-- A seed: `?seed=N` (the default is 3). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`.
-- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md)
+- A seed: `?seed=N` (the default is 3). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`. The building yard: `?yard=1` (`&proto=1` for the prototypes the kit was chosen by).
+- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md)
 
 ```sh
 npm install

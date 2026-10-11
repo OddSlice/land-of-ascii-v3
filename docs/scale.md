@@ -74,11 +74,34 @@ The range goes on past the north and east edges as three receding ridgelines: ne
 | Copses (phase 2a) | up to 32 small clumps of 5 to 30 conifers, 4.5 m apart, in the open lowland at least 140 m apart, clear of the stands, water, shore and range | Something to walk toward in the middle of the map. Seed 3 has 31 copses. |
 | Tree height | 11 to 24 m for most trees; a few emergent trees reach about 36 m | Seed 3 median 19.4 m. Mature spruce and fir height, so a stand edge stands well above the eye across a meadow. |
 | Roads | dirt, 4 m wide, flattened across their width; steepest 12% | A cart track. The path search refuses 4 m steps steeper than 7.5% and loosens only where it must (9, 11, 14, then 20%). The laid road is graded to 9.6% and never cut or banked more than 1.5 m. `world-check.mjs` measures each road along its length over 4 m. |
-| The wall | 120 m long, 3 m thick, 6 m high, with merlons 1.5 m high and a gate 4 m wide | The 0A wall, at the fort site. The gate faces the roads. |
+| The wall | 120 m long, 3 m thick, 6 m high, with merlons 1.5 m high and a gate 4 m wide | The 0A wall. Since phase 3a only in the lab; the generated world has the fort (below). |
 
 ## Sites
 
 - **Spawn:** on a road, on a low rise (9 m above the ground around it on seed 3), facing the main lake, with forest to one side and the range behind.
-- **Fort:** on a rise near the main lake (on seed 3, 172 m from it and 12 m above its surroundings).
+- **Fort:** on a rise near the main lake (on seed 3, 172 m from it and 12 m above its surroundings). Since phase 3a the site must be seen from the spawn, over the land and the forest: the keep's top or a tower's (the next best site if not; any site if none is). 14 of 65 seeds checked moved their fort for it; seed 3's did not.
 - **Villages:** three, on flat ground near water.
 - **Viewpoints:** four, on high ground with long views, each moved (phase 2a) to the brow of its hill: within 90 m, no more than 18 m lower, where the ground falls away soonest in the direction it looks, so its own slope does not fill the view (on seed 3, 205, 195, 219 and 35 m above the sea).
+
+## Buildings (phase 3a)
+
+The building kit's sizes, in `SCALE.kit`. Heights are above the ground a piece stands on (the fort's platform).
+
+| | | |
+|---|---|---|
+| Curtain wall | walk 6.5 m up, 3.2 m thick, foundation 2 m deep; parapet 0.6 m thick on the outer side, breastwork 1 m above the walk, merlons 1 m above that, 1.4 m long with 0.9 m gaps | A walk 2.6 m wide, so two can pass. At 6.5 m the walk looks over the trees' lower crowns and the yard is hidden from outside. |
+| Gate | a block 10 m along the wall; its passage 3.6 m wide and 7.4 m deep, the arch springing at 3.2 m (crown at 5 m) | Deep enough to feel like going through, not past; a cart's width. |
+| Towers | square: 4.4–4.9 m half width; round: 3.7–4.3 m radius; walls 1.15 m thick; 3 m above the walk | Room inside for a stair, a floor at the walk's height and a hatch; a square tower is turned square to its walls, and needs the width to fit its ground door beside a wall, in the corner the yard sees. |
+| Keep | 6–7.5 m by 5–6 m (half), walls 1.5 m, 6 m above the walk; its hall 5 m high | The tallest thing in the fort, so it reads from far off. |
+| Doorways | 1.5 m wide, 2.7 m high (onto the walk 2.5 m; the keep's 2.0 by 3.3 m) | Walked through in comfort at an eye of 1.7 m. |
+| Stairs to the walk | 1.7 m wide, steps 0.2 m high and 0.28 m deep | A comfortable 36 degrees. |
+| A tower's stair | 1.0 m wide (strips of 1.1 m), steps 0.22 m by 0.25 m | Steeper, to fit: two flights and a landing to the walk, slabs on to the top. |
+| Floors | 0.3 m thick; rooms at least 2.6 m high | |
+| Timber house | 3.3–4.2 by 2.4–2.9 m (half), eaves at 3 m, roof pitch 0.95 (about 44 degrees), 0.45 m overhang | A barn or a store against the wall. |
+| Well | 1 m radius, 0.85 m high | |
+| Window | 0.7 m wide, 1.1 m high, 0.35 m deep | |
+
+**The fort:** 4 to 6 towers at the corners of a rough polygon (square and round mixed, at least one of each), 53–64 m across on the five check seeds, its yard 1,100–2,000 m². The gate is in the side facing where the road arrives; the keep stands against the far wall; one or two timber houses and a well stand in the yard; stairs go up to the walk in at least two places. Seed 3's fort: 6 towers (3 round), 2 stairs, 2 houses, a well, 26 torches and 10 lit windows in 294 shapes; 63.6 m across, its yard 1,984 m².
+
+**Its site:** the platform is levelled to the median ground under it, with banks of 1 in 2.4 out to the land; water within its footprint is filled. Where its road could not come in at 8% or gentler from any point of the old road nearby, the platform is moved toward the road's height by up to 2.5 m (seed 3: 2.1 m lower than its ground). The road's last stretch is replaced by a curve into the gate, graded evenly, and the ground along it brought to it on banks of 1 in 2.6. Trees and bushes are cleared from the fort and 24 m beyond its walls.
+

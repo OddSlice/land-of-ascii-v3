@@ -264,6 +264,12 @@ So everything has a floor that grows with distance (`minR`, the width of a cell 
 | Bushes | at least two cells |
 | Cloud edges | a lumpy band a few cells wide, its width scaled with distance |
 | Reflections | the mirrored pass uses the same floors; reflected trees are thinner, so they are checked separately in the flicker set |
+| Buildings: thin shapes (phase 3a) | a wall seen end on, a post, a bracket, a beam: held at least two cells across, as trunks are |
+| Buildings: merlons | sink into the parapet before they get thinner than about two cells across or tall |
+| Buildings: openings | a door, a window, an arrow slit or the gate far off closes once it is under about two cells across or two rows tall, as a notch in a crown does |
+| Buildings: stairs | the steps melt into an even slope once a step is under about three rows tall |
+| Buildings: lit windows | held at two rows, faded by how much of that is really window, as a flame is |
+| Buildings: masonry, framing, shingles, boards, paving | each fades as a cell's footprint on the surface passes its size (a course, a frame bay, a shingle row) |
 
 **Time moves only what should move:**
 - the clouds drift;
@@ -337,7 +343,39 @@ The shape: a bare trunk under a stack of overlapping cone tiers, each wide at it
 
 - **Bushes:** a squat ellipsoid with a lumpy outline, at least two cells.
 - **Torch:** a post and a flame. By day the flame is a small pale light (`flameStrength` 0.6, `#f0dfba`), at night warm and full. It lights the ground within 11 m.
-- **Wall:** spans of stone on the grid, with merlons that sink with distance; the gate is an arch.
+- **Wall (the lab):** spans of stone on the grid, with merlons that sink with distance; the gate is an arch. The generated world's fort is built from the kit instead (below).
+
+### Buildings (phase 3a)
+
+Every structure is made from one kit of pieces, described as data (`src/world/kit-pieces.js`) and built from exact shapes (boxes, cylinders, gable prisms, stairs, panes) that can stand at any angle and have openings cut through them (`src/world/kit.js`). The same shapes are drawn, cast shadows, are walked on and are checked by the tools. Why exact shapes and not spans: `docs/phase3a.md`.
+
+**The pieces:**
+- **Curtain wall:** 6.5 m to its walk, 3.2 m thick; the walk is 2.6 m wide behind a 0.6 m parapet, crenellated outward (merlons 1.4 m, gaps 0.9 m, 1 m tall over a 1 m breastwork).
+- **Gate:** a block 10 m along the wall with an arched passage 3.6 m wide and 7.4 m deep through it, torches at its mouth and inside it.
+- **Towers:** square (half width 4.4–4.9 m, turned square to its walls, which leave through the middles of two faces) or round (radius 3.7–4.3 m), 3 m above the walk; a doorway from the yard at the base, a stair inside to a floor at the walk's height with doors onto both walks, and a hatch to the open, crenellated top; a window lit at night.
+- **Keep:** one hall 5 m high, against the far wall, 6 m above the walk; a door from the yard, windows lit at night.
+- **Stair to the walk:** solid stone steps against the wall's inside face.
+- **Timber building:** a framed house (posts and beams with plaster between), a shingle roof, a door.
+- **Well, torch on a bracket or post, lit window.**
+
+**The materials** (colours by keyframe in `look.js`; stone in blocks is the wall's stone):
+
+| Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | With distance |
+|---|---|---|---|---|---|
+| Stone in blocks | `:=#▒▓█` | `#9a958d` / `#4d4b50` | `#6e6064` | `#45464e` | courses and joints fade with the footprint |
+| Timber | `.-=#H` | `#6e573f` / `#30261e` | `#4f3d31` | `#302b23` | posts and beams held two cells; framing fades |
+| Plaster | `.,:;=` | `#b3a994` / `#575450` | `#806d69` | `#504f52` | plain; goes with the frame's fading |
+| Shingle roof | `:^=#%` | `#6d625a` / `#2d2a2c` | `#4d424f` | `#363641` | shingle rows fade |
+| Packed-earth yard | `.,:-=` | `#8a7a64` / `#403830` | `#735e59` | `#40424d` | as the dirt road; no meadow tufts on it |
+| Lit window | `:=#▓` | dark by day (`#24201d`), lit `#e2a65e`–`#eeaa5e` from dusk | strength 0.8 | strength 1 | held at two rows and faded, as a flame |
+
+Each also has a dawn, a starlit (dark moon) and phase 1's night colour (`look.js`, keyframes `dawn`, `starlit`, `night`).
+
+**Light inside:** a surface inside a room or the gate's passage takes the sky's soft light only by the share its doorways, windows and open tops let in, and darkens toward 0.42 of itself where none comes in (`LOOK.interior`). A torch there lights it at least at strength 0.32, even by day, so an interior is dark but reads by its openings and its torches. Torchlight reaches only surfaces sharing its zone (outside, the yard, or one room), so a torch never lights through a wall, and a torch's cost depends only on the shapes near it.
+
+**At night** the fort's torches and lit windows are small warm points from afar (held at two rows, faded by how much of that they really are); near, the torches light the stone and the ground round them and show in the lake.
+
+**The fort's site:** the platform is levelled to the ground's median under it, with banks of 1 in 2.4 round it, or moved toward the road's height by up to 2.5 m where the road could not otherwise come in at a gentle grade; trees and bushes are cleared from it and 24 m beyond its walls; the road runs straight in through the gate's passage, graded evenly.
 
 ### Sky
 
@@ -351,7 +389,7 @@ The shape: a bare trunk under a stack of overlapping cone tiers, each wide at it
 
 ### The overhead map (M)
 
-The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort site's wall, `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
+The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort's walls (all the way round, phase 3a), `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
 
 ---
 
@@ -393,6 +431,15 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 19. **Never judge terrain from the overhead map.** Height noise that looks gentle on a map is usually far too steep at eye level. The generated world is judged by the sky test (`tools/world-check.mjs`: at eye level the median frame is at least 35% sky, and under one view in ten has less than 15%) and by standing in it.
 20. **Never simulate the weather** (phase 2b). Every part of it, the mix of kinds, the wetness of the ground and the clouds' drift, is worked out from the seed, the day and the hour, so a frozen clock repeats exactly and every thread draws the same picture.
 21. **Never let anything on screen but the picture into a tool's frames** (phase 2b). The tools run with the menu, the hint and the start card suppressed from the first frame (`tools/lib/serve.mjs`).
+
+**Buildings (phase 3a):**
+
+22. **Never lock a building to the grid.** Pieces stand at any angle and their outlines are exact; a turned wall drawn as 1 m columns steps and crawls as you walk past it.
+23. **Never let collision and the picture disagree.** Walking, shadows and drawing read the same shapes; a walker must never pass through a wall, stand inside one, get stuck or fall through a floor, and `tools/world-check.mjs` walks every place and a thousand random walks to prove it.
+24. **Never let an opening or a thin part blink.** A door, a window or the gate far off closes before it is two cells across; a post or a wall end on is held at two cells; merlons sink; masonry, framing and shingles fade with the footprint. Large flat walls at eye height are checked for moiré at every density.
+25. **Never light an interior from the open sky.** Inside, light comes by doorways, windows, open tops and torches only, so a hall is dark but readable; and a torch never lights through a wall (zones).
+26. **Never place a door where the floor is not.** Every doorway opens onto something to stand on at its sill, in line with the walk or path that reaches it (phase 3a's square towers once clamped a walk door off the walk, over a stairwell).
+27. **Never leave a cliff, a trench or a floating base round a building.** Its platform is levelled with gentle banks, and its road meets its gate without a step.
 
 ---
 

@@ -1,5 +1,5 @@
 {
- "saved": "2026-10-11T10:38:15.852Z",
+ "saved": "2026-10-11T20:00:42.077Z",
  "density": 3,
  "frames": [
   {
@@ -420,6 +420,384 @@
    "cols": 360,
    "rows": 112,
    "offset": 19031040,
+   "length": 322560
+  },
+  {
+   "name": "world 9 the fort from the road (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 19353600,
+   "length": 322560
+  },
+  {
+   "name": "world 9 the fort from the road (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 19676160,
+   "length": 322560
+  },
+  {
+   "name": "world 9 the fort from the road (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 19998720,
+   "length": 322560
+  },
+  {
+   "name": "world 10 inside the gate passage, looking in (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 20321280,
+   "length": 322560
+  },
+  {
+   "name": "world 10 inside the gate passage, looking in (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 20643840,
+   "length": 322560
+  },
+  {
+   "name": "world 10 inside the gate passage, looking in (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 20966400,
+   "length": 322560
+  },
+  {
+   "name": "world 11 the courtyard (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 21288960,
+   "length": 322560
+  },
+  {
+   "name": "world 11 the courtyard (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 21611520,
+   "length": 322560
+  },
+  {
+   "name": "world 11 the courtyard (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 21934080,
+   "length": 322560
+  },
+  {
+   "name": "world 12 the wall walk over the valley (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 22256640,
+   "length": 322560
+  },
+  {
+   "name": "world 12 the wall walk over the valley (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 22579200,
+   "length": 322560
+  },
+  {
+   "name": "world 12 the wall walk over the valley (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 22901760,
+   "length": 322560
+  },
+  {
+   "name": "yard 1 gate, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 23224320,
+   "length": 322560
+  },
+  {
+   "name": "yard 1 gate, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 23546880,
+   "length": 322560
+  },
+  {
+   "name": "yard 1 gate, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 23869440,
+   "length": 322560
+  },
+  {
+   "name": "yard 2 square tower, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 24192000,
+   "length": 322560
+  },
+  {
+   "name": "yard 2 square tower, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 24514560,
+   "length": 322560
+  },
+  {
+   "name": "yard 2 square tower, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 24837120,
+   "length": 322560
+  },
+  {
+   "name": "yard 3 round tower, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 25159680,
+   "length": 322560
+  },
+  {
+   "name": "yard 3 round tower, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 25482240,
+   "length": 322560
+  },
+  {
+   "name": "yard 3 round tower, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 25804800,
+   "length": 322560
+  },
+  {
+   "name": "yard 4 keep, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 26127360,
+   "length": 322560
+  },
+  {
+   "name": "yard 4 keep, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 26449920,
+   "length": 322560
+  },
+  {
+   "name": "yard 4 keep, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 26772480,
+   "length": 322560
+  },
+  {
+   "name": "yard 5 stair, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 27095040,
+   "length": 322560
+  },
+  {
+   "name": "yard 5 stair, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 27417600,
+   "length": 322560
+  },
+  {
+   "name": "yard 5 stair, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 27740160,
+   "length": 322560
+  },
+  {
+   "name": "yard 6 house, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 28062720,
+   "length": 322560
+  },
+  {
+   "name": "yard 6 house, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 28385280,
+   "length": 322560
+  },
+  {
+   "name": "yard 6 house, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 28707840,
+   "length": 322560
+  },
+  {
+   "name": "yard 7 well, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 29030400,
+   "length": 322560
+  },
+  {
+   "name": "yard 7 well, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 29352960,
+   "length": 322560
+  },
+  {
+   "name": "yard 7 well, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 29675520,
+   "length": 322560
+  },
+  {
+   "name": "yard 8 torches, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 29998080,
+   "length": 322560
+  },
+  {
+   "name": "yard 8 torches, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 30320640,
+   "length": 322560
+  },
+  {
+   "name": "yard 8 torches, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 30643200,
+   "length": 322560
+  },
+  {
+   "name": "yard 9 window, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 30965760,
+   "length": 322560
+  },
+  {
+   "name": "yard 9 window, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 31288320,
+   "length": 322560
+  },
+  {
+   "name": "yard 9 window, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 31610880,
+   "length": 322560
+  },
+  {
+   "name": "yard 10 the yard, middle distance (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 31933440,
+   "length": 322560
+  },
+  {
+   "name": "yard 10 the yard, middle distance (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 32256000,
+   "length": 322560
+  },
+  {
+   "name": "yard 10 the yard, middle distance (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 32578560,
+   "length": 322560
+  },
+  {
+   "name": "yard 11 the yard, far (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 32901120,
+   "length": 322560
+  },
+  {
+   "name": "yard 11 the yard, far (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 33223680,
+   "length": 322560
+  },
+  {
+   "name": "yard 11 the yard, far (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 33546240,
+   "length": 322560
+  },
+  {
+   "name": "yard 12 the yard at night (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 33868800,
+   "length": 322560
+  },
+  {
+   "name": "yard 12 the yard at night (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 34191360,
+   "length": 322560
+  },
+  {
+   "name": "yard 12 the yard at night (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 34513920,
+   "length": 322560
+  },
+  {
+   "name": "yard 13 inside the gate passage (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 34836480,
+   "length": 322560
+  },
+  {
+   "name": "yard 13 inside the gate passage (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 35159040,
+   "length": 322560
+  },
+  {
+   "name": "yard 13 inside the gate passage (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 35481600,
+   "length": 322560
+  },
+  {
+   "name": "yard 14 on the wall walk (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 35804160,
+   "length": 322560
+  },
+  {
+   "name": "yard 14 on the wall walk (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 36126720,
+   "length": 322560
+  },
+  {
+   "name": "yard 14 on the wall walk (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 36449280,
    "length": 322560
   }
  ]
