@@ -25,6 +25,62 @@
     font: 12px/1.5 Menlo, Consolas, monospace; color: #dcd7cb; white-space: pre; }
   #error { position: fixed; inset: 0; display: none; z-index: 10; padding: 28px; background: #3a1010; color: #ffd9cf;
     font: 13px/1.5 Menlo, monospace; white-space: pre-wrap; }
+
+  /* phase 2b: the hint, the start card and the menu, in the game's own
+     monospace and the art bible's colours (src/app/menu.js) */
+  :root { --ink: #dcd7cb; --quiet: #a9a397; --head: #f0e6cc; --accent: #ffb060; --line: #383842; --panel: rgba(13, 14, 18, .94);
+    --hover: #1c1d22; --press: #2a2620; --mono: Menlo, Consolas, monospace; }
+  #hint { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 5px 10px; font: 12px/1.4 var(--mono);
+    color: var(--ink); background: rgba(13, 14, 18, .6); border-radius: 3px; pointer-events: none; opacity: 0; transition: opacity 300ms ease; }
+  #hint.on { opacity: 1; }
+  #hint kbd, #card kbd, .menu kbd { font: inherit; color: var(--head); }
+  #card { position: fixed; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; cursor: pointer;
+    background: rgba(13, 14, 18, .35); opacity: 0; transition: opacity 200ms ease; }
+  #card.on { display: flex; }
+  #card.shown { opacity: 1; }
+  #card .box { max-width: calc(100vw - 32px); padding: 22px 28px; font: 13px/1.6 var(--mono); color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+  #card h1 { margin: 0 0 4px; font: 600 18px/1.3 var(--mono); color: var(--head); letter-spacing: .02em; }
+  #card .go { margin: 0 0 14px; color: var(--accent); }
+  #card dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 0; }
+  #card dt { color: var(--head); } #card dd { margin: 0; color: var(--quiet); }
+
+  .menu { position: fixed; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center; font: 13px/1.55 var(--mono); color: var(--ink); }
+  .menu.on { display: flex; }
+  .menu .back { position: absolute; inset: 0; background: rgba(13, 14, 18, .5); opacity: 0; transition: opacity 200ms ease; }
+  .menu .panel { position: relative; display: flex; flex-direction: column; width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 4px; opacity: 0; transform: translateY(6px);
+    transition: opacity 200ms ease, transform 200ms ease; }
+  .menu.shown .back, .menu.shown .panel { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .menu .panel { transform: none; } }
+  .menu header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 14px 18px 12px; border-bottom: 1px solid var(--line); }
+  .menu h1 { margin: 0; font: 600 15px/1.3 var(--mono); color: var(--head); }
+  .menu nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+  .menu .body { overflow-y: auto; padding: 4px 18px 18px; overscroll-behavior: contain; }
+  .menu section { padding-top: 14px; }
+  .menu h2 { margin: 0 0 8px; font: 600 13px/1.4 var(--mono); color: var(--head); }
+  .menu h2:focus { outline: none; }
+  .menu h3 { margin: 12px 0 4px; font: 12px/1.4 var(--mono); color: var(--quiet); text-transform: lowercase; letter-spacing: .04em; }
+  .menu .keys { display: grid; grid-template-columns: minmax(10ch, max-content) 1fr; gap: 1px 16px; margin: 0; }
+  .menu .keys dt { color: var(--head); white-space: nowrap; } .menu .keys dd { margin: 0; color: var(--ink); }
+  .menu .row { margin: 0 0 10px; }
+  .menu .row .note { margin: 4px 0 0; }
+  .menu .row .label { display: block; margin-bottom: 4px; color: var(--quiet); }
+  .menu .opts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .menu .note { margin: 2px 0 10px; color: var(--quiet); }
+  .menu .line { margin: 0 0 10px; }
+  .menu button, .menu input { font: inherit; color: var(--ink); }
+  .menu button { padding: 3px 10px; background: transparent; border: 1px solid var(--line); border-radius: 3px; cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  .menu button:hover { background: var(--hover); border-color: #5a5650; }
+  .menu button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--press); }
+  .menu button:focus-visible, .menu input:focus-visible, #card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .menu button.resume { color: var(--head); border-color: #6a655c; }
+  .menu button.disclose { padding: 0; border: 0; color: var(--head); font-weight: 600; }
+  .menu button.disclose:hover { background: transparent; color: var(--accent); }
+  .menu input[type="text"] { width: 12ch; padding: 3px 6px; background: #121317; border: 1px solid var(--line); border-radius: 3px; }
+  .menu input[type="range"] { width: min(260px, 60vw); accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+  .menu .inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 </style>
 </head>
 <body>
@@ -39,6 +95,20 @@
 <div id="hud"></div>
 <div id="progress"></div>
 <div id="look" style="display:none"></div>
+<div id="hint" aria-hidden="true"><kbd>Esc</kbd>  menu and controls</div>
+<div id="card" role="dialog" aria-labelledby="card-title" tabindex="-1">
+  <div class="box">
+    <h1 id="card-title">Land of Ascii</h1>
+    <p class="go">click to explore</p>
+    <dl>
+      <dt>W A S D</dt><dd>walk (Shift runs)</dd>
+      <dt>mouse</dt><dd>look</dd>
+      <dt>F</dt><dd>fly</dd>
+      <dt>Esc</dt><dd>menu: every control and option</dd>
+    </dl>
+  </div>
+</div>
+<div id="menu" class="menu" aria-hidden="true"></div>
 <div id="error"></div>
 <script type="module" src="/src/main.js"></script>
 </body>

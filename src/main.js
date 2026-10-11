@@ -27,6 +27,10 @@ import { Pacer } from './app/pace.js';
 import { CAMERAS } from './app/cameras.js';
 import { layout, cellWidth, TARGETS } from './app/grid.js';
 import { MAX_PITCH } from './scene/cpu/view.js';
+import { weatherFor, forecastOf, mainKind, KINDS } from './weather.js';
+import { Menu } from './app/menu.js';
+import { loadDisplay, saveDisplay, seenCard, markCardSeen } from './app/settings.js';
+import { moonLit } from './world/sky.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -45,6 +49,12 @@ const threadsParam = params.get('threads');
 const AUTO = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 2));
 const THREADS = threadsParam !== null ? Math.max(0, parseInt(threadsParam, 10) || 0) : WORLD && !ISOLATED ? Math.min(4, AUTO) : AUTO;
 const SHARED = WORLD && ISOLATED && THREADS > 0;
+// The menu's Display choices, kept between visits (phase 2b); ?density= still wins.
+const display = loadDisplay();
+if (params.has('density')) display.density = Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1));
+// The tools run with the menu, the hint and the start card suppressed
+// (tools/lib/serve.mjs sets this before the page starts; lab.setQuiet too).
+let QUIET = !!self.LAND_QUIET;
 
 const state = {
   hour: LOOK.hours.day, t: 0,
@@ -52,13 +62,17 @@ const state = {
   // the clock passes midnight
   day: params.has('day') ? (parseInt(params.get('day'), 10) || 0) : LOOK.moon.startDay,
   running: false,            // T: time of day moves
+  rate: CLOCK_RATE,          // how fast it moves, game hours a second (the menu)
   frozen: false,             // lab.freeze: every clock stands still
   held: false,               // lab.setCamera with a height: no walking or falling
   // density 3 by default (the phase 0b verdict); ?density=1..4 or −/+ for the others
-  preset: params.has('density') ? Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1)) : 2,
+  preset: display.density,
   cam: 0, camName: CAMERAS[0].name,
   // the look candidates in use (LOOK.choices), from the URL or the defaults
   look: lookFrom(Object.fromEntries(Object.keys(LOOK.choices).map((k) => [k, params.get(k)]))),
+  // the weather (phase 2b): 'auto', the world's forecast, or one kind held
+  // (the lab and the stress scene keep fair, as before weather)
+  weather: WORLD ? 'auto' : 'fair',
   seq: 0, presented: 0, failed: false,
 };
 
@@ -141,7 +155,9 @@ const CAMS = STRESS || WORLD ? world.cameras : CAMERAS;
 const player = new Player(world, { rules: WORLD ? 'world' : 'lab' });
 const canvas = $('view');
 const presenter = new Presenter(canvas);
+presenter.glyphs = display.glyphs;
 const hud = new Hud($('hud'));
+hud.setMode(display.hud);
 const ref = new RefView($('ref'));
 const lookPanel = new LookPanel($('look'));
 const map = WORLD ? new MapView(world) : null;
@@ -189,7 +205,7 @@ const input = new Input(canvas, {
   time: setTime,
   toggleClock: () => { state.running = !state.running; state.frozen = false; },
   nextCamera: () => useCamera((state.cam + 1) % CAMS.length),
-  toggleGlyphs: () => { presenter.glyphs = !presenter.glyphs; },
+  toggleGlyphs: () => setDisplay('glyphs', !display.glyphs),
   // R: in the lab, the reference frame (the stress scene has none); in the
   // world, a new world from a new seed (the page reloads with it, so the
   // old world's memory is freed)
@@ -209,8 +225,13 @@ const input = new Input(canvas, {
   toggleHud: () => hud.toggle(),
   toggleLook: () => lookPanel.toggle(),
   cycleLook: (name) => { state.look = nextOption(state.look, name); },
-  density: (d) => { state.preset = Math.max(0, Math.min(3, state.preset + d)); relayout(); },
+  density: (d) => setDisplay('density', Math.max(0, Math.min(3, state.preset + d))),
+  escape: () => onEscape(),
+  unlocked: () => onUnlocked(),
 });
+input.sensitivity = display.sensitivity;
+input.invert = display.invert;
+input.blocked = () => menu.open || card.up;
 
 relayout();
 
@@ -223,11 +244,16 @@ function makeFrame() {
     aspect: grid.cols / (2 * grid.rows),
     hour: state.hour, t: state.t, day: state.day,
     look: state.look,
+    weather: weatherNow(),
   };
   // which shared shadow store this frame reads
   if (shadows) f.shadow = shadows.frame;
   return f;
 }
+
+// The frame's weather (src/weather.js): a pure function of the seed, the day
+// and the hour, or one kind held.
+function weatherNow() { return typeof state.weather === 'object' ? state.weather : weatherFor(SEED, state.day, state.hour, state.weather); }
 
 // ---- rendering --------------------------------------------------------------
 
@@ -310,7 +336,7 @@ function tick(now) {
   const R = pacer.refresh / 1000, raw = Math.max(0, (now - last) / 1000);
   const dt = Math.min(0.1, raw > 0 ? R * Math.max(1, Math.round(raw / R)) : 0);
   last = now;
-  const look = input.takeLook(dt);
+  const look = menu.open ? { yaw: 0, pitch: 0 } : input.takeLook(dt);
   if (look.yaw || look.pitch) {
     player.yaw += look.yaw;
     player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, player.pitch + look.pitch));
@@ -318,11 +344,13 @@ function tick(now) {
   // an eye placed at a height by lab.setCamera stays there until a walk key
   const k = input.keys;
   if (state.held && (k.KeyW || k.KeyA || k.KeyS || k.KeyD)) state.held = false;
-  if (!state.held) player.update(dt, k);
-  if (!state.frozen) {
+  // (while the menu is open the clocks and movement stand still)
+  const paused = menu.open;
+  if (!state.held && !paused) player.update(dt, k);
+  if (!state.frozen && !paused) {
     state.t += dt;
     if (state.running) {
-      state.hour += dt * CLOCK_RATE;
+      state.hour += dt * state.rate;
       if (state.hour >= 24) { state.hour -= 24; state.day++; }
     }
   }
@@ -357,10 +385,12 @@ function tick(now) {
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
     threads: THREADS, hour: state.hour, day: state.day, night: state.look.night, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
+    weather: WORLD || state.weather !== 'fair' ? weatherName() : null,
     stress: STRESS, buildMs: buildMs(), sweepMs: shadows ? shadows.sweepMs : light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
     world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on) } : null,
   });
   lookPanel.update(state.look);
+  if (menu.open && now > menuNext) { menuNext = now + 250; menu.update(); }
   requestAnimationFrame(tick);
 }
 
@@ -377,7 +407,7 @@ function keyName(h) {
 const buildMs = () => (WORLD ? worldBuild.total : pool ? pool.buildMs : world.buildMs);
 // (with shared shadows, frames wait for the first sweep)
 const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => (shadows ? (worldProgress('casting shadows', 0.98), shadows.first) : null))
-  .then(() => { started = true; $('progress').style.display = 'none'; });
+  .then(() => { started = true; $('progress').style.display = 'none'; if (!card.show()) showHint(); });
 
 // M: the overhead map, drawn in the same cells, instead of the view
 function presentMap() {
@@ -387,6 +417,152 @@ function presentMap() {
   presenter.draw();
 }
 requestAnimationFrame(tick);
+
+// ---- the menu, the start card and the hint (phase 2b) --------------------------
+
+// A Display choice, applied at once and kept for the next visit.
+function setDisplay(k, v, keep = true) {
+  display[k] = v;
+  if (state.preset !== display.density) { state.preset = display.density; relayout(); }
+  presenter.glyphs = display.glyphs;
+  if (k === 'hud') hud.setMode(display.hud);
+  input.sensitivity = display.sensitivity; input.invert = display.invert;
+  if (keep) saveDisplay(display);
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+function clockText() { const hh = Math.floor(state.hour), mm = Math.floor((state.hour - hh) * 60); return `${pad2(hh)}:${pad2(mm)}`; }
+// The weather now, in a few words: one kind, or one turning into another.
+function weatherName() {
+  const w = weatherNow(), main = mainKind(w);
+  const other = KINDS.filter((k) => k !== main && (w.mix[k] || 0) > 0.05).sort((a, b) => w.mix[b] - w.mix[a])[0];
+  return other ? `${main} turning ${other}` : main;
+}
+const reload = (q) => { location.search = q.toString(); };
+
+const game = {
+  scene: WORLD ? 'world' : STRESS ? 'stress' : 'lab',
+  seed: SEED,
+  cameras: CAMS,
+  get display() { return display; },
+  setDisplay,
+  get rate() { return state.running ? state.rate : 0; },
+  setRate(r) { if (r === 0) state.running = false; else { state.rate = r; state.running = true; state.frozen = false; } },
+  get weather() { return state.weather; },
+  setWeather(m) { state.weather = m; },
+  setTime(name) { setTime(name); },
+  get look() { return state.look; },
+  setLook(name, v) { state.look = lookFrom({ ...state.look, [name]: v }); },
+  camera(i) { useCamera(i); },
+  newWorld(seed) { const q = new URLSearchParams(location.search); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
+  goScene(sc) {
+    const q = new URLSearchParams(location.search);
+    q.delete('lab'); q.delete('stress');
+    if (sc === 'lab') q.set('lab', '1'); else if (sc === 'stress') q.set('stress', '1');
+    reload(q);
+  },
+  // A link to this exact world (its seed), to the clipboard.
+  async copyLink() {
+    const link = `${location.href.split(/[?#]/)[0]}?seed=${SEED}`;
+    try { await navigator.clipboard.writeText(link); return true; } catch { /* try the old way */ }
+    try {
+      const t = document.createElement('textarea');
+      t.value = link; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.append(t); t.select();
+      const ok = document.execCommand('copy');
+      t.remove();
+      return ok;
+    } catch { return false; }
+  },
+  clockLine() {
+    const moon = state.look.night === 'moon' ? `, moon ${Math.round(100 * moonLit(state.hour, state.day))}% lit` : '';
+    return `${clockText()} (${keyName(state.hour)}), day ${state.day}${moon}; the clock is ${state.running ? 'running' : 'stopped'}`;
+  },
+  weatherLine() {
+    if (!WORLD && state.weather === 'fair') return 'The Look Lab and the stress scene keep fair weather unless one is held here.';
+    if (typeof state.weather === 'object') return `set by a tool: ${weatherName()}${state.weather.wet ? ', wet ground' : ''}`;
+    return state.weather === 'auto' ? `now ${weatherName()}, from the forecast for seed ${SEED}, day ${state.day}` : `held: ${state.weather}`;
+  },
+  workersLine() {
+    if (!THREADS) return 'everything on the page, no workers';
+    if (!WORLD) return `${THREADS} workers, each building its own copy of the scene`;
+    return SHARED ? `${THREADS} workers, sharing one copy of the world (shared memory)`
+      : `${THREADS} workers, each with its own copy of the world (${ISOLATED ? 'shared memory off' : 'the page is not cross-origin isolated'})`;
+  },
+  close({ recapture }) { closeMenu(recapture); },
+};
+const menu = new Menu($('menu'), game);
+let menuNext = 0, menuOpenedAt = 0, releasing = false;
+
+function openMenu() {
+  if (QUIET || state.failed || card.up || menu.open) return false;
+  input.clear();
+  menu.show();
+  menuOpenedAt = performance.now();
+  hideHint();
+  // (the menu gives the mouse back; that is not a reason to open it again)
+  if (document.pointerLockElement) { releasing = true; document.exitPointerLock(); }
+  return true;
+}
+// Resume takes the mouse again; Escape, a click beside the menu or anything
+// else that closes it does not.
+function closeMenu(recapture = false) {
+  if (!menu.open) return;
+  menu.hide();
+  input.clear();
+  if (recapture) input.capture();
+}
+function onEscape() {
+  if (card.up) { card.dismiss(false); return; }
+  if (menu.open) {
+    // (the browser may deliver the Escape that freed the mouse after the
+    // menu has already opened for it)
+    if (performance.now() - menuOpenedAt < 350) return;
+    closeMenu(false);
+  } else openMenu();
+}
+// The browser frees a captured mouse on the first Escape (or when the tab is
+// left): open the menu then too, so one press always works.
+function onUnlocked() {
+  if (releasing) { releasing = false; return; }
+  openMenu();
+}
+
+// The start card, on the first visit only: the title, click to explore, the
+// essential keys.
+const card = {
+  el: $('card'),
+  up: false,
+  show() {
+    if (QUIET || !WORLD || state.failed || seenCard()) return false;
+    this.up = true;
+    this.el.classList.add('on');
+    requestAnimationFrame(() => this.el.classList.add('shown'));
+    this.el.focus({ preventScroll: true });
+    return true;
+  },
+  dismiss(capture) {
+    if (!this.up) return;
+    this.up = false;
+    markCardSeen();
+    this.el.classList.remove('shown', 'on');
+    if (capture) input.capture();
+    showHint();
+  },
+};
+card.el.addEventListener('click', () => card.dismiss(true));
+addEventListener('keydown', (e) => { if (card.up && e.key !== 'Escape' && e.key !== 'Tab' && !e.repeat) { e.preventDefault(); card.dismiss(true); } });
+
+// The hint that Escape opens the menu, fading after a few seconds.
+let hintTimer = 0;
+function showHint() {
+  if (QUIET || state.failed) return;
+  const el = $('hint');
+  el.classList.add('on');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => el.classList.remove('on'), 4000);
+}
+function hideHint() { clearTimeout(hintTimer); $('hint').classList.remove('on'); }
 
 // ---- the debug handle ---------------------------------------------------------
 
@@ -418,10 +594,23 @@ Object.assign(lab, {
   setDay(d) { state.day = d; },
   unfreeze() { state.frozen = false; },
   setHour(h) { state.hour = typeof h === 'string' ? LOOK.hours[h] : h; },
-  runClock(on = true) { state.running = on; },
-  setDensity(i) { state.preset = Math.max(0, Math.min(3, i)); relayout(); },
-  setGlyphs(on) { presenter.glyphs = !!on; },
-  setHud(on) { if (hud.visible !== !!on) hud.toggle(); },
+  // (`rate`: game hours a real second, phase 2b; the menu's speeds)
+  runClock(on = true, rate) { state.running = on; if (rate !== undefined) state.rate = rate; },
+  setDensity(i) { setDisplay('density', Math.max(0, Math.min(3, i)), false); },
+  setGlyphs(on) { setDisplay('glyphs', !!on, false); },
+  setHud(on) { hud.force(on ? 'full' : 'none'); },
+  // The menu, the hint and the start card suppressed (the tools), or not.
+  setQuiet(on) {
+    QUIET = !!on;
+    if (QUIET) { closeMenu(false); if (card.up) { card.up = false; card.el.classList.remove('shown', 'on'); } hideHint(); }
+  },
+  // The menu, for the tools: open it, close it, read what it shows.
+  menu: {
+    open() { return openMenu(); },
+    close(recapture = false) { closeMenu(recapture); },
+    isOpen() { return menu.open; },
+    read() { return { ...menu.read(), quiet: QUIET, card: card.up, hint: $('hint').classList.contains('on'), hud: hud.shown, display: { ...display } }; },
+  },
   setRef(on) { if (ref.on !== !!on) { ref.toggle(CAMERAS[state.cam]); relayout(); } },
   // The look candidates: setLook({ tree, cloud, meadow, shallows }) (any of
   // them), resetLook() back to the defaults, look() the ones in use;
@@ -432,6 +621,18 @@ Object.assign(lab, {
   // refreshes after it was asked for (setPace() for adaptive again).
   setPace(every, lag = every) { pacer.fixed = every ? [every, lag] : null; if (every) { pacer.every = every; pacer.lag = lag; } },
   look() { return { ...state.look }; },
+  // The weather: setWeather('auto') for the forecast, or one kind held
+  // ('clear', 'fair', 'overcast', 'rain', 'mist'); weather() what it is now
+  // (the mode, the kind that applies most, the frame's mix, wetness and
+  // drift, and today's forecast).
+  // (for the tools also a frame's weather itself, { mix, wet, drift }: e.g.
+  // { mix: { fair: 1 }, wet: 1 }, fair weather on wet ground)
+  setWeather(mode) {
+    if (mode === 'auto' || KINDS.includes(mode)) state.weather = mode;
+    else if (mode && typeof mode === 'object' && mode.mix) state.weather = { mix: { ...mode.mix }, wet: +mode.wet || 0, drift: +mode.drift || 0 };
+    return state.weather;
+  },
+  weather() { const w = weatherNow(); return { mode: state.weather, kind: mainKind(w), ...w, forecast: forecastOf(SEED, state.day) }; },
   setLookPanel(on) { if (lookPanel.on !== !!on) lookPanel.toggle(); },
   state() {
     return {
@@ -441,6 +642,8 @@ Object.assign(lab, {
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
       isolated: !!self.crossOriginIsolated, shared: SHARED, look: { ...state.look }, mode: player.mode, flying: player.flying,
       pace: local ? 1 : pacer.every, lag: local ? 0 : pacer.lag, refresh: pacer.refresh,
+      weather: state.weather, menu: menu.open, rate: state.running ? state.rate : 0,
+      glyphs: presenter.glyphs, sensitivity: input.sensitivity, invert: input.invert,
     };
   },
   // Resolves once a frame made after this call is on screen, with cast
