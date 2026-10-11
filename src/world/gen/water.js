@@ -323,7 +323,8 @@ export function wetFine(H, N, coarse, lakeInfo, rivers, accAt, seed) {
 
 // Distance in metres (approximately, by a two-pass chamfer) from every node
 // to the nearest node where `src` is true, up to 255.
-export function distanceTo(N, src) {
+// (`raw`: the distances in tenths of a metre, as Uint16, instead of whole metres)
+export function distanceTo(N, src, raw = false) {
   const NN = N + 1, cells = NN * NN;
   const d = new Uint16Array(cells).fill(65535);
   for (let j = 0; j < cells; j++) if (src(j)) d[j] = 0;
@@ -354,6 +355,7 @@ export function distanceTo(N, src) {
       d[j] = v;
     }
   }
+  if (raw) return d;
   const out = new Uint8Array(cells);
   for (let j = 0; j < cells; j++) out[j] = Math.min(255, Math.round(d[j] / A));
   return out;

@@ -132,6 +132,26 @@ export const LOOK = {
     flame:   { glyphs: '*^&@',       ink: { lit: 0.25, dark: 0.25 }, emissive: true },
     bed:     { glyphs: '.,:;',       ink: { lit: -0.20, dark: 0.40 }, tone: 0.10 },
     floor:   { glyphs: '.,:;+%',     ink: { lit: -0.26, dark: 0.48 }, tone: 0.16 },
+    foam:    { glyphs: '.:;=',       ink: { lit: -0.10, dark: 0.30 }, tone: 0 },
+  },
+
+  // The coast (phase 2a, the generated world): a darker wet band where sand
+  // meets water (`wet`, metres wide: by the sea, by a lake), drawn in the
+  // bed's colours; a broken foam line in the water that runs up and back
+  // (`reach` metres out from the shore at its highest, `swing` more at its
+  // lowest, over `period` seconds, `width` metres either side of its line,
+  // at `strength`), a pure function of position and time, faded by how much
+  // of a cell's footprint it covers; and on the open sea a gentle swell
+  // ([length m, direction deg, speed m/s, height m] as the ripples), faded
+  // like them as a cell's footprint passes its length.
+  coast: {
+    wet: [2.2, 0.8],
+    foam: {
+      sea:  { reach: 1.2, swing: 1.8, period: 9, width: 0.55, strength: 0.95 },
+      lake: { reach: 0.3, swing: 0.4, period: 6, width: 0.22, strength: 0.3 },
+    },
+    swell: [[64, 52, 7, 0.28], [118, 38, 10, 0.45]],
+    swellFade: [0.25, 0.8],
   },
 
   // Water. Each water cell mixes what its ray sees reflected off the surface
@@ -266,6 +286,7 @@ export const LOOK = {
       flameStrength: 0.6, flameFloor: 0,
       bed:    { lit: '#6b6148', shade: '#353026' },
       floor:  { lit: '#4c4a33', shade: '#22231b' },
+      foam:   { lit: '#d6dad4', shade: '#7a8290' },
     },
     dusk: {
       sky:    { high: '#4b3d5d', horizon: '#7a5a64', glow: '#c48a6e', glowSize: 0.30 },
@@ -294,6 +315,7 @@ export const LOOK = {
       flameStrength: 0.85, flameFloor: 0.25,
       bed:    { lit: '#544a42', shade: '#2a2526' },
       floor:  { lit: '#34312d', shade: '#1b1a1b' },
+      foam:   { lit: '#b8a8a8', shade: '#5a5262' },
     },
     night: {
       sky:    { high: '#161927', horizon: '#252438', glow: '#2c3046', glowSize: 0.10 },
@@ -322,6 +344,7 @@ export const LOOK = {
       flameStrength: 1, flameFloor: 0.5,
       bed:    { lit: '#24231f', shade: '#121210' },
       floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
+      foam:   { lit: '#4a4e5a', shade: '#262830' },
     },
   },
 
@@ -366,6 +389,7 @@ export const LOOK = {
       flameStrength: 0.65, flameFloor: 0.1,
       bed:    { lit: '#74684e', shade: '#363028' },
       floor:  { lit: '#54503a', shade: '#22231c' },
+      foam:   { lit: '#efe2d6', shade: '#86808e' },
     },
     dusk: { ...K.dusk, light: { ambient: 0.22, direct: 0.95, cloudShadow: 0.25, castShadow: 0.82 } },
     moonlit: {
@@ -395,21 +419,22 @@ export const LOOK = {
       flameStrength: 1, flameFloor: 0.5,
       bed:    { lit: '#2e2f2c', shade: '#161614' },
       floor:  { lit: '#26262a', shade: '#121214' },
+      foam:   { lit: '#8a90a2', shade: '#383c48' },
     },
     starlit: {
       sky:    { high: '#121520', horizon: '#1c1f2e', glow: '#20243a', glowSize: 0.10 },
       cloud:  { lit: '#262832', shade: '#12131a' },
       cloudFlat: 0.85, cloudStretch: 1.12,
-      light:  { ambient: 0.34, direct: 0.10, cloudShadow: 0.1, castShadow: 0.4 },
+      light:  { ambient: 0.42, direct: 0.10, cloudShadow: 0.1, castShadow: 0.4 },
       haze:   { colour: '#181a26', dist: 330, max: 0.80 },
       air:    { dist: 700, distC: 500, lum: 0.45, chroma: 0.66 },
       torch:  { colour: '#ffc46a', strength: 0.55 },
       stars:  1.15,
       sun:    '#f4eedc',
       moon:   '#c9ccd4',
-      grass:  { lit: '#1f2726', shade: '#151b1c' },
-      dirt:   { lit: '#22232a', shade: '#16171c' },
-      sand:   { lit: '#25262c', shade: '#17181d' },
+      grass:  { lit: '#232c2b', shade: '#171e1f' },
+      dirt:   { lit: '#26272e', shade: '#18191e' },
+      sand:   { lit: '#292a30', shade: '#191a1f' },
       rock:   { lit: '#24262c', shade: '#15161b' },
       snow:   { lit: '#3e4352', shade: '#22252f' },
       water:  { lit: '#161b25', shade: '#10141b', sky: '#1a1f30', deep: '#0c0f15', shallow: '#1e1e1c', blue: '#121722' },
@@ -423,6 +448,7 @@ export const LOOK = {
       flameStrength: 1, flameFloor: 0.5,
       bed:    { lit: '#1f1f1d', shade: '#121210' },
       floor:  { lit: '#18191b', shade: '#0f0f11' },
+      foam:   { lit: '#3a3e4a', shade: '#22242c' },
     },
   };
 }

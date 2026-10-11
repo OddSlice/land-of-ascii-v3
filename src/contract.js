@@ -21,6 +21,7 @@ export const MAT = {
   STONE: 11, CONIFER: 12, TRUNK: 13, BUSH: 14, WOOD: 15, FLAME: 16,
   BED: 17,                         // the silt of a lake or river bed
   FLOOR: 18,                       // the needle-strewn ground under a stand of trees
+  FOAM: 19,                        // foam floating at the waterline (phase 2a; only ever in R2)
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;
@@ -37,6 +38,17 @@ export const MAT_NONE = 255;
 //                    hit: the bed (BED, SAND, ...), lit as any surface; `dist`
 //                    is the length of the path through the water, which the
 //                    resolve step turns into depth colour. MAT_NONE elsewhere.
+//                    Or (phase 2a) FOAM, where foam floats at the waterline:
+//                    lit as the surface, `tone` how much of the cell the foam
+//                    covers (255 = all), `dist` the path to the bed as above
+//                    (0: none marched); resolve draws the water with a sandy
+//                    bed under it and the foam over it by that share.
+// R1 (bytes 8..15)   also (phase 2a), for a cell that is NOT water: MAT_NONE,
+//                    or, where a skyline covers only part of the cell (the
+//                    land in R0 rising into it from below), what lies behind
+//                    the rest of it (sky, cloud, a far ridgeline), whose [4]
+//                    is then the share of the cell the land covers (its own
+//                    glow is taken as none); resolve blends the two by it.
 // For a water cell R0's `tone` is the Fresnel share of the mirror (with the
 // ripples), and R0's shadow, cloud and glow are those of the surface point.
 // A backend that does no water rays leaves R1 and R2 MAT_NONE and resolve
@@ -95,8 +107,11 @@ export const CELL_STRIDE = 8;
 //   aspect,                   width / height of the picture in pixels
 //   hour,                     time of day, 0..24
 //   t,                        animation clock in seconds (clouds, flame)
-//   look: { tree, cloud, meadow, shallows }   the look candidates in use
-//                             (LOOK.choices); missing keys take the defaults
+//   look: { tree, cloud, meadow, shallows, air, night }   the look candidates
+//                             and rules in use (LOOK.choices); missing keys
+//                             take the defaults
+//   day,                      (phase 2a) whole days since day 0, which the
+//                             moon's phase follows; missing means day 0
 // }
 // Cell (cx, cy) has its centre at screen position
 //   x = 2 (cx + 0.5) / cols - 1,  y = 1 - 2 (cy + 0.5) / rows   (both -1..1)

@@ -11,7 +11,7 @@ import { clusterAt } from '../../world/sky.js';
 import { hash2, vnoise, fbm } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { project } from './view.js';
-import { waterRays } from './water.js';
+import { waterRays, swellSlope } from './water.js';
 import { bil2, bilU8 } from './sample.js';
 import { makePalette } from '../../resolve.js';
 
@@ -122,8 +122,10 @@ export class SkyPass {
     const D = (v.ey - sea) / -s;
     const x = v.ex + rays.pdx[p] * D, z = v.ez + rays.pdz[p] * D;
     if (bilU8(T.wWater, x, z, N, NN) < 0.5 || Math.abs(bil2(T.levels[0], T.levels[0].H, x, z) - sea) > 0.05) return false;
-    const wr = waterRays(s, 0);
-    m.write(ci, 0, MAT.WATER, this.light.L[1], 0, this.light.cloudAt(x, z), 0, wr.F * 2 - 1, D * Math.sqrt(1 + s * s));
+    // (with the swell, faded by the cell's footprint, in the generated world)
+    const len = Math.sqrt(1 + s * s), fp = D * len * v.rowAngle / Math.max(0.006, -s / len);
+    const wr = waterRays(s, T.shore ? swellSlope(x, z, this.t, rays.pdx[p], rays.pdz[p], fp) : 0);
+    m.write(ci, 0, MAT.WATER, this.light.L[1], 0, this.light.cloudAt(x, z), 0, wr.F * 2 - 1, D * len);
     rays.rsig[ci] = wr.sr; rays.rdw[ci] = D; rays.rey[ci] = 2 * sea - v.ey; rays.rdepth[ci] = Infinity;
     return true;
   }
@@ -135,6 +137,7 @@ export class SkyPass {
     const pal = makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night')), k = pal.k;
     this.illum = pal.night === 'p1' ? 1 : pal.illum;
     this.farRule = ruleOf(frame.look, 'air') === 'aerial';
+    this.t = frame.t;
     this.treat = B ? LOOK.clouds.B : LOOK.clouds.A;
     this.flat = B ? k.cloudFlat : 1; this.stretch = B ? k.cloudStretch : 1;
     this.streaky = B;

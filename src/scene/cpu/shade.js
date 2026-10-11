@@ -5,13 +5,14 @@
 // row for reflect.js.
 import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
-import { rippleSlope, waterRays } from './water.js';
+import { rippleSlope, swellSlope, waterRays } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
 
-const MEADOW = LOOK.meadow, FAR = LOOK.far;
+const MEADOW = LOOK.meadow, FAR = LOOK.far, COAST = LOOK.coast;
+const SEA_LEVEL = 20;          // (the generated world's; water at it is the sea)
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 // detail of a given size fades as the cell's footprint grows past it
@@ -137,6 +138,13 @@ const methods = {
     else if (this.weight(T.wRock, T.wRockL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
     else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
     else mat = MAT.GRASS;
+    // the coast (phase 2a): where sand meets the sea or a lake, a darker wet
+    // band in the bed's colours, wherever it covers most of the cell's footprint
+    if (mat === MAT.SAND && T.shore) {
+      const sd = this.shoreAt(T.shore, x, z);
+      const W = y < SEA_LEVEL + 3 ? COAST.wet[0] : COAST.wet[1];
+      if (sd < W + fp && this.band(sd, fp, 0, W) > 0.5) mat = MAT.BED;
+    }
     const Ld = light.L;
     const shadow = (bil2S(lv[L], light.S[L], x, z) * (1 - beta) + (beta > 0 ? bil2S(lv[L + 1], light.S[L + 1], x, z) * beta : 0)) * light.sK;
     const cloud = light.cloudAt(x, z);
@@ -228,14 +236,56 @@ const methods = {
     // than this would alias, so they are faded out and far water lies calm
     const graze = Math.max(0.006, -s / len);
     const fp = D * len * v.rowAngle / graze;
-    const g = rippleSlope(x, z, this.t, this.dx, this.dz, fp);
+    const T = this.world.terrain;
+    // (the open sea also has its swell)
+    const sea = T.shore && W > SEA_LEVEL - 0.05 && W < SEA_LEVEL + 0.05;
+    const g = rippleSlope(x, z, this.t, this.dx, this.dz, fp) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) : 0);
     const wr = waterRays(s, g);
     const glow = this.glowAt(x, W, z, 0, 1, 0);
     this.write(ci, 0, MAT.WATER, light.L[1], shadow, cloud, glow, wr.F * 2 - 1, D * len);
     const sr = wr.sr, st = wr.st, F = wr.F;
     // where the surface is nearly all mirror the bed cannot show: no bed ray
     if (F < 0.85) this.refract(ci, x, W, z, st);
+    // the foam line at the shore of the sea or a lake (phase 2a): in place
+    // of the bed's record, keeping the path to it
+    if (T.shore) {
+      const f = this.foamAt(T.shore, x, z, sea, fp);
+      if (f > 0.004) {
+        const h = this.hits, o = ci * HIT_STRIDE + 2 * REC;
+        const path = h[o] === MAT_NONE ? 0 : (h[o + 6] | (h[o + 7] << 8)) / 10;
+        this.write(ci, 2, MAT.FOAM, light.L[1], shadow, cloud, glow, f * 2 - 1, path);
+      }
+    }
     this.addReflection(ci, sr, D, W);
+  },
+
+  // The signed distance (m) to the edge of the sea or a lake at a point:
+  // above 0 on land, below in the water (LOOK: shoreLine, in eighths of a metre).
+  shoreAt(A, x, z) { return (bilU8(A, x, z, this.N, this.NN) * 255 - 128) / 8; },
+
+  // How much of a footprint fp wide, centred at sd, the band [a, b] covers.
+  band(sd, fp, a, b) {
+    const h = fp > 0.1 ? fp / 2 : 0.05;
+    const lo = Math.max(sd - h, a), hi = Math.min(sd + h, b);
+    return hi > lo ? (hi - lo) / (2 * h) : 0;
+  },
+
+  // The foam line: a broken line in the water that runs up toward the shore
+  // and back (a pure function of position and time), as the share of the
+  // cell's footprint it covers, so far off it fades instead of breaking up.
+  foamAt(A, x, z, sea, fp) {
+    const sd = this.shoreAt(A, x, z);
+    const P = sea ? COAST.foam.sea : COAST.foam.lake;
+    if (sd > 0.2 || sd < -(P.reach + P.swing + P.width + fp)) return 0;
+    const ph = this.t * 2 * Math.PI / P.period + 6.283 * vnoise(x / 70, z / 70, SEED + 151);
+    const line = -(P.reach + P.swing * (0.5 + 0.5 * Math.sin(ph)));
+    const cov = this.band(sd, fp, line - P.width, line + P.width);
+    if (cov <= 0) return 0;
+    // broken along its length, the breaks drifting slowly; far off, where a
+    // cell spans several breaks, their average
+    const br = smooth(0.32, 0.62, vnoise(x / 2.6 + this.t * 0.12, z / 2.6, SEED + 152));
+    const k = smooth(1.5, 6, fp);
+    return P.strength * cov * (br + (0.5 - br) * k);
   },
 
   // Walk the refracted ray down to the bed and light the bed where it lands.

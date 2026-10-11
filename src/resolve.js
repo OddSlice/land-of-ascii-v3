@@ -279,6 +279,15 @@ function waterColour(pal, hits, o, ey = 0, mu = 0) {
     mr = rec.skyR + (mr - rec.skyR) * rec.cover; mg = rec.skyG + (mg - rec.skyG) * rec.cover; mb = rec.skyB + (mb - rec.skyB) * rec.cover;
   }
   const mBright = hits[o + REC] === MAT.SUN || hits[o + REC] === MAT.MOON ? 1 : rec.bright;
+  // foam at the waterline (phase 2a): its record stands in for the bed's,
+  // which is taken as sand under the same light, at the same depth
+  const o2 = o + 2 * REC;
+  let foam = 0;
+  if (hits[o2] === MAT.FOAM) {
+    foam = hits[o2 + 5] / 255;
+    hits[o2 + 5] = 128;
+    hits[o2] = (hits[o2 + 6] | hits[o2 + 7]) ? MAT.SAND : MAT_NONE;
+  }
   // the bed, darkened and tinted by the water it is seen through
   let br, bg, bb, bBright;
   if (hits[o + 2 * REC] !== MAT_NONE) {
@@ -298,6 +307,14 @@ function waterColour(pal, hits, o, ey = 0, mu = 0) {
     br = deep[0]; bg = deep[1]; bb = deep[2]; bBright = 0.2;
   }
   let r = br + (mr - br) * F, g = bg + (mg - bg) * F, b = bb + (mb - bb) * F;
+  let fBright = 0;
+  if (foam > 0) {
+    // the foam over it, lit as the surface
+    const L = pal.ambient + pal.direct * (hits[o2 + 1] / 255) * (1 - pal.castK * hits[o2 + 2] / 255) * (1 - pal.cloudK * hits[o2 + 3] / 255);
+    const t = Math.pow(L < 0 ? 0 : L > 1 ? 1 : L, pal.curve[MAT.FOAM]), j = MAT.FOAM * 3, lit = pal.lit, sh = pal.shade;
+    r += (sh[j] + (lit[j] - sh[j]) * t - r) * foam; g += (sh[j + 1] + (lit[j + 1] - sh[j + 1]) * t - g) * foam; b += (sh[j + 2] + (lit[j + 2] - sh[j + 2]) * t - b) * foam;
+    fBright = t;
+  }
   // torchlight on the surface
   const tg = (hits[o + 4] / 255) * k.torch.strength * W.torchSurface;
   r += k.torch.colour[0] * tg; g += k.torch.colour[1] * tg; b += k.torch.colour[2] * tg;
@@ -309,8 +326,10 @@ function waterColour(pal, hits, o, ey = 0, mu = 0) {
     r += (haze.colour[0] - r) * h; g += (haze.colour[1] - g) * h; b += (haze.colour[2] - b) * h;
   }
   let bright = bBright + (mBright - bBright) * F + tg * 2.5;
+  if (foam > 0) bright += (fBright - bright) * foam;
   if (bright > 1) bright = 1; else if (bright < 0) bright = 0;
   rec.r = r; rec.g = g; rec.b = b; rec.bright = bright; rec.h = h; rec.cover = 1;
+  return foam >= 0.5 ? MAT.FOAM : MAT.WATER;
 }
 
 // A cell a skyline covers only in part (the far rule): R1 is what lies
@@ -371,7 +390,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame) {
       }
       const mirrorFlame = m === MAT.WATER && hits[o + REC] === MAT.FLAME;
       let gm = m;
-      if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) waterColour(pal, hits, o, ey, mu);
+      if (m === MAT.WATER && hits[o + REC] !== MAT_NONE) gm = waterColour(pal, hits, o, ey, mu);
       else if (hits[o + REC] !== MAT_NONE) gm = fringeColour(pal, hits, o, ey, mu);
       else recordColour(pal, hits, o, airOn && m > MAT.STAR && m !== MAT.CLOUD ? airOf(ey, mu, (hits[o + 6] | (hits[o + 7] << 8)) / 10) : -1);
       if (m === MAT.FLAME || mirrorFlame) {

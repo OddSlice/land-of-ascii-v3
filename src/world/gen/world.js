@@ -15,10 +15,10 @@ import { SCALE } from '../scale.js';
 import { hash2, smoothstep } from '../noise.js';
 import { makeFrame, knolls, shapeLand } from './land.js';
 import { CG, KIND, coarsen, flood, accumulate, findLakes, pickRivers, wetFine, distanceTo } from './water.js';
-import { forestField, chooseThreshold, plant } from './plants.js';
-import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt } from './sites.js';
+import { forestField, chooseThreshold, plant, copses, fieldAt } from './plants.js';
+import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt, brow } from './sites.js';
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, STEEP } from './roads.js';
-import { materials, detail, gullies } from './ground.js';
+import { materials, detail, gullies, shoreLine } from './ground.js';
 import { worldCameras } from './cameras.js';
 import { makeLevels, materialCode, weightLevels } from '../terrain.js';
 import { floorField } from '../objects.js';
@@ -102,7 +102,10 @@ export function* generateWorld(seed) {
   const wetDist = new Uint8Array(cells);
   for (let j = 0; j < cells; j++) wetDist[j] = Math.min(seaDist[j], freshDist[j]);
   const F = forestField(N, H, kind, wetDist, frame, seed);
-  const thr = chooseThreshold(F, N, seed);
+  // the copses take their share of the trees; the stands the rest
+  let thr = chooseThreshold(F, N, seed);
+  const clumps = copses(N, H, kind, wetDist, frame, F, thr, seed);
+  thr = chooseThreshold(F, N, seed, SCALE.trees.target - clumps.reduce((a, c) => a + c.n, 0));
   lap('forest field');
   yield { stage: STAGES[4], p: 0.56 };
 
@@ -185,7 +188,7 @@ export function* generateWorld(seed) {
     for (const v of villages) if (Math.hypot(v.x - x, v.z - z) < 60) return true;
     return false;
   };
-  const { trees, bushes } = plant(terrain, F, thr, seed, clear, wetDist, kind);
+  const { trees, bushes } = plant(terrain, F, thr, seed, clear, wetDist, kind, clumps);
   lap('plants');
   yield { stage: STAGES[7], p: 0.74 };
 
@@ -209,12 +212,16 @@ export function* generateWorld(seed) {
   for (const k of FILTERED) terrain[`${k}L`] = weightLevels(terrain[k], N);
   // the range's gullies, on the 4 m grid (the far rule)
   terrain.form = gullies(co, acc, gOf);
+  // the waterline of the sea and the lakes (the coast's wet band and foam)
+  terrain.shore = shoreLine(N, kind);
   lap('ground');
   yield { stage: STAGES[8], p: 0.9 };
   terrain.levels = makeLevels(surface, N, false);
   const spans = buildSpans(N, { ...wall, base: wallGround - 2, top: wallGround + W.height, merlon: 1.5, merlonW: 2, merlonGap: 2 },
     { x0: gateX - W.gate / 2, x1: gateX + W.gate / 2, cx: gateX, r: W.gate / 2, jamb: 2.8, ground: wallGround });
   const viewpoints = chooseViewpoints(ctx, [fort, ...villages]);
+  // each viewpoint stands at the brow of its hill, looking its way (phase 2a)
+  for (const v of viewpoints) { const b = brow(ground, N, kind, v.x, v.z, v.yaw); v.x = b.x; v.z = b.z; v.h = b.h; }
   const world = {
     kind: 'world', seed, N, NN, center: [N / 2, N / 2], viewDist: SCALE.viewDist, openEdge: true, sea: SEA,
     terrain, spans, objects: { trees, bushes, torches: [], water: SEA },

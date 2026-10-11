@@ -49,6 +49,25 @@ export function rippleSlope(x, z, t, dx, dz, footprint) {
   return s;
 }
 
+// The open sea's swell (phase 2a, LOOK.coast.swell): long waves running
+// onshore, the same way, faded as a cell's footprint passes LOOK.coast.swellFade
+// of their length (so the far sea lies calm and meets the sky softly).
+const SW = LOOK.coast.swell.map(([len, deg, speed, height]) => {
+  const k = 2 * Math.PI / len, a = deg * Math.PI / 180;
+  return [k * Math.cos(a), k * Math.sin(a), k * speed, height * k, len];
+});
+const SWF = LOOK.coast.swellFade;
+export function swellSlope(x, z, t, dx, dz, footprint) {
+  let s = 0;
+  for (let i = 0; i < SW.length; i++) {
+    const [kx, kz, w, amp, len] = SW[i];
+    const fade = 1 - smooth(len * SWF[0], len * SWF[1], footprint);
+    if (fade <= 0) continue;
+    s += amp * fade * Math.cos(kx * x + kz * z - w * t + i * 1.7) * (kx * dx + kz * dz) / Math.hypot(kx, kz);
+  }
+  return s;
+}
+
 const out = { sr: 0, st: 0, F: 0 };
 
 // For an incoming ray of slope sigma (negative, looking down) meeting water

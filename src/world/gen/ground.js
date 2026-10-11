@@ -5,7 +5,7 @@
 // fields every material's tone is built from.
 import { fbm, vnoise, smoothstep } from '../noise.js';
 import { SCALE } from '../scale.js';
-import { KIND } from './water.js';
+import { KIND, distanceTo } from './water.js';
 
 const SEA = SCALE.sea;
 
@@ -22,10 +22,10 @@ export function materials(N, H, kind, level, seaDist, freshDist, seed) {
       const sx = (r - l) / 2, sz = (u - d) / 2;
       const slope = Math.hypot(sx, sz);
       const n1 = fbm(i / 37, k / 37, seed + 901, 2);
-      // beaches: low, gentle ground by the sea; a narrow strip round lakes and
-      // along rivers; and the shallow beds next to them
+      // beaches: low, gentle ground by the sea (narrow, phase 2a); a narrow
+      // strip round lakes and along rivers; and the shallow beds next to them
       let sand = 0;
-      if (seaDist[j] <= 34 + 10 * n1 && h < SEA + 2.6 + n1 && slope < 0.3) sand = 1;
+      if (seaDist[j] <= SCALE.beach + 8 * n1 && h < SEA + 2.2 + 0.8 * n1 && slope < 0.3) sand = 1;
       if (freshDist[j] <= 2.5 + 1.5 * n1 && slope < 0.35 && kind[j] !== KIND.RIVER) sand = 1;
       if (kind[j] === KIND.LAKE && level[j] - h < 1.0) sand = 1;
       wSand[j] = sand * 255;
@@ -37,6 +37,25 @@ export function materials(N, H, kind, level, seaDist, freshDist, seed) {
     }
   }
   return { wSand, wRock, wSnow };
+}
+
+// The waterline (phase 2a): every node's distance to the edge of the sea or
+// a lake, in eighths of a metre about 128 (above on land, below in the
+// water), out to 16 m either way; rivers keep 255 (no shore). The march
+// draws the wet band and the foam line from it.
+export function shoreLine(N, kind) {
+  const NN = N + 1, cells = NN * NN;
+  const toWater = distanceTo(N, (j) => kind[j] === KIND.SEA || kind[j] === KIND.LAKE, true);
+  const toLand = distanceTo(N, (j) => kind[j] === KIND.NONE, true);
+  const out = new Uint8Array(cells);
+  for (let j = 0; j < cells; j++) {
+    const k = kind[j];
+    // (the chamfer distance runs from node to node: half a metre to the line between)
+    if (k === KIND.SEA || k === KIND.LAKE) out[j] = Math.max(0, Math.round(128 - (toLand[j] / 10 - 0.5) * 8));
+    else if (k === KIND.NONE) out[j] = Math.min(254, Math.round(128 + (toWater[j] / 10 - 0.5) * 8));
+    else out[j] = 255;
+  }
+  return out;
 }
 
 // Gullies on the range (phase 2a, the far rule): where rain gathers on steep

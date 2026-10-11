@@ -111,7 +111,8 @@ export function weightLevels(w, N0) {
   for (let L = 1; L < LEVELS; L++) {
     const f = downsample(src, n);
     n >>= 1;
-    src = Uint8Array.from(f, (v) => Math.round(v));
+    src = new Uint8Array(f.length);
+    for (let i = 0; i < f.length; i++) src[i] = Math.round(f[i]);
     out.push(src);
   }
   return out;
@@ -124,11 +125,21 @@ export function downsample(src, n) {
   const out = new Float32Array(mm * mm);
   const at = (i, k) => src[Math.min(n, Math.max(0, k)) * nn + Math.min(n, Math.max(0, i))];
   for (let k = 0; k <= m; k++) {
+    const K = k * 2, edgeRow = K === 0 || K === n;
     for (let i = 0; i <= m; i++) {
-      const I = i * 2, K = k * 2;
-      let s = 4 * at(I, K);
-      s += 2 * (at(I - 1, K) + at(I + 1, K) + at(I, K - 1) + at(I, K + 1));
-      s += at(I - 1, K - 1) + at(I + 1, K - 1) + at(I - 1, K + 1) + at(I + 1, K + 1);
+      const I = i * 2;
+      let s;
+      if (edgeRow || I === 0 || I === n) {
+        s = 4 * at(I, K);
+        s += 2 * (at(I - 1, K) + at(I + 1, K) + at(I, K - 1) + at(I, K + 1));
+        s += at(I - 1, K - 1) + at(I + 1, K - 1) + at(I - 1, K + 1) + at(I + 1, K + 1);
+      } else {
+        // (inside: the same sums in the same order, without the clamping)
+        const c = K * nn + I, u = c - nn, d = c + nn;
+        s = 4 * src[c];
+        s += 2 * (src[c - 1] + src[c + 1] + src[u] + src[d]);
+        s += src[u - 1] + src[u + 1] + src[d - 1] + src[d + 1];
+      }
       out[k * mm + i] = s / 16;
     }
   }
