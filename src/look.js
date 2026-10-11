@@ -145,7 +145,7 @@ export const LOOK = {
   // ([length m, direction deg, speed m/s, height m] as the ripples), faded
   // like them as a cell's footprint passes its length.
   coast: {
-    wet: [2.2, 0.8],
+    wet: [2.2, 0.4],
     foam: {
       sea:  { reach: 1.2, swing: 1.8, period: 9, width: 0.55, strength: 0.95 },
       lake: { reach: 0.3, swing: 0.4, period: 6, width: 0.22, strength: 0.3 },
