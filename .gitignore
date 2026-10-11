@@ -8,3 +8,4 @@ shots/*
 .claude/
 .vercel/
 !shots/phase1/
+!shots/phase2a/

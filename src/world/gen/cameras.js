@@ -161,7 +161,8 @@ export function worldCameras(world, { seaDist, shore }) {
 
   // 6. the coast: on a beach close to the sea, looking along the shore
   // (the sea on one side, the land on the other), toward the side where
-  // the coast rises highest within view
+  // the coast rises highest within view; turned 42 degrees from the sea (60
+  // in phase 1), so the waterline runs across the frame now beaches are narrower
   {
     let best = null;
     for (let z = 40; z < N - 40; z += 12) for (let x = 40; x < N - 40; x += 12) {
@@ -172,7 +173,7 @@ export function worldCameras(world, { seaDist, shore }) {
       const gl = Math.hypot(gx, gz);
       if (gl < 1) continue;
       const sx = -gx / gl, sz = -gz / gl;
-      for (const turn of [-60, 60]) {
+      for (const turn of [-42, 42]) {
         const ang = Math.atan2(sx, sz) + turn * Math.PI / 180, dx = Math.sin(ang), dz = Math.cos(ang);
         let rise = 0;
         for (let d = 150; d <= 450; d += 50) rise = Math.max(rise, heightAt(H, N, x + dx * d - sx * 20, z + dz * d - sz * 20) - SCALE.sea);

@@ -87,20 +87,26 @@ export class SkyPass {
   // snow, or wooded lower slopes, lit by the sun or moon through the face's
   // own lean (it faces the map, leaning back, turned by the line's peaks and
   // saddles), its gullies dark and its rock in broad strata.
-  backdropShade(m, ci, slot, p, k, s, ey, dist) {
+  backdropShade(m, ci, slot, p, k, s, ey, dist, rowAngle) {
     const bd = this.bd, K = bd.layers.length, q = p * K + k, Ly = bd.layers[k];
     const t = this.bT[q], u = this.bU[q], H = this.bH[q], y = ey + s * t;
     const P = lineAt(bd, Ly.D, u, this.Pl);
     const FAR = LOOK.far, C = SCALE.backdrop, sea = SCALE.sea;
     const g = smooth(0.6, 0.88, vnoise(u / 75, y / 320, SEED + 141 + k));
-    const snowY = sea + Ly.snow + 45 * fbm(u / 700, k * 3.1, SEED + 142, 2) - 40 * g;
+    // snow caps the peaks: above the line, the more of a peak the taller it
+    // stands over it, so the snow line follows the peaks instead of cutting
+    // them all at one height; it runs down the gullies
+    const line = sea + Ly.snow + 45 * fbm(u / 700, k * 3.1, SEED + 142, 2);
+    const snowY = line + Math.max(0, H - line) * C.cap - 40 * g;
+    // (strata finer than a couple of rows fade, as on the map's own range)
+    const strata = 1 - smooth(FAR.strata * 0.15, FAR.strata * 0.55, dist * rowAngle);
     let mat, tone;
     if (y > snowY) { mat = MAT.SNOW; tone = 0.25 * (vnoise(u / 60, y / 40, SEED + 143) * 2 - 1); }
     else if (y < sea + Ly.tree + 30 * vnoise(u / 500, k * 3.3, SEED + 144)) {
       const wood = vnoise(u / 90, y / 60, SEED + 145) > 0.42;
       mat = wood ? MAT.CONIFER : MAT.GRASS;
       tone = 0.6 * (vnoise(u / 25, y / 30, SEED + 146) * 2 - 1);
-    } else { mat = MAT.ROCK; tone = FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(u / 400, k * 2.7, SEED + 147)); }
+    } else { mat = MAT.ROCK; tone = FAR.bands * strata * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(u / 400, k * 2.7, SEED + 147)); }
     // the face's normal: leaning back from the map at C.face, turned along
     // the line by the ridgeline's slope near the crest
     const lean = C.lean * leanAt(Ly, bd.step, u, H - y);
@@ -225,12 +231,12 @@ export class SkyPass {
       // what the ray meets: a cloud, a ridgeline, or the sky
       const cd = dy > 0.01 ? this.cloud(v, v.ey, dx, dy, dz, cx, cy, Lc, m, ci, 0, p) : Infinity;
       let behind = cd;
-      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 0, p, bk, s, v.ey, bDist); behind = bDist; }
+      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 0, p, bk, s, v.ey, bDist, v.rowAngle); behind = bDist; }
       else if (cd === Infinity) this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
       // the skyline in front: what the ray meets moves behind (R1), with the
       // share the land covers; the land at the skyline takes the cell
       if (fc > 0 && fDist < behind) {
-        if (fBd) { const st = this.bTop[p]; this.backdropShade(m, ci, 2, p, this.bTopK[p], st, v.ey, fDist); }
+        if (fBd) { const st = this.bTop[p]; this.backdropShade(m, ci, 2, p, this.bTopK[p], st, v.ey, fDist, v.rowAngle); }
         for (let b = 0; b < REC; b++) { hits[o + REC + b] = hits[o + b]; hits[o + b] = hits[o + 2 * REC + b]; }
         hits[o + REC + 4] = Math.round(fc >= 1 ? 255 : fc * 255);
       }
@@ -254,7 +260,7 @@ export class SkyPass {
       const bDist = bk >= 0 ? this.bT[p * K + bk] / inv : Infinity;
       const cd = dy > 0.01 ? this.cloud(v, ey, dx, dy, dz, cx, cy, Lc, m, ci, 1, p) : Infinity;
       // (a ridgeline in the water: its leg is from the water on)
-      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 1, p, bk, s, ey, bDist - rays.rdw[ci] / inv); continue; }
+      if (bk >= 0 && bDist < cd) { this.backdropShade(m, ci, 1, p, bk, s, ey, bDist - rays.rdw[ci] / inv, v.rowAngle); continue; }
       if (cd < Infinity) continue;
       this.skyRecord(hits, o, dx, dy, dz, cosSun, cosMoon);
       if (hits[o] !== MAT.SKY) continue;

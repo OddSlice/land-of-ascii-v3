@@ -167,7 +167,7 @@ const methods = {
       // normals miss them) and rock shows broad strata, both fixed to the land
       if (this.farRule && T.form && (mat === MAT.ROCK || mat === MAT.SNOW)) {
         lam *= 1 - FAR.gully * this.gullyAt(T.form, x, z);
-        if (mat === MAT.ROCK) tone += FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(x / 210, z / 210, SEED + 131)) * fadeOf(FAR.strata / 2, fp);
+        if (mat === MAT.ROCK) tone += FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(x / 210, z / 210, SEED + 131)) * fadeOf(FAR.strata / 2, fp) * (1 - smooth(FAR.strata * 0.15, FAR.strata * 0.55, D * v.rowAngle));
       }
       // (judged by the cell's footprint along the view, where rows are tall)
       if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);

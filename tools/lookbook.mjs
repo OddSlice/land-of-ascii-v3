@@ -19,6 +19,11 @@
 //   node tools/lookbook.mjs --phase 1 [--seeds 3,1,2,4,5] [--built]
 //       docs/phase1.md: the overhead map (M) of each seed, and the default
 //       seed's eight world cameras at day, dusk and night (shots/phase1/)
+//   node tools/lookbook.mjs --phase 2a --ref DIR [--seeds 3,1,2,4,5] [--built]
+//       docs/phase2a.md: the spawn, the ridge-top vista, the coast and the
+//       main lake at day, dawn, dusk and night under a bright and a dark
+//       moon, each beside the same camera in the build in DIR (a copy of
+//       phase 1's), and the overhead maps of the seeds (shots/phase2a/)
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -28,6 +33,7 @@ import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 const a = args();
 if (a.regress) { await regress(); process.exit(process.exitCode || 0); }
 if (String(a.phase) === '1') { await phase1(); process.exit(0); }
+if (String(a.phase) === '2a') { await phase2a(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -405,5 +411,79 @@ async function phase1() {
   } finally {
     await browser.close();
     server.close();
+  }
+}
+
+// ---- phase 2a: before and after, and the maps with their copses -------------
+
+async function phase2a() {
+  if (!a.ref) throw new Error('--phase 2a needs --ref DIR (a copy of phase 1, for the frames before)');
+  const OUT = path.join(ROOT, 'shots', 'phase2a');
+  fs.mkdirSync(OUT, { recursive: true });
+  const seeds = String(a.seeds || '3,1,2,4,5').split(',').map(Number);
+  const now = await serve(), ref = await serve(a.ref);
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  // the times: [label, hour, day] (phase 1 has no dawn of its own and no moon's
+  // phases, so its frames at those times show what it drew then)
+  const TIMES = [['day (14:00)', 14, 0], ['dawn (06:09)', 6.15, 0], ['dusk (17:51)', 17.85, 0], ['night (23:00), bright moon (day 0)', 23, 0], ['night (23:00), dark moon (day 15)', 23, 15]];
+  const CAMS = [[0, 'spawn view'], [6, 'ridge-top vista'], [5, 'the coast'], [1, 'main lake shore']];
+  try {
+    const bench = await workbench(browser);
+    const compose = (srcs, labels, title, per, scale = 1) => bench.evaluate(async ({ srcs, labels, title, per, scale }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const pad = 12, top = 30, w = Math.round(ims[0].width * scale), h = Math.round(ims[0].height * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, x, y, w, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.88);
+    }, { srcs, labels, title, per, scale });
+    // before and after
+    const frames = {};
+    for (const [tag, srv] of [['before', ref], ['after', now]]) {
+      const lab = await openLab(browser, srv.url, { built: !!a.built, scene: 'world', seed: seeds[0] });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      for (const [ci] of CAMS) for (const [, hour, day] of TIMES) {
+        await lab.page.evaluate(async ({ ci, hour, day }) => { window.lab.camera(ci); window.lab.freeze(hour, 0, day); await window.lab.whenIdle(); }, { ci, hour, day });
+        await lab.check();
+        frames[`${tag} ${ci} ${hour} ${day}`] = await shot(lab.page);
+      }
+      await lab.ctx.close();
+    }
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    for (const [ci, name] of CAMS) {
+      const srcs = [], labels = [];
+      for (const [label, hour, day] of TIMES) {
+        srcs.push(frames[`before ${ci} ${hour} ${day}`], frames[`after ${ci} ${hour} ${day}`]);
+        labels.push(`phase 1, ${label}`, `phase 2a, ${label}`);
+      }
+      writeDataURL(path.join(OUT, `${slug(name)}.jpg`), await compose(srcs, labels, `${name} (seed ${seeds[0]}): phase 1 and phase 2a`, 2, 0.25));
+    }
+    // the maps (M), with the copses
+    const maps = [];
+    for (const seed of seeds) {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed, width: 1100, height: 900 });
+      await lab.page.evaluate(async () => { window.lab.setHud(false); window.lab.freeze('day', 0); await window.lab.whenIdle(); window.lab.setMap(true); await new Promise((r) => setTimeout(r, 300)); });
+      await lab.check();
+      const src = await shot(lab.page);
+      maps.push(src);
+      writeDataURL(path.join(OUT, `map-seed-${seed}.jpg`), await compose([src], [`seed ${seed}${seed === seeds[0] ? ' (the default)' : ''}`], `Overhead map (M), seed ${seed}: the stands and the copses`, 1, 0.5));
+      await lab.ctx.close();
+    }
+    writeDataURL(path.join(OUT, 'maps.jpg'), await compose(maps, seeds.map((s, k) => `seed ${s}${k === 0 ? ' (the default)' : ''}`), 'Overhead maps (M): the copses are the small dark clumps in the open lowland', 3, 0.3));
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase2a/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    now.server.close(); ref.server.close();
   }
 }

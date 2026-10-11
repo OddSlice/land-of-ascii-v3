@@ -61,10 +61,12 @@ export const SCALE = {
     // turn along the line by `lean` times the line's own slope near a crest,
     // so a peak has a lit flank and a shaded one
     face: 0.8, lean: 2.2,
+    // snow caps a peak above its line by this share of its height over it
+    cap: 0.55,
     layers: [
-      { dist: 450, low: 200, high: 580, wave: 1100, snow: 450, tree: 210 },
-      { dist: 1400, low: 320, high: 840, wave: 1700, snow: 560, tree: 220 },
-      { dist: 3200, low: 440, high: 980, wave: 2600, snow: 640, tree: 230 },
+      { dist: 450, low: 200, high: 580, wave: 1100, snow: 480, tree: 210 },
+      { dist: 1400, low: 320, high: 840, wave: 1700, snow: 620, tree: 220 },
+      { dist: 3200, low: 440, high: 980, wave: 2600, snow: 700, tree: 230 },
     ],
   },
 };

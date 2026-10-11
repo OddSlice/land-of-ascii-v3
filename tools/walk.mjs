@@ -27,6 +27,11 @@ const WALKS = [
   { name: 'stress-lake', stress: true, cam: 1, script: [[['KeyD'], 8], [['ArrowLeft'], 0.6], [['KeyA'], 8], [['ArrowRight'], 0.6], [['KeyS'], 2.8]] },
   { name: 'ridge', stress: true, cam: 2, script: [[['KeyW'], 6], [['ArrowLeft'], 1], [['KeyW'], 6], [['ArrowRight'], 2], [['KeyS'], 5]] },
   { name: 'world-road', world: true, road: 120 },
+  // phase 2a: the same walk from 17:33, dusk into night (the clock runs a
+  // game hour a minute), and a minute's slow pan (150 degrees) from the
+  // ridge-top vista at the brow of its hill
+  { name: 'world-dusk', world: true, road: 120, hour: 17.55 },
+  { name: 'world-pan', world: true, cam: 6, pan: 60, panDeg: 150 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -49,17 +54,29 @@ try {
     else if (w.world) { if (a.seed) q.set('seed', String(a.seed)); } else q.set('lab', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-    await page.evaluate(async (cam) => {
+    await page.evaluate(async ({ cam, hour }) => {
       await window.lab.ready;
       if (cam !== undefined) window.lab.camera(cam);
+      if (hour !== undefined) window.lab.setHour(hour);
       await window.lab.whenIdle();
       window.lab.unfreeze();
       window.lab.runClock(true);
-    }, w.cam);
+    }, { cam: w.cam, hour: w.hour });
     const s0 = await page.evaluate(() => window.lab.state().presented);
     const t0 = Date.now();
     if (w.road) await followRoad(page, w.road);
-    else for (const [keys, secs] of w.script) {
+    else if (w.pan) {
+      // turn at a steady rate, one step each display refresh
+      await page.evaluate(({ secs, deg }) => new Promise((res) => {
+        const t0 = performance.now(), y0 = window.lab.state().yaw - deg / 2;
+        const step = () => {
+          const t = (performance.now() - t0) / 1000;
+          window.lab.face(y0 + deg * Math.min(1, t / secs));
+          if (t < secs) requestAnimationFrame(step); else res();
+        };
+        step();
+      }), { secs: w.pan, deg: w.panDeg });
+    } else for (const [keys, secs] of w.script) {
       for (const k of keys) await page.keyboard.down(k);
       await page.waitForTimeout(secs * 1000);
       for (const k of keys) await page.keyboard.up(k);

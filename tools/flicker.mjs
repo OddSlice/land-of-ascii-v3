@@ -7,7 +7,13 @@
 //                                          build (--ref DIR, e.g. a copy of phase 0b's sources)
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
 //   node tools/flicker.mjs --set world     a walk through the generated world (default seed, settled
-//                                          look): meadow, forest and along the lake, from its cameras
+//                                          look): meadow, forest and along the lake, from its cameras,
+//                                          and (phase 2a) along the coast's foam line and swell
+//   node tools/flicker.mjs --skyline [--ref DIR]   (phase 2a; in Node, no browser) turning toward the
+//                                          range from the world's cameras, each blink sorted by what it
+//                                          sits on, so the far skyline's crawl (a cell changing between
+//                                          sky and land) is counted on its own; with --ref, the same for
+//                                          another build (e.g. a copy of phase 1's sources)
 //   --only forest,stand                    only the runs whose label contains one of these
 //   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look tree=B]
 //
@@ -51,6 +57,10 @@ const SETS = {
     { label: 'world, open meadow: turning', scene: 'world', cam: 3, face: 180, ...TURN },
     { label: 'world, inside a forest stand: turning', scene: 'world', cam: 2, ...TURN },
     { label: 'world, main lake shore: turning', scene: 'world', cam: 1, ...TURN },
+    // the coast (phase 2a): walking along the beach, its foam line and the
+    // sea's swell in view, and turning across the sea
+    { label: 'world, the coast: walking along the beach', scene: 'world', cam: 5, ...F },
+    { label: 'world, the coast: turning across the sea', scene: 'world', cam: 5, ...TURN },
   ],
   water: [
     { label: 'lab, meadow (no water): walking sideways', at: [262, 225, -8, 2], ...W },
@@ -65,6 +75,66 @@ const SETS = {
 };
 const OPTIONS = { tree: ['A', 'B'], cloud: ['A', 'B'], meadow: [0, 1, 2] };
 const frames = Number(a.frames || 60);
+
+// ---- the far skyline (phase 2a), in Node --------------------------------------
+// Turning at 18 degrees a second from the spawn and the main lake's shore (the
+// world's own cameras, which look toward the range), density 3, every clock
+// frozen: blinks (a cell that changes and changes back) where the cell goes
+// between sky (sky, cloud, sun, moon, stars) and land are the skyline's crawl.
+async function skyline(root, seed) {
+  const G = await import(`${root}/src/world/gen/world.js`), PK = await import(`${root}/src/world/pack.js`);
+  const BE = await import(`${root}/src/scene/cpu/backend.js`), RS = await import(`${root}/src/resolve.js`), LK = await import(`${root}/src/look.js`);
+  const CT = await import(`${root}/src/contract.js`), OB = await import(`${root}/src/world/objects.js`);
+  const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
+  const w = PK.unpackWorld(PK.packWorld(r.value));
+  const cols = 360, rows = 112, n = cols * rows, look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const out = [];
+  for (const ci of [0, 1]) {
+    const c = w.cameras[ci], be = BE.createCpuBackend(w);
+    const fr = [];
+    for (let i = 0; i < frames + 1; i++) {
+      const cam = { x: c.x, z: c.z, y: OB.groundAt(w.terrain, c.x, c.z) + 1.7, yaw: (c.yaw + 0.3 * i) * Math.PI / 180, pitch: c.pitch * Math.PI / 180 };
+      const f = { seq: i, cam, cols, rows, fovY: LK.LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: 14, t: 0, day: 0, look };
+      const hits = new Uint8Array(n * CT.HIT_STRIDE);
+      for (let k = 0; k < 400; k++) { be.render(f, 0, cols, hits); if (be.settled) break; }
+      const mats = new Uint8Array(n);
+      for (let k = 0; k < n; k++) mats[k] = hits[k * CT.HIT_STRIDE] <= CT.MAT.STAR ? 1 : 0;
+      const cells = new Uint8Array(n * 8);
+      if (LK.LOOK.moonKeys) RS.resolveStripe(RS.makePalette(14, 0, 'moon'), hits, cells, cols, rows, 0, f);
+      else RS.resolveStripe(RS.makePalette(14), hits, cells, cols, rows, 0, look);
+      fr.push({ cells, mats });
+    }
+    let sg = 0, sc = 0, ag = 0, ac = 0;
+    for (let i = 2; i < fr.length; i++) {
+      const A = fr[i - 2], B = fr[i - 1], C = fr[i];
+      for (let k = 0; k < n; k++) {
+        const o = k * 8;
+        const same = (x, y) => x[o] === y[o] && x[o + 1] === y[o + 1] && x[o + 2] === y[o + 2] && x[o + 3] === y[o + 3];
+        if (same(A.cells, B.cells) || !same(A.cells, C.cells)) continue;
+        const gb = A.cells[o + 3] !== B.cells[o + 3];
+        const cb = Math.abs(A.cells[o] - B.cells[o]) > 6 || Math.abs(A.cells[o + 1] - B.cells[o + 1]) > 6 || Math.abs(A.cells[o + 2] - B.cells[o + 2]) > 6;
+        // (the skyline: sky in one frame, land in the next, or a fading top cell)
+        const sky = A.mats[k] !== B.mats[k] || (A.mats[k] === 0 && (k >= cols && A.mats[k - cols] === 1));
+        if (gb) { ag++; if (sky) sg++; }
+        if (cb) { ac++; if (sky) sc++; }
+      }
+    }
+    const per = (x) => 100 * x / (fr.length - 2) / n;
+    out.push({ view: c.name, skylineGlyph: per(sg), skylineColour: per(sc), allGlyph: per(ag), allColour: per(ac) });
+  }
+  return out;
+}
+if (a.skyline) {
+  const seed = Number(a.seed || 3);
+  const rows = [['this build', await skyline(ROOT, seed)]];
+  if (a.ref) rows.push([`reference build (${a.ref})`, await skyline(a.ref, seed)]);
+  const f3 = (x) => `${x.toFixed(3)}%`;
+  console.log(`\nthe far skyline, turning (seed ${seed}, density 3, ${frames} frames at 18 degrees a second)\n`);
+  console.log('| build | view | skyline glyph blinks | skyline colour blinks (>6 levels) | all glyph blinks | all colour blinks |');
+  console.log('|---|---|---|---|---|---|');
+  for (const [name, list] of rows) for (const v of list) console.log(`| ${name} | ${v.view} | ${f3(v.skylineGlyph)} | ${f3(v.skylineColour)} | ${f3(v.allGlyph)} | ${f3(v.allColour)} |`);
+  process.exit(0);
+}
 
 let runs;
 if (a.at) {

@@ -8,6 +8,9 @@
 //   options: --threads N, --density 1..4, --browser chromium|firefox|webkit, --out dir,
 //            --look tree=B,cloud=B,meadow=2,shallows=blue (the look candidates), --stress (its three cameras),
 //            --cam x,z,yaw,pitch --time day --name test  (a free camera)
+//   node tools/shoot.mjs --world [--seed N] [--built]   (phase 2a) the generated
+//       world's views beside the reference's mountain and dusk frames, into
+//       shots/ref-2a/ (private, like every sheet with the reference in it)
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, dataURL, writeDataURL, workbench } from './lib/browser.mjs';
@@ -22,6 +25,49 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 const { server, url } = await serve();
 const browser = await launch(a.browser || 'chromium');
 let failed = false;
+// (phase 2a) the world beside the reference's far mountain and dusk
+const PAIRS = [
+  { name: 'the range from the spawn, by day', ref: '04-5.png', refLabel: 'ASCII Fort 0:57, mountains', cam: 0, hour: 14 },
+  { name: 'the range across the main lake, by day', ref: '04-5.png', refLabel: 'ASCII Fort 0:57, mountains', cam: 1, hour: 14 },
+  { name: 'dusk from the spawn', ref: '03-5.png', refLabel: 'mountains video 0:47, dusk', cam: 0, hour: 17.85 },
+  { name: 'dusk across the main lake', ref: '03-4.png', refLabel: 'mountains video 0:36, dusk wall', cam: 1, hour: 17.85 },
+];
+if (a.world) {
+  const dir = path.join(ROOT, 'shots', 'ref-2a');
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    const lab = await openLab(browser, url, { built: !!a.built, scene: 'world', seed: a.seed });
+    const { page } = lab;
+    await page.evaluate(() => window.lab.setHud(false));
+    const bench = await workbench(browser);
+    for (const P of PAIRS) {
+      await page.evaluate(async ({ cam, hour }) => { window.lab.camera(cam); window.lab.freeze(hour, 0, 0); await window.lab.whenIdle(); }, P);
+      await lab.check();
+      const own = `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+      const png = await bench.evaluate(async ({ ref, main, title, labels }) => {
+        const [R, M] = await Promise.all([ref, main].map(loadImage));
+        const H = 660, pad = 14, top = 34, rw = Math.round(R.width * H / R.height), mw = Math.round(M.width * H / M.height);
+        const c = document.createElement('canvas');
+        c.width = pad + rw + pad + rw + pad + mw + pad; c.height = top + H + 22 + pad;
+        const g = c.getContext('2d');
+        g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+        g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 22);
+        g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(R, pad, top, rw, H);
+        const cropW = M.height * R.width / R.height;
+        g.drawImage(M, (M.width - cropW) / 2, 0, cropW, M.height, pad * 2 + rw, top, rw, H);
+        g.drawImage(M, pad * 3 + rw * 2, top, mw, H);
+        labels.forEach((l, k) => g.fillText(l, pad + k * (rw + pad), top + H + 16));
+        return c.toDataURL('image/png');
+      }, { ref: dataURL(path.join(ROOT, 'reference', 'thumbs', P.ref)), main: own, title: `${P.name} (private: the reference is other people's footage)`, labels: [`reference: ${P.refLabel}`, 'the world, same shape', 'the world, whole frame'] });
+      const file = path.join(dir, `${slug(P.name)}.png`);
+      writeDataURL(file, png);
+      console.log(path.relative(ROOT, file));
+    }
+  } catch (err) { console.error(err.message); failed = true; } finally { await browser.close(); server.close(); }
+  process.exit(failed ? 1 : 0);
+}
 try {
   const lab = await openLab(browser, url, { built: !!a.built, threads: a.threads, density: a.density, look: parseLook(a.look), stress: !!a.stress });
   const { page } = lab;

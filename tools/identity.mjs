@@ -36,11 +36,15 @@ const STRESS = [
 // The generated world: its eight cameras (found from its data) at their own
 // time and at night, and views that test the edges: the open sea from above
 // a cliff (it must run to the horizon), the map's edge from outside it, down
-// into a river, up at the fort's gate.
+// into a river, up at the fort's gate. Phase 2a adds dawn, the night under a
+// bright and a dark moon, and the waterline from the beach both ways (one
+// of them looks out to sea); the lake's camera sees the backdrop and its
+// mirror image in the water.
 const WORLD = [
   ...[0, 1, 2, 3, 4, 5, 6, 7].map((cam) => ({ cam, t: 'day' })),
   { cam: 0, t: 'dusk' }, { cam: 1, t: 'night' }, { cam: 4, t: 'dusk' },
   { site: 'coastUp', t: 'day' }, { site: 'edge', t: 'day' }, { site: 'gate', t: 'night' }, { site: 'river', t: 'day' },
+  { cam: 0, t: 'dawn' }, { cam: 0, t: 'night', day: 15 }, { cam: 6, t: 'night' }, { site: 'shoreL', t: 'day' }, { site: 'shoreR', t: 'dusk' },
 ];
 const scenes = {
   lab: [['lab', LAB]], stress: [['stress', STRESS]], both: [['lab', LAB], ['stress', STRESS]],
@@ -85,8 +89,9 @@ try {
             if (v.site === 'edge') L.setCamera({ x: 1024, z: -150, y: 60, yaw: 10, pitch: -6 });
             if (v.site === 'gate') L.setCamera({ x: s.fort.gate.x + 0.3, z: s.fort.front.z, yaw: s.fort.front.z < s.fort.gate.z ? 0 : 180, pitch: 18 });
             if (v.site === 'river') L.setCamera({ x: riv.x, z: riv.z, yaw: riv.yaw + 70, pitch: -35 });
+            if (v.site === 'shoreL' || v.site === 'shoreR') L.setCamera({ x: coast.x, z: coast.z, yaw: coast.yaw + (v.site === 'shoreL' ? -90 : 90), pitch: -14 });
           } else L.camera(v.cam);
-          L.freeze(v.t, 12.5);
+          L.freeze(v.t, 12.5, v.day || 0);
           await L.whenIdle();
           return L.cellHash();
         }, { v, look });
