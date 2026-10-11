@@ -24,7 +24,25 @@
 //     snow or meadow over 800 m away), the quarter of its cells the most
 //     light reaches against the quarter the least does.
 //
+//  8. (phase 3a) the fort: it is placed and its road enters its gate (the
+//     road's end lies in the yard, a road point lies in the gate's passage,
+//     and the ground along the road from 30 m out to the yard rises or falls
+//     no more than the roads' limit between points a metre apart: no step);
+//     a walker under the walking rules and the building kit's exact
+//     collision (the game's own Player) can go from the gate's mouth
+//     through the passage, across the yard, up each stone stair, along the
+//     whole wall walk (points every 4 m on every run of wall), into each
+//     tower and up to its top, into the keep's hall, and from each of those
+//     back out of the gate; a thousand random walking attempts from places
+//     in and round the fort (3 s each, turning now and then) never pass
+//     through a wall, never get stuck and never leave the walker inside
+//     solid stone; no tree stands in the fort or the margin round it.
+//  9. (phase 3a) far readability also counts the fort: from the spawn,
+//     turned toward it, it must differ from the cells round it by a visible step.
+//
 //   node tools/world-check.mjs [--seeds 1,2,3,4,5] [--points 300] [--road 50] [--out file.json]
+//   node tools/world-check.mjs --fort-only --sweep 60 [--from 1000]   (phase 3a) the fort's
+//         checks (8) alone on sixty random seeds
 import fs from 'node:fs';
 import path from 'node:path';
 import { args, ROOT } from './lib/serve.mjs';
@@ -40,9 +58,13 @@ import { SCALE } from '../src/world/scale.js';
 import { groundAt } from '../src/world/objects.js';
 import { spanAt } from '../src/world/spans.js';
 import { hash2 } from '../src/world/noise.js';
+import { Player } from '../src/app/player.js';
+import { solidAt, bodyBlocked, PF, P as KP, P_STRIDE } from '../src/world/kit.js';
+import { inPoly, polyDist } from '../src/world/gen/fort.js';
 
 const a = args();
-const seeds = String(a.seeds || `${DEFAULT_SEED},2,3,4,5`).split(',').map(Number);
+// (the default seed and four others: 3, 1, 2, 4, 5)
+const seeds = String(a.seeds || [DEFAULT_SEED, ...[1, 2, 3, 4, 5].filter((s) => s !== DEFAULT_SEED)].slice(0, 5).join(',')).split(',').map(Number);
 const nPts = Number(a.points || 300), nRoad = Number(a.road || 50);
 
 function build(seed) {
@@ -177,8 +199,15 @@ function farRead(w, gw) {
   const be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE), cells = new Uint8Array(cols * rows * CELL_STRIDE);
   const look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  // (phase 3a) and from the spawn turned toward the fort, aimed a little
+  // over its yard, which must read: its stone, timber, plaster, roofs and
+  // windows against the cells round them
+  const fort = w.sites.fort, fy = groundAt(w.terrain, w.start.x, w.start.z) + SCALE.eye, fd = Math.hypot(fort.x - w.start.x, fort.z - w.start.z);
   const spots = [{ name: 'spawn', x: w.start.x, z: w.start.z, yaw: w.start.yaw, pitch: 0, range: true },
+    { name: 'spawn, toward the fort', x: w.start.x, z: w.start.z, yaw: Math.atan2(fort.x - w.start.x, fort.z - w.start.z) * 180 / Math.PI, pitch: Math.atan2(fort.base + 4 - fy, fd) * 180 / Math.PI, fort: true },
     ...w.sites.viewpoints.map((v, i) => ({ name: `viewpoint ${i + 1}`, x: v.x, z: v.z, yaw: v.yaw, pitch: -6 }))];
+  const fortFoot = (x, z) => polyDist(fort.poly, x, z) < 8;
+  const KITMAT = new Set([MAT.STONE, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.WINDOW]);
   const out = [];
   for (const sp of spots) {
     const cam = { x: sp.x, z: sp.z, y: groundAt(w.terrain, sp.x, sp.z) + SCALE.eye, yaw: sp.yaw * Math.PI / 180, pitch: sp.pitch * Math.PI / 180 };
@@ -188,7 +217,7 @@ function farRead(w, gw) {
     resolveStripe(makePalette(f.hour, 0, 'moon'), hits, cells, cols, rows, 0, f);
     // each cell's ray (the contract's own), to find where it lands
     const ty = Math.tan(f.fovY / 2), tx = ty * f.aspect, cp = Math.cos(cam.pitch), spp = Math.sin(cam.pitch), cy0 = Math.cos(cam.yaw), sy0 = Math.sin(cam.yaw);
-    const cls = new Int8Array(cols * rows).fill(-1);    // 0 lake, 1 river, 2 forest, 3 road
+    const cls = new Int8Array(cols * rows).fill(-1);    // 0 lake, 1 river, 2 forest, 3 road, 4 the fort
     const faces = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const k = r * cols + c, o = k * HIT_STRIDE, m = rec[o], d = (rec[o + 6] | (rec[o + 7] << 8)) / 10;
@@ -196,6 +225,7 @@ function farRead(w, gw) {
       const fz = cp - Y * spp, fy = Y * cp + spp, len = Math.hypot(X, fy, fz);
       const hx = cam.x + (X * cy0 + fz * sy0) / len * d, hz = cam.z + (-X * sy0 + fz * cy0) / len * d;
       const j = Math.round(Math.max(0, Math.min(N, hz))) * NN + Math.round(Math.max(0, Math.min(N, hx)));
+      if (sp.fort) { if (KITMAT.has(m) && fortFoot(hx, hz)) cls[k] = 4; continue; }
       if (m === MAT.WATER && d < 6500) {
         if (kind[j] === KIND.LAKE && Math.abs(level[j] - lake.level) < 0.3) cls[k] = 0;
         else if (kind[j] === KIND.RIVER) cls[k] = 1;
@@ -206,7 +236,8 @@ function farRead(w, gw) {
     const mean = (list) => { const s = [0, 0, 0]; for (const k of list) for (let q = 0; q < 3; q++) s[q] += cells[k * CELL_STRIDE + q]; return s.map((v) => v / list.length); };
     const step = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
     const res = { name: sp.name, features: {} };
-    ['main lake', 'river', 'forest', 'road'].forEach((name, q) => {
+    ['main lake', 'river', 'forest', 'road', 'fort'].forEach((name, q) => {
+      if ((q === 4) !== !!sp.fort) return;
       const inside = [], round = [];
       for (let k = 0; k < cols * rows; k++) if (cls[k] === q) inside.push(k);
       if (inside.length < 6) { res.features[name] = null; return; }
@@ -238,10 +269,180 @@ function farRead(w, gw) {
       }
       res.range = best || { ok: false, note: 'range faces not in view' };
     }
-    res.ok = Object.values(res.features).every((v) => !v || v.ok) && (!sp.range || res.range.ok);
+    // (the fort must be there to read; the others only where they are seen)
+    res.ok = Object.values(res.features).every((v) => !v || v.ok) && (!sp.range || res.range.ok) && (!sp.fort || !!res.features.fort);
     out.push(res);
   }
   return { spots: out, ok: out.every((s) => s.ok) };
+}
+
+// 8. The fort.
+function fortChecks(w) {
+  const f = w.sites.fort, K = SCALE.kit, out = { placed: !!(w.kit && w.kit.np && f && f.towers), towers: f.towers.length, stairs: f.stairs.length };
+  const NN = w.NN, T = w.terrain;
+  // the road into the gate
+  const rd = w.roads.find((r) => r.to === 'fort');
+  const g = f.gate, o = g.out, across = [-o[1], o[0]];
+  let inPassage = false;
+  for (let q = 0; q < rd.n; q++) {
+    const dx = rd.x[q] - g.x, dz = rd.z[q] - g.z, a = Math.abs(dx * across[0] + dz * across[1]), t = Math.abs(dx * o[0] + dz * o[1]);
+    if (a < K.gate.width / 2 - 0.6 && t < K.gate.depth / 2) inPassage = true;
+  }
+  const endInYard = inPoly(f.yard, rd.x[0], rd.z[0]);
+  const surf = { ground: T.levels[0].H, N: w.N, NN };
+  // from the yard out along the road to 30 m past the gate's mouth: the
+  // grade over 4 m (as the roads are measured) and the biggest rise between
+  // points a metre apart (a step would show there)
+  let worstStep = 0, worstRise = 0;
+  for (let q = 0; q + 4 < rd.n; q++) {
+    const dfront = Math.hypot(rd.x[q] - f.front.x, rd.z[q] - f.front.z);
+    if (dfront > 30 && !inPoly(f.yard, rd.x[q], rd.z[q]) && q > 30) break;
+    let run = 0;
+    for (let u = q; u < q + 4; u++) run += Math.hypot(rd.x[u + 1] - rd.x[u], rd.z[u + 1] - rd.z[u]);
+    worstStep = Math.max(worstStep, Math.abs(groundAt(surf, rd.x[q + 4], rd.z[q + 4]) - groundAt(surf, rd.x[q], rd.z[q])) / Math.max(1e-6, run));
+    worstRise = Math.max(worstRise, Math.abs(groundAt(surf, rd.x[q + 1], rd.z[q + 1]) - groundAt(surf, rd.x[q], rd.z[q])));
+  }
+  out.road = { inPassage, endInYard, worstStep: +worstStep.toFixed(3), worstRise: +worstRise.toFixed(3), ok: inPassage && endInYard && worstStep <= SCALE.road.maxSlope && worstRise <= 0.2 };
+  // trees
+  const cleared = w.fortDesc.cleared[0];
+  out.treesIn = w.objects.trees.filter((t) => inPoly(cleared, t.x, t.z)).length;
+  // the walker: states on a 0.5 m lattice, with the feet's height
+  const p = new Player(w, { rules: 'world' });
+  const STEP = 0.6, HEAD = 1.8, R = 0.3, sub = 0.25;
+  const b = w.kit.box, x0 = b.x0 - 18, z0 = b.z0 - 18, x1 = b.x1 + 18, z1 = b.z1 + 18;
+  const key = (ix, iz, ft) => `${ix},${iz},${Math.round(ft * 8)}`;
+  const states = new Map(), list = [];
+  const addState = (ix, iz, ft) => { const k = key(ix, iz, ft); if (states.has(k)) return states.get(k); const id = list.length; states.set(k, id); list.push({ ix, iz, ft, nb: [] }); return id; };
+  // one move of up to 0.5 m: true and where it ends, or false if blocked
+  const move = (x, z, ft, dx, dz, dist) => {
+    const n = Math.max(1, Math.ceil(dist / sub - 1e-9)), h = dist / n;
+    for (let s = 0; s < n; s++) {
+      const nx = x + dx * h, nz = z + dz * h;
+      const gg = p.supportAt(nx, nz, ft), rise = gg - ft;
+      const onGround = gg <= groundAt(T, nx, nz) + 1e-3;
+      if (onGround ? rise > SCALE.climb * h + 1e-3 : rise > STEP) return null;
+      if (p.blocked(nx, nz, Math.max(gg, ft)) || (gg < ft - 0.05 && p.blocked(nx, nz, gg))) return null;
+      x = nx; z = nz; ft = gg;
+    }
+    return [x, z, ft];
+  };
+  const start = [f.front.x + o[0] * 6, f.front.z + o[1] * 6];
+  const sx = Math.round(start[0] * 2), sz = Math.round(start[1] * 2);
+  addState(sx, sz, p.restAt(sx / 2, sz / 2));
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (let h = 0; h < list.length && list.length < 600000; h++) {
+    const st = list[h], x = st.ix / 2, z = st.iz / 2;
+    for (const [ddx, ddz] of DIRS) {
+      const nx = (st.ix + ddx) / 2, nz = (st.iz + ddz) / 2;
+      if (nx < x0 || nx > x1 || nz < z0 || nz > z1) continue;
+      const l = Math.hypot(ddx, ddz) / 2;
+      const r = move(x, z, st.ft, ddx / 2 / l, ddz / 2 / l, l);
+      if (!r) continue;
+      st.nb.push(addState(st.ix + ddx, st.iz + ddz, r[2]));
+    }
+  }
+  // which states can get back to the gate's mouth (edges backwards)
+  const back = new Uint8Array(list.length), rev = Array.from({ length: list.length }, () => []);
+  list.forEach((st, i) => { for (const j of st.nb) rev[j].push(i); });
+  const qb = [0]; back[0] = 1;
+  for (let h = 0; h < qb.length; h++) for (const i of rev[qb[h]]) if (!back[i]) { back[i] = 1; qb.push(i); }
+  // a target is reached if a state within `rad` m and `dy` m of its height is, and gets back out
+  const reachedAt = (x, z, y, rad = 0.8, dy = 0.5) => {
+    let any = false, outToo = false;
+    for (let iz = Math.round((z - rad) * 2); iz <= Math.round((z + rad) * 2); iz++) for (let ix = Math.round((x - rad) * 2); ix <= Math.round((x + rad) * 2); ix++) {
+      for (let k = -40; k <= 40; k++) {
+        const ft = Math.round(y * 8) / 8 + k / 8;
+        if (Math.abs(ft - y) > dy) continue;
+        const id = states.get(key(ix, iz, ft));
+        if (id === undefined) continue;
+        any = true; if (back[id]) outToo = true;
+      }
+    }
+    return { reached: any, out: outToo };
+  };
+  const targets = [];
+  targets.push({ name: 'the yard (inside the gate)', at: [f.inner.x - o[0] * 4, f.inner.z - o[1] * 4], y: f.base });
+  f.stairs.forEach((s, i) => targets.push({ name: `stair ${i + 1}, its top`, at: s.top, y: f.base + K.wall.height, rad: 1.0 }));
+  // the wall walk: every 4 m along every run of wall (off its ends), on the walk's middle
+  f.edges.forEach((e, i) => {
+    const d = [e.b[0] - e.a[0], e.b[1] - e.a[1]], L = Math.hypot(d[0], d[1]);
+    const ta = f.towers[i], tb = f.towers[(i + 1) % f.towers.length];
+    for (let t = ta.size + 1.2; t <= L - tb.size - 1.2; t += 4) {
+      const onLine = [e.a[0] + d[0] / L * t, e.a[1] + d[1] / L * t];
+      const at = [onLine[0] - e.out[0] * (K.wall.parapet / 2), onLine[1] - e.out[1] * (K.wall.parapet / 2)];
+      if (e.gate && Math.abs(t - L / 2) < K.gate.length / 2 + 0.5) { targets.push({ name: `wall walk, side ${i + 1} at ${t.toFixed(0)} m (over the gate)`, at, y: f.base + K.wall.height, walk: true }); continue; }
+      targets.push({ name: `wall walk, side ${i + 1} at ${t.toFixed(0)} m`, at, y: f.base + K.wall.height, walk: true });
+    }
+  });
+  f.towers.forEach((t, i) => {
+    targets.push({ name: `tower ${i + 1} (${t.round ? 'round' : 'square'}), inside`, at: [t.x, t.z], y: f.base, rad: 1.6, dy: 0.4 });
+    targets.push({ name: `tower ${i + 1}, its top`, at: [t.x, t.z], y: f.base + K.wall.height + K.tower.above, rad: t.size - 1.0, dy: 0.4 });
+  });
+  targets.push({ name: 'the keep, its hall', at: [f.keep.x, f.keep.z], y: f.base, rad: 2, dy: 0.4 });
+  const res = targets.map((t) => ({ name: t.name, ...reachedAt(t.at[0], t.at[1], t.y, t.rad, t.dy) }));
+  out.walker = { states: list.length, targets: res.length, reached: res.filter((r) => r.reached).length, out: res.filter((r) => r.reached && r.out).length, failed: res.filter((r) => !r.reached || !r.out).map((r) => `${r.name}${r.reached ? ' (no way back out)' : ''}`) };
+  out.walker.ok = out.walker.failed.length === 0;
+  // a thousand random walks
+  const pool = list.map((st, i) => i).filter((i) => back[i]);
+  let through = 0, stuck = 0, inside = 0;
+  const wall = [];
+  for (let k = 0; k < 1000; k++) {
+    const st = list[pool[Math.floor(hash2(k, 1, 4407) * pool.length)]];
+    const yaw0 = hash2(k, 2, 4407) * Math.PI * 2;
+    p.place(st.ix / 2, st.iz / 2, yaw0, 0, st.ft);
+    const keys = { KeyW: true };
+    let still = 0, px = p.x, pz = p.z, pf = p.feet, bad = null;
+    for (let fr = 0; fr < 180; fr++) {
+      if (fr % 30 === 0) { p.yaw = yaw0 + (hash2(k, 10 + fr, 4407) - 0.5) * 2.4; keys.ShiftLeft = hash2(k, 50 + fr, 4407) < 0.3; keys.KeyD = hash2(k, 90 + fr, 4407) < 0.15; }
+      p.update(1 / 60, keys);
+      // through a wall: anything solid at waist height along the way it moved
+      const dl = Math.hypot(p.x - px, p.z - pz), n = Math.ceil(dl / 0.04);
+      for (let s = 1; s <= n && !bad; s++) {
+        const t = s / n, x = px + (p.x - px) * t, z = pz + (p.z - pz) * t;
+        if (solidAt(w.kit, x, Math.max(pf, p.feet) + 1.1, z)) bad = 'through';
+      }
+      if (!bad && bodyBlocked(w.kit, p.x, p.z, p.feet + STEP + 0.02, p.feet + HEAD - 0.02, R * 0.85)) bad = 'inside';
+      if (bad) break;
+      if (dl < 0.002) still++; else still = 0;
+      if (still >= 45) {
+        // stuck: no way at all to step out of where it stands
+        let free = false;
+        for (let a = 0; a < 16 && !free; a++) { const ang = a * Math.PI / 8; if (move(p.x, p.z, p.feet, Math.cos(ang), Math.sin(ang), 0.25)) free = true; }
+        if (!free) bad = 'stuck';
+        still = 0;
+      }
+      px = p.x; pz = p.z; pf = p.feet;
+    }
+    if (bad === 'through') through++; else if (bad === 'stuck') stuck++; else if (bad === 'inside') inside++;
+    if (bad && wall.length < 5) wall.push({ k, bad, x: +p.x.toFixed(2), z: +p.z.toFixed(2), feet: +p.feet.toFixed(2), start: [st.ix / 2, st.iz / 2, +st.ft.toFixed(3), +yaw0.toFixed(4)] });
+  }
+  out.walks = { attempts: 1000, through, stuck, inside, examples: wall, ok: through === 0 && stuck === 0 && inside === 0 };
+  out.ok = out.placed && out.road.ok && out.treesIn === 0 && out.walker.ok && out.walks.ok;
+  return out;
+}
+
+function printFort(seed, ft) {
+  console.log(`  fort: ${ft.ok ? 'ok' : 'FAIL'}, ${ft.towers} towers, ${ft.stairs} stairs; road in the gate's passage ${ft.road.inPassage}, ending in the yard ${ft.road.endInYard}, steepest near the gate ${(100 * ft.road.worstStep).toFixed(1)}% over 4 m, biggest rise in a metre ${ft.road.worstRise.toFixed(2)} m; trees in the fort or its margin ${ft.treesIn}`);
+  console.log(`  walker: ${ft.walker.reached} of ${ft.walker.targets} places reached, ${ft.walker.out} of them with a way back out (${ft.walker.states} states)${ft.walker.failed.length ? `; FAILED: ${ft.walker.failed.join('; ')}` : ''}`);
+  console.log(`  random walks: ${ft.walks.attempts}, through a wall ${ft.walks.through}, stuck ${ft.walks.stuck}, inside stone ${ft.walks.inside}${ft.walks.examples.length ? ` e.g. ${JSON.stringify(ft.walks.examples)}` : ''}`);
+}
+
+if (a['fort-only']) {
+  const n = Number(a.sweep || 60), from = Number(a.from || 1000);
+  const list = a.seeds ? seeds : Array.from({ length: n }, (_, i) => from + i * 7919 % 100000);
+  const rows = [];
+  for (const seed of list) {
+    let ft, err = null;
+    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); } catch (e) { err = String(e.message || e); }
+    rows.push({ seed, ft, err });
+    if (err) console.log(`seed ${seed}: FAIL ${err}`); else { console.log(`seed ${seed}: ${ft.ok ? 'PASS' : 'FAIL'}`); if (!ft.ok || a.detail) printFort(seed, ft); }
+  }
+  const okN = rows.filter((r) => r.ft && r.ft.ok).length;
+  console.log(`\n${okN} of ${rows.length} seeds pass the fort's checks`);
+  console.log(`walker places reached and back out: ${rows.filter((r) => r.ft).reduce((s, r) => s + r.ft.walker.out, 0)} of ${rows.filter((r) => r.ft).reduce((s, r) => s + r.ft.walker.targets, 0)}; random walks through a wall ${rows.filter((r) => r.ft).reduce((s, r) => s + r.ft.walks.through, 0)}, stuck ${rows.filter((r) => r.ft).reduce((s, r) => s + r.ft.walks.stuck, 0)}, inside stone ${rows.filter((r) => r.ft).reduce((s, r) => s + r.ft.walks.inside, 0)} (of ${rows.filter((r) => r.ft).length * 1000})`);
+  fs.mkdirSync(path.join(ROOT, 'shots', 'world-check'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'shots', 'world-check', `fort-sweep-${list.length}.json`), JSON.stringify(rows, null, 1));
+  process.exit(okN === rows.length ? 0 : 1);
 }
 
 const results = [];
@@ -258,7 +459,9 @@ for (const seed of seeds) {
   };
   r.sky = sky(w, seed);
   r.far = farRead(w, w1);
-  r.ok = r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4;
+  // (phase 3a) the fort's checks (8)
+  r.fort = fortChecks(w);
+  r.ok = r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok;
   results.push(r);
   const pc = (x) => `${(100 * x).toFixed(1)}%`;
   console.log(`seed ${seed}: ${r.ok ? 'PASS' : 'FAIL'}  build ${r.buildMs} ms, hash ${h1} ${r.same ? '(same twice)' : `!= ${h2}`}`);
@@ -271,15 +474,16 @@ for (const seed of seeds) {
     const fs2 = Object.entries(s.features).map(([k, v]) => `${k} ${v ? `${v.step}${v.ok ? '' : ' TOO FAINT'}` : 'not in view'}`).join(', ');
     console.log(`  far, from the ${s.name}: ${fs2}${s.range ? `; range lit/shaded ${s.range.step !== undefined ? `${s.range.step} (${s.range.material})` : s.range.note}${s.range.ok ? '' : ' TOO FAINT'}` : ''}`);
   }
+  printFort(seed, r.fort);
 }
 const out = a.out || path.join(ROOT, 'shots', 'world-check', `world-check-${seeds.join('-')}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(results, null, 1));
 const pc = (x) => `${(100 * x).toFixed(1)}%`;
-console.log('\n| seed | same twice | sites reached | steepest road | rivers downhill to lake/sea | trees in water / on roads | sky median | views under 15% | far readability: weakest step | result |');
-console.log('|---|---|---|---|---|---|---|---|---|---|');
+console.log('\n| seed | same twice | sites reached | steepest road | rivers downhill to lake/sea | trees in water / on roads | sky median | views under 15% | far readability: weakest step | the fort | result |');
+console.log('|---|---|---|---|---|---|---|---|---|---|---|');
 for (const r of results) {
   const steps = r.far.spots.flatMap((s) => [...Object.values(s.features).filter(Boolean).map((v) => v.step), ...(s.range && s.range.step !== undefined ? [s.range.step] : [])]);
-  console.log(`| ${r.seed} | ${r.same ? 'yes' : 'NO'} | ${r.reach.sites.filter((s) => s.ok).length} of ${r.reach.sites.length} | ${pc(r.roads.steep)} | ${r.rivers.filter((v) => v.ok).length} of ${r.rivers.length} | ${r.trees.wet} / ${r.trees.road} | ${pc(r.sky.median)} | ${pc(r.sky.low)} | ${r.far.ok ? 'pass' : 'FAIL'}, ${Math.min(...steps)} | ${r.ok ? 'pass' : 'FAIL'} |`);
+  console.log(`| ${r.seed} | ${r.same ? 'yes' : 'NO'} | ${r.reach.sites.filter((s) => s.ok).length} of ${r.reach.sites.length} | ${pc(r.roads.steep)} | ${r.rivers.filter((v) => v.ok).length} of ${r.rivers.length} | ${r.trees.wet} / ${r.trees.road} | ${pc(r.sky.median)} | ${pc(r.sky.low)} | ${r.far.ok ? 'pass' : 'FAIL'}, ${Math.min(...steps)} | ${r.fort.ok ? 'pass' : 'FAIL'}: ${r.fort.walker.out} of ${r.fort.walker.targets} places, walks ${r.fort.walks.through + r.fort.walks.stuck + r.fort.walks.inside} bad | ${r.ok ? 'pass' : 'FAIL'} |`);
 }
 process.exit(results.every((r) => r.ok) ? 0 : 1);

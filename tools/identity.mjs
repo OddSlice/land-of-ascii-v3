@@ -1,11 +1,12 @@
 // Checks that the cell buffer is byte-identical whatever the number of
 // render workers, including ?threads=0 (everything on the main thread), in
-// the lab's scene, the stress scene and the generated world, for each look
-// combination asked for. The generated world is checked twice: served
-// cross-origin isolated (shared memory, one shadow worker) and without the
-// headers (each worker its own copy), and every page must build the same
-// world, byte for byte (lab.worldHash), whether in a worker or on the page.
-//   node tools/identity.mjs [--threads 0,1,3,5,8] [--scene lab|stress|both|world|all] [--built]
+// the lab's scene, the stress scene, the building yard and the generated
+// world, for each look combination asked for. The generated world is
+// checked twice: served cross-origin isolated (shared memory, one shadow
+// worker) and without the headers (each worker its own copy), and every
+// page must build the same world, byte for byte (lab.worldHash), whether in
+// a worker or on the page.
+//   node tools/identity.mjs [--threads 0,1,3,5,8] [--scene lab|stress|both|yard|world|all] [--built]
 //                           [--seed N]                the generated world's seed (default: the page's)
 //                           [--look tree=B,cloud=B]   one look (the rest at their defaults)
 //                           [--looks all]             every combination of the look candidates
@@ -50,14 +51,25 @@ const WORLD = [
   { cam: 0, t: 'dusk' }, { cam: 1, t: 'night' }, { cam: 4, t: 'dusk' },
   { site: 'coastUp', t: 'day' }, { site: 'edge', t: 'day' }, { site: 'gate', t: 'night' }, { site: 'river', t: 'day' },
   { cam: 0, t: 'dawn' }, { cam: 0, t: 'night', day: 15 }, { cam: 6, t: 'night' }, { site: 'shoreL', t: 'day' }, { site: 'shoreR', t: 'dusk' },
+  // (phase 3a) the fort's four cameras, by day, and the passage and the
+  // courtyard at night (torches, lit windows), the wall walk at dusk
+  ...[8, 9, 10, 11].map((cam) => ({ cam, t: 'day' })),
+  { cam: 9, t: 'night' }, { cam: 10, t: 'night' }, { cam: 11, t: 'dusk' }, { cam: 8, t: 'night' },
+];
+// (phase 3a) the building yard: every piece near, the yard middle and far,
+// at night, the passage and the wall walk; the gate, the keep, the torches
+// and the window at night too
+const YARD = [
+  ...Array.from({ length: 14 }, (_, cam) => ({ cam, t: cam === 11 ? 'night' : cam === 13 ? 'dusk' : 'day' })),
+  { cam: 0, t: 'night' }, { cam: 3, t: 'night' }, { cam: 7, t: 'night' }, { cam: 8, t: 'night' }, { cam: 12, t: 'night' },
 ];
 const WEATHERS = a.weather === 'all' ? ['clear', 'fair', 'overcast', 'rain', 'mist'] : a.weather ? String(a.weather).split(',') : ['fair'];
 // (phase 2b) where the mist lies: over the lake and along the river at dawn
 if (a.weather) WORLD.push({ cam: 1, t: 6.6 }, { cam: 4, t: 6.6 });
 const scenes = {
-  lab: [['lab', LAB]], stress: [['stress', STRESS]], both: [['lab', LAB], ['stress', STRESS]],
+  lab: [['lab', LAB]], stress: [['stress', STRESS]], both: [['lab', LAB], ['stress', STRESS]], yard: [['yard', YARD]],
   world: [['world', WORLD, true], ['world', WORLD, false]],
-  all: [['lab', LAB], ['stress', STRESS], ['world', WORLD, true], ['world', WORLD, false]],
+  all: [['lab', LAB], ['stress', STRESS], ['yard', YARD], ['world', WORLD, true], ['world', WORLD, false]],
 }[a.scene || 'both'];
 
 // the looks to check

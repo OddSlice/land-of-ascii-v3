@@ -49,7 +49,8 @@ export function args(argv = process.argv.slice(2)) {
 // Open the game in a page and wait until it is running. Fails on any page
 // error or worker failure. `scene`: 'lab' (the default, for the tools written
 // before the generated world), 'stress' (or stress: true) or 'world' (with
-// `seed`).
+// `seed`), or (phase 3a) 'yard', the building yard (extra: { proto: 1 } for
+// the prototypes).
 // `quiet` (the default): the menu, the hint and the start card (phase 2b) are
 // suppressed from the first frame, so no picture or measurement changes
 // because of them; builds without them ignore it.
@@ -66,6 +67,7 @@ export async function openLab(browser, base, { built = false, threads, density, 
   if (density !== undefined) q.set('density', String(density));
   if (scene === 'stress') q.set('stress', '1');
   if (scene === 'lab') q.set('lab', '1');
+  if (scene === 'yard') q.set('yard', '1');
   if (scene === 'world' && seed !== undefined) q.set('seed', String(seed));
   if (extra) for (const [k, v] of Object.entries(extra)) q.set(k, String(v));
   // the look candidates (a build without them ignores these)

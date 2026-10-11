@@ -6,6 +6,9 @@
 //                                          views where it shows, beside the same run on a reference
 //                                          build (--ref DIR, e.g. a copy of phase 0b's sources)
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
+//   node tools/flicker.mjs --set fort      (phase 3a) the fort beside the lab's wall and gate: walking
+//                                          the road to the gate, walking the wall walk, turning inside
+//   node tools/flicker.mjs --set proto     (phase 3a) the two prototypes, spans and exact shapes
 //   node tools/flicker.mjs --set world     a walk through the generated world (default seed, settled
 //                                          look): meadow, forest and along the lake, from its cameras,
 //                                          and (phase 2a) along the coast's foam line and swell
@@ -14,6 +17,9 @@
 //                                          sits on, so the far skyline's crawl (a cell changing between
 //                                          sky and land) is counted on its own; with --ref, the same for
 //                                          another build (e.g. a copy of phase 1's sources)
+//   node tools/flicker.mjs --buildings [--seed N]   (phase 3a; in Node) the fort set, its blinks counted
+//                                          only on the buildings' own cells, so the fort and the lab's
+//                                          wall compare like for like
 //   --only forest,stand                    only the runs whose label contains one of these
 //   --built [--root DIR]                   the single-file build (in DIR: a copy, so the repository can change meanwhile)
 //   (phase 2b) the world set also counts glyph flips (a glyph that changes and changes back, whatever
@@ -81,6 +87,29 @@ const SETS = {
     { label: 'stress, across the lake: turning across the lake', stress: true, cam: 1, ...TURN },
   ],
 };
+// (phase 3a) the prototypes in the building yard: each piece as spans and as
+// exact shapes, turned 30 degrees, walked past sideways at middle distance,
+// walked toward from near and turned beside
+SETS.proto = [];
+for (const set of ['spans', 'shapes']) for (const piece of ['wall', 'tower', 'house']) {
+  SETS.proto.push({ label: `prototype ${set}, ${piece}: walking sideways, middle distance`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, middle`, ...W });
+  SETS.proto.push({ label: `prototype ${set}, ${piece}: walking toward it, near`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, near`, ...F, step: -0.075 });
+  SETS.proto.push({ label: `prototype ${set}, ${piece}: turning, near`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, near`, ...TURN });
+}
+// (phase 3a) the fort against the lab's wall and gate (spans, phase 0a):
+// walking the road toward the gate from 14 m off (both start at the same
+// distance, so the masonry is seen at the same size), walking along the
+// wall's walk with the parapet beside, and turning just inside (the lab:
+// just outside its gate, the fort: in its courtyard); the fort on the
+// default seed, by day
+SETS.fort = [
+  { label: 'lab wall: walking the road to the gate', at: [256, 143, 0, 2], ...F },
+  { label: 'lab wall: walking the wall walk', at: [230, 158.5, 90, -3], y: 18.7, ...F },
+  { label: 'lab wall: turning by the gate', at: [256, 145, 0, 2], ...TURN },
+  { label: 'fort: walking the road to the gate', scene: 'world', fort: 'road', ...F },
+  { label: 'fort: walking the wall walk', scene: 'world', fort: 'walk', ...F },
+  { label: 'fort: turning in the courtyard', scene: 'world', camName: 'the courtyard', ...TURN },
+];
 const OPTIONS = { tree: ['A', 'B'], cloud: ['A', 'B'], meadow: [0, 1, 2] };
 const frames = Number(a.frames || 60);
 
@@ -132,6 +161,86 @@ async function skyline(root, seed) {
   }
   return out;
 }
+// ---- the buildings' own cells (phase 3a), in Node ----------------------------
+// The fort set's six runs, rendered in Node at 360 x 112 (density 3), every
+// clock frozen at 14:00: blinks counted only on cells that show a building
+// (stone, timber, plaster, roof, a window) in any of the three frames, as a
+// share of those cells, so the fort and the lab's wall compare like for like
+// whatever else is in view.
+async function buildings(seed) {
+  const { buildWorld } = await import('../src/world/world.js');
+  const G = await import('../src/world/gen/world.js'), PK = await import('../src/world/pack.js');
+  const BE = await import('../src/scene/cpu/backend.js'), RS = await import('../src/resolve.js'), { LOOK } = await import('../src/look.js');
+  const CT = await import('../src/contract.js'), OB = await import('../src/world/objects.js'), { Player } = await import('../src/app/player.js');
+  const lab = buildWorld();
+  const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
+  const w = PK.unpackWorld(PK.packWorld(r.value)), f = w.sites.fort;
+  const BLD = new Set([CT.MAT.STONE, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
+  const cols = 360, rows = 112, n = cols * rows, look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const o = f.gate.out, deg = (x) => x * 180 / Math.PI;
+  // the wall walk: the camera's spot, along its wall
+  const wc = w.cameras.find((c) => c.name === 'the wall walk over the valley');
+  let best = null;
+  for (const e of f.edges) {
+    const dx = e.b[0] - e.a[0], dz = e.b[1] - e.a[1], l = Math.hypot(dx, dz), t = Math.max(0, Math.min(1, ((wc.x - e.a[0]) * dx + (wc.z - e.a[1]) * dz) / (l * l)));
+    const d = Math.hypot(wc.x - e.a[0] - dx * t, wc.z - e.a[1] - dz * t);
+    if (!best || d < best.d) best = { d, dx: dx / l, dz: dz / l };
+  }
+  const yc = w.cameras.find((c) => c.name === 'the courtyard');
+  const pl = new Player(w, { rules: 'world' });
+  const RUNS = [
+    { label: 'lab wall: walking the road to the gate', world: lab, x: 256, z: 143, yaw: 0, pitch: 2, ...F },
+    { label: 'lab wall: walking the wall walk', world: lab, x: 230, z: 158.5, y: 18.7, yaw: 90, pitch: -3, ...F },
+    { label: 'lab wall: turning by the gate', world: lab, x: 256, z: 145, yaw: 0, pitch: 2, ...TURN },
+    { label: 'fort: walking the road to the gate', world: w, x: f.front.x + o[0] * 14, z: f.front.z + o[1] * 14, yaw: deg(Math.atan2(-o[0], -o[1])), pitch: 2, ...F },
+    { label: 'fort: walking the wall walk', world: w, x: wc.x, z: wc.z, y: wc.y, yaw: deg(Math.atan2(best.dx, best.dz)), pitch: -3, ...F },
+    { label: 'fort: turning in the courtyard', world: w, x: yc.x, z: yc.z, y: pl.standOn(yc.x, yc.z, yc.y - 1.7) + 1.7, yaw: yc.yaw, pitch: yc.pitch, ...TURN },
+  ];
+  const out = [];
+  for (const run of RUNS) {
+    const be = BE.createCpuBackend(run.world), fr = [];
+    const way = (run.yaw + run.dir) * Math.PI / 180;
+    for (let i = 0; i < frames + 1; i++) {
+      const x = run.x + Math.sin(way) * run.step * i, z = run.z + Math.cos(way) * run.step * i;
+      const y = run.y ?? OB.groundAt(run.world.terrain, x, z) + 1.7;
+      const cam = { x, z, y, yaw: (run.yaw + run.turn * i) * Math.PI / 180, pitch: run.pitch * Math.PI / 180 };
+      const fq = { seq: i, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: 14, t: 0, day: 0, look };
+      const hits = new Uint8Array(n * CT.HIT_STRIDE);
+      for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
+      const mats = new Uint8Array(n);
+      for (let k = 0; k < n; k++) mats[k] = BLD.has(hits[k * CT.HIT_STRIDE]) ? 1 : 0;
+      const cells = new Uint8Array(n * 8);
+      RS.resolveStripe(RS.makePalette(14, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+      fr.push({ cells, mats });
+    }
+    let bc = 0, gf = 0, cf = 0, agf = 0, acf = 0;
+    for (let i = 2; i < fr.length; i++) {
+      const A = fr[i - 2], B = fr[i - 1], C = fr[i];
+      for (let k = 0; k < n; k++) {
+        const q = k * 8, bld = A.mats[k] || B.mats[k] || C.mats[k];
+        const flipG = A.cells[q + 3] === C.cells[q + 3] && A.cells[q + 3] !== B.cells[q + 3];
+        const jump = Math.max(Math.abs(A.cells[q] - B.cells[q]), Math.abs(A.cells[q + 1] - B.cells[q + 1]), Math.abs(A.cells[q + 2] - B.cells[q + 2]));
+        const back = Math.max(Math.abs(A.cells[q] - C.cells[q]), Math.abs(A.cells[q + 1] - C.cells[q + 1]), Math.abs(A.cells[q + 2] - C.cells[q + 2]));
+        const flipC = jump > 6 && back <= jump / 4;
+        if (flipG) agf++; if (flipC) acf++;
+        if (!bld) continue;
+        bc++; if (flipG) gf++; if (flipC) cf++;
+      }
+    }
+    const frN = fr.length - 2;
+    out.push({ label: run.label, share: 100 * bc / frN / n, glyph: 100 * gf / Math.max(1, bc), colour: 100 * cf / Math.max(1, bc), allGlyph: 100 * agf / frN / n, allColour: 100 * acf / frN / n });
+    console.log(`${run.label}: building cells ${(100 * bc / frN / n).toFixed(1)}% of the frame; on them glyph flips ${(100 * gf / Math.max(1, bc)).toFixed(3)}%, colour flips ${(100 * cf / Math.max(1, bc)).toFixed(3)}%`);
+  }
+  return out;
+}
+if (a.buildings) {
+  const seed = Number(a.seed || 3), list = await buildings(seed), f3 = (x) => `${x.toFixed(3)}%`;
+  console.log(`\nthe buildings' own cells (seed ${seed}, Node, 360 x 112, ${frames} frames, 14:00)\n`);
+  console.log('| run | building cells (share of the frame) | glyph flips on them | colour flips on them (>6 levels) | glyph flips, whole frame | colour flips, whole frame |');
+  console.log('|---|---|---|---|---|---|');
+  for (const v of list) console.log(`| ${v.label} | ${v.share.toFixed(1)}% | ${f3(v.glyph)} | ${f3(v.colour)} | ${f3(v.allGlyph)} | ${f3(v.allColour)} |`);
+  process.exit(0);
+}
 if (a.skyline) {
   const seed = Number(a.seed || 3);
   const rows = [['this build', await skyline(ROOT, seed)]];
@@ -170,18 +279,36 @@ async function measure(browser, root, list) {
   const { server, url } = await serve(root);
   const out = [];
   try {
-    for (const scene of ['lab', 'stress', 'world']) {
+    for (const scene of ['lab', 'stress', 'world', 'yard']) {
       const mine = list.filter((r) => (r.scene || (r.stress ? 'stress' : 'lab')) === scene);
       if (!mine.length) continue;
-      const lab = await openLab(browser, url, { scene, density: a.density, built: !!a.built });
+      const lab = await openLab(browser, url, { scene, density: a.density, built: !!a.built, seed: a.seed, extra: mine.some((r) => r.proto) ? { proto: 1 } : null });
       for (const run of mine) {
         const r = await lab.page.evaluate(async ({ run, frames }) => {
           const L = window.lab;
           // (the look set compares options against the phase 0b look; the
           // world set runs the settled look)
-          if (L.setLook) { if (run.scene === 'world') L.resetLook(); else L.setLook({ tree: 'A', cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
+          if (L.setLook) { if (run.scene === 'world' || run.scene === 'yard') L.resetLook(); else L.setLook({ tree: 'A', cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
           let s0;
-          if (run.cam !== undefined) { L.camera(run.cam); if (run.face) L.face(L.state().yaw + run.face); s0 = L.state(); } else {
+          if (run.camName !== undefined) run.cam = L.cameras.findIndex((c) => c.name === run.camName);
+          if (run.fort === 'road') {
+            // 14 m out from the gate's mouth along the road's way in, facing the gate
+            const f = L.world.sites.fort, o = f.gate.out;
+            L.setCamera({ x: f.front.x + o[0] * 14, z: f.front.z + o[1] * 14, yaw: Math.atan2(-o[0], -o[1]) * 180 / Math.PI, pitch: 2 });
+            s0 = L.state();
+          } else if (run.fort === 'walk') {
+            // on the wall walk camera's spot, looking and walking along its wall
+            L.camera(L.cameras.findIndex((c) => c.name === 'the wall walk over the valley'));
+            const st = L.state(), f = L.world.sites.fort;
+            let best = null;
+            for (const e of f.edges) {
+              const dx = e.b[0] - e.a[0], dz = e.b[1] - e.a[1], l = Math.hypot(dx, dz), t = Math.max(0, Math.min(1, ((st.x - e.a[0]) * dx + (st.z - e.a[1]) * dz) / (l * l)));
+              const d = Math.hypot(st.x - e.a[0] - dx * t, st.z - e.a[1] - dz * t);
+              if (!best || d < best.d) best = { d, dx: dx / l, dz: dz / l };
+            }
+            L.setCamera({ x: st.x, z: st.z, y: st.eye, yaw: Math.atan2(best.dx, best.dz) * 180 / Math.PI, pitch: -3 });
+            s0 = L.state(); run.y = st.eye;
+          } else if (run.cam !== undefined) { L.camera(run.cam); if (run.face) L.face(L.state().yaw + run.face); s0 = L.state(); } else {
             L.setCamera({ x: run.at[0], z: run.at[1], yaw: run.at[2], pitch: run.at[3] });
             s0 = L.state();
             if (run.y !== undefined) s0.eye = run.y;

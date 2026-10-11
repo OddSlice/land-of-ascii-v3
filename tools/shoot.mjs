@@ -11,6 +11,9 @@
 //   node tools/shoot.mjs --world [--seed N] [--built]   (phase 2a) the generated
 //       world's views beside the reference's mountain and dusk frames, into
 //       shots/ref-2a/ (private, like every sheet with the reference in it)
+//   node tools/shoot.mjs --fort [--seed N] [--built]   (phase 3a) the fort's
+//       cameras beside the reference's wall and gate frames, into shots/ref-3a/
+//       (private)
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, dataURL, writeDataURL, workbench } from './lib/browser.mjs';
@@ -32,16 +35,25 @@ const PAIRS = [
   { name: 'dusk from the spawn', ref: '03-5.png', refLabel: 'mountains video 0:47, dusk', cam: 0, hour: 17.85 },
   { name: 'dusk across the main lake', ref: '03-4.png', refLabel: 'mountains video 0:36, dusk wall', cam: 1, hour: 17.85 },
 ];
-if (a.world) {
-  const dir = path.join(ROOT, 'shots', 'ref-2a');
+// (phase 3a) the fort beside the reference's wall and gate
+const FORT_PAIRS = [
+  { name: 'the fort from the road, by day', ref: '04-1.png', refLabel: 'ASCII Fort 0:03, road to the wall', cam: 8, hour: 14 },
+  { name: 'the gate passage at night', ref: '02-1.png', refLabel: 'day & night 0:11, gate and torch', cam: 9, hour: 23 },
+  { name: 'the fort from the road at night', ref: '02-1.png', refLabel: 'day & night 0:11, gate and torch', cam: 8, hour: 23 },
+  { name: 'the wall walk at dusk', ref: '03-4.png', refLabel: 'ray collision 0:36, dusk wall', cam: 11, hour: 17.85 },
+  { name: 'the fort from the road at dusk', ref: '03-4.png', refLabel: 'ray collision 0:36, dusk wall', cam: 8, hour: 17.85 },
+];
+if (a.world || a.fort) {
+  const dir = path.join(ROOT, 'shots', a.fort ? 'ref-3a' : 'ref-2a');
+  const PAIRS_NOW = a.fort ? FORT_PAIRS : PAIRS;
   fs.mkdirSync(dir, { recursive: true });
   try {
     const lab = await openLab(browser, url, { built: !!a.built, scene: 'world', seed: a.seed });
     const { page } = lab;
     await page.evaluate(() => window.lab.setHud(false));
     const bench = await workbench(browser);
-    for (const P of PAIRS) {
-      await page.evaluate(async ({ cam, hour }) => { window.lab.camera(cam); window.lab.freeze(hour, 0, 0); await window.lab.whenIdle(); }, P);
+    for (const P of PAIRS_NOW) {
+      await page.evaluate(async ({ cam, hour }) => { window.lab.setWeather('fair'); window.lab.camera(cam); window.lab.freeze(hour, 0, 0); await window.lab.whenIdle(); }, P);
       await lab.check();
       const own = `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
       const png = await bench.evaluate(async ({ ref, main, title, labels }) => {
