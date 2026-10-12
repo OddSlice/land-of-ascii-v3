@@ -257,17 +257,52 @@ async function walkVillage(page, seed, secs) {
   let last;
   if (p.jetty) {
     const pa = (p.paths || []).find((q) => q.to === 'water');
-    last = [...(pa ? pa.x.map((x, i) => [x, pa.z[i]]) : []), p.jetty.a, p.jetty.b];
+    // (the footpath, from its end at the centre to its end at the water)
+    const fp = pa ? pa.x.map((x, i) => [x, pa.z[i]]) : [];
+    const d = (q) => Math.hypot(q[0] - p.centre.x, q[1] - p.centre.z);
+    if (fp.length && d(fp[0]) > d(fp[fp.length - 1])) fp.reverse();
+    last = [...fp, p.jetty.a, p.jetty.b];
   } else {
     const b = (w.sites.bridges || []).map((b) => ({ b, ...G.way(p.centre.x, p.centre.z, b.x, b.z) })).sort((A, B) => A.length - B.length)[0];
     last = b ? b.pts : [];
   }
+  // (from the road's end to the start of that last stretch: a way round the
+  // houses on a half-metre grid, by the game's own collision)
+  const { Player } = await import('../src/app/player.js');
+  const { groundAt } = await import('../src/world/objects.js');
+  const pl = new Player(w, { rules: 'world' });
+  const A = road[road.length - 1], B = last[0] || [p.centre.x, p.centre.z];
+  const between = (() => {
+    const s2 = 0.5, x0 = Math.min(A[0], B[0]) - 30, z0 = Math.min(A[1], B[1]) - 30, nx = Math.ceil((Math.abs(A[0] - B[0]) + 60) / s2), nz = Math.ceil((Math.abs(A[1] - B[1]) + 60) / s2);
+    const free = (i, k) => { const x = x0 + i * s2, z = z0 + k * s2; return !pl.blocked(x, z, groundAt(w.terrain, x, z) + 0.05); };
+    const key = (i, k) => k * nx + i, start = [Math.round((A[0] - x0) / s2), Math.round((A[1] - z0) / s2)], goal = [Math.round((B[0] - x0) / s2), Math.round((B[1] - z0) / s2)];
+    const dist = new Float64Array(nx * nz).fill(Infinity), prev = new Int32Array(nx * nz).fill(-1), seen = new Uint8Array(nx * nz), ok = new Int8Array(nx * nz).fill(-1);
+    const open = [[0, key(...start)]]; dist[key(...start)] = 0;
+    while (open.length) {
+      open.sort((a, b) => a[0] - b[0]);
+      const [, c] = open.shift(); if (seen[c]) continue; seen[c] = 1;
+      if (c === key(...goal)) break;
+      const ci = c % nx, ck = (c - ci) / nx;
+      for (const [di, dk] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const i = ci + di, k = ck + dk; if (i < 0 || k < 0 || i >= nx || k >= nz) continue;
+        const q = key(i, k); if (ok[q] < 0) ok[q] = free(i, k) ? 1 : 0; if (!ok[q]) continue;
+        const nd = dist[c] + Math.hypot(di, dk) * s2;
+        if (nd < dist[q]) { dist[q] = nd; prev[q] = c; open.push([nd + Math.hypot(i - goal[0], k - goal[1]) * s2, q]); }
+      }
+    }
+    const out = []; for (let c = key(...goal); c >= 0; c = prev[c]) out.push([x0 + (c % nx) * s2, z0 + Math.floor(c / nx) * s2]);
+    return out.length > 1 ? out.reverse().filter((q, i, a) => i % 4 === 0 || i === a.length - 1) : [];
+  })();
+  last = [...between, ...last];
   console.log(`world-village: village ${p.q + 1} (${p.pattern}), ${Math.round(ways[0].length)} m by road from the gate, then ${p.jetty ? 'its jetty' : 'the nearest bridge'}`);
   await page.evaluate(({ x, z, yaw }) => window.lab.setCamera({ x, z, yaw }), { x: x0, z: z0, yaw: Math.atan2(o[0], o[1]) * 180 / Math.PI });
   const t0 = Date.now();
   await page.keyboard.down('KeyW');
+  const at = async (what) => { const st = await page.evaluate(() => window.lab.state()); console.log(`  ${what}: x ${st.x.toFixed(1)} z ${st.z.toFixed(1)} after ${((Date.now() - t0) / 1000).toFixed(0)} s`); };
   await follow(page, road, 4, 200);
+  await at('at the village');
   await follow(page, last, 2, 90);
+  await at(p.jetty ? 'on the jetty' : 'on the bridge');
   await page.keyboard.up('KeyW');
   // a slow look round, out over the water, for whatever time is left
   const left = Math.max(10, secs - (Date.now() - t0) / 1000);

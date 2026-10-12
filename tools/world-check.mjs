@@ -39,6 +39,17 @@
 //     solid stone; no tree stands in the fort or the margin round it.
 //  9. (phase 3a) far readability also counts the fort: from the spawn,
 //     turned toward it, it must differ from the cells round it by a visible step.
+// 10. (phase 3b) the villages: all three placed, each a different pattern,
+//     with 8 to 20 houses, a chapel, a well, one or two barns, a signpost and
+//     at least two lanterns; every road walked end to end (across every
+//     bridge) and every footpath; no building, fence or field over a road,
+//     water, the fort or another; no door onto a drop, into water or into a
+//     neighbour; a walker reaches every house one can enter, every barn, the
+//     jetty's end and every door from the well and gets back out; a thousand
+//     random walks in each village never pass through a wall, get stuck or
+//     end inside anything; and from its viewpoint each village differs from
+//     its surroundings by a visible step by day and shows at least two lit
+//     cells at night.
 //
 //   node tools/world-check.mjs [--seeds 1,2,3,4,5] [--points 300] [--road 50] [--out file.json]
 //   node tools/world-check.mjs --fort-only --sweep 60 [--from 1000]   (phase 3a) the fort's

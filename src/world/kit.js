@@ -412,10 +412,18 @@ function inPoly(poly, x, z) {
 // The zone bits of an outside surface at (x, z): in a yard or outside.
 export function zoneAt(kit, x, z) {
   if (!kit || !kit.yards.length) return ZONE_ALL;
-  const b = kit.box;
+  // (phase 3b: the yards' own bounds, not the whole kit's, which now spans
+  // the map with the villages and bridges)
+  const b = kit.yardBox || (kit.yardBox = yardBounds(kit.yards));
   if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) return ZONE_OUT;
   for (const p of kit.yards) if (inPoly(p, x, z)) return ZONE_YARD;
   return ZONE_OUT;
+}
+
+function yardBounds(yards) {
+  const b = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+  for (const p of yards) for (const [x, z] of p) { if (x < b.x0) b.x0 = x; if (x > b.x1) b.x1 = x; if (z < b.z0) b.z0 = z; if (z > b.z1) b.z1 = z; }
+  return b;
 }
 
 export function inYard(kit, x, z) { for (const p of kit.yards) if (inPoly(p, x, z)) return true; return false; }

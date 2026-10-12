@@ -316,7 +316,7 @@ const methods = {
     // (rain's rings: the share of mirror takes their whole tilt, the rays
     // only up to RING_TILT, which the mirrored objects' culling allows for)
     // (phase 3b: none under a bridge or a jetty, where no rain falls)
-    const roofed = T.roof && T.roof[Math.round(z < 0 ? 0 : z > this.N ? this.N : z) * this.NN + Math.round(x < 0 ? 0 : x > this.N ? this.N : x)];
+    const roofed = wp.rain > 0 && T.roof && T.roof[Math.round(z < 0 ? 0 : z > this.N ? this.N : z) * this.NN + Math.round(x < 0 ? 0 : x > this.N ? this.N : x)];
     const ring = wp.rain > 0 && !roofed ? wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp) : 0;
     const wr = waterRays(s, ring === 0 ? g : g + (ring > RING_TILT ? RING_TILT : ring < -RING_TILT ? -RING_TILT : ring));
     const sr = wr.sr, st = wr.st, F = ring === 0 ? wr.F : waterRays(s, g + ring).F;
