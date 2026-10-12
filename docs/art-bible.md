@@ -370,7 +370,32 @@ Each also has a dawn, a starlit (dark moon) and phase 1's night colour (`look.js
 
 **At night** the fort's torches and lit windows are small warm points from afar (held at two rows, faded by how much of that they really are); near, the torches light the stone and the ground round them and show in the lake.
 
-**The fort's site:** the platform is levelled to the ground's median under it, with banks of 1 in 2.4 round it, or moved toward the road's height by up to 2.5 m where the road could not otherwise come in at a gentle grade; trees and bushes are cleared from it and 24 m beyond its walls; the road runs straight in through the gate's passage, graded evenly.
+**The fort's site:** the platform is levelled to the ground's median under it, with banks of 1 in 2.4 round it, or moved toward the road's height by up to 2.5 m where the road could not otherwise come in at a gentle grade; trees and bushes are cleared from it and 24 m beyond its walls; the road runs straight in through the gate's passage, graded evenly. Since phase 3b the road winds up to the gate: it leaves the old road where its length covers the climb at a gentle grade, clears the towers, turns without hairpins and meets the old road without a kink; a road that would pass through the fort goes round it.
+
+### Villages and bridges (phase 3b)
+
+Three villages on every seed, each composed from the kit (`src/world/kit-village.js`) by a generator (`src/world/gen/village.js`), never stamped: one strung along its road, one round a green with its well and market shelter, one on the shore with a jetty and its houses facing the water. Each has 8 to 20 houses of mixed kinds (cottage, larger house with an upper storey), angles, setbacks and roofs, a chapel, a well, one or two barns at its edge, lanterns at its centre and at its bridge or jetty, lit windows in most houses, and a signpost where its road meets the main road. Houses sit on rubble footings that take the slope; a house that would need more than 1.2 m of footing, or whose door would open onto a drop, is moved or dropped, never forced. Round each village lie fields in strips along the contour, bounded here and there by fences and dry-stone walls with gate gaps, and footpaths to the fields, the water and the nearest viewpoint. Bridges carry the main roads over rivers: timber over narrow crossings, stone with one to three arches over wide ones.
+
+**The materials** (the same columns as the fort's table above; all within the muted palette, each a shift of a colour already in it):
+
+| Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | With distance |
+|---|---|---|---|---|---|
+| Thatch | `:;=%#` | `#857048` / `#403526` | `#6f5640` | `#3e3d37` | coarse courses (0.4 m) by how much of the cell they cover; the streaks only while four columns wide |
+| Plaster, warm (`plaster2`) | `.,:;=` | `#b7a27c` / `#595143` | `#836958` | `#524c45` | plain; its mottle only while a patch is four columns wide |
+| Plaster, rose (`plaster3`) | `.,:;=` | `#ae9882` / `#544c46` | `#7c625c` | `#4e4748` | as above |
+| Timber, dark (`timber2`) | `.-=#H` | `#584635` / `#261e19` | `#3f3129` | `#26221d` | boards by their own tones while five columns wide, no gaps |
+| Timber, pale (`timber3`) | `.-=#H` | `#795939` / `#35271b` | `#573e2c` | `#352c20` | as above |
+| Crop | `,:;"+*` | `#76873a` / `#2f3724` | `#404532` | `#3f4944` | furrows (0.9 m) box filtered, fading with the footprint |
+| Stubble | `.,:;=+` | `#967d51` / `#483b2a` | `#7d6048` | `#46443e` | as crop |
+| Fallow | `.:-=+#` | `#725e48` / `#372d26` | `#5f4840` | `#353337` | as crop |
+
+The villages' and bridges' stone is the fort's dressed stone (`masonry`) with its course joints, but without the joints between blocks: the blocks differ a little in tone near instead. Their paving and shingle roofs are drawn the same way: what walking or turning would sweep across the cells faster than it is wide (a joint between blocks or slabs, a gap between boards, a post narrower than four columns, a tile narrower than five) is left out or faded, and the surface keeps its average darkness. A bridge's parapets are plain dressed stone. The fort keeps its own textures, unchanged.
+
+**Strips and fields:** a strip's own material shows while the strip is at least three cells across; further off a field shows its main kind, so far strips cannot break into blinking cells.
+
+**Footpaths and the worn yard:** drawn as dirt, 1.4 m wide (2.6 m across the fort's yard), faded at their edges and only near; further off they are part of the meadow.
+
+**At night:** lanterns (as the fort's torches, on posts) at each village's centre, at its jetty and at both ends of each bridge; lit windows in most houses; a hearth's fire inside a house one can enter. From each village's viewpoint its lights must be visible at night (`tools/world-check.mjs`).
 
 ### Sky
 
@@ -435,6 +460,13 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 25. **Never light an interior from the open sky.** Inside, light comes by doorways, windows, open tops and torches only, so a hall is dark but readable; and a torch never lights through a wall (zones).
 26. **Never place a door where the floor is not.** Every doorway opens onto something to stand on at its sill, in line with the walk or path that reaches it (phase 3a's square towers once clamped a walk door off the walk, over a stairwell).
 27. **Never leave a cliff, a trench or a floating base round a building.** Its platform is levelled with gentle banks, and its road meets its gate without a step.
+
+**Villages and bridges (phase 3b):**
+
+28. **Never draw a thin line that walking or turning sweeps across the cells faster than it is wide.** At a walk a wall's detail slides about 0.075 m a frame, and turning moves everything about two columns a frame, so a joint, a board's gap or a narrow post shows in one frame and is gone in the next however it is filtered. Leave it out, or draw it only while it is several frames' travel wide, and keep the surface's average darkness. The flicker tool (`--buildings --bymat`) finds them.
+29. **Never stamp a village.** It is composed from the land: its pattern, its houses' kinds, angles, setbacks and roofs come from the seed and the ground, and every place is checked for overlaps with roads, rivers, the fort and each other.
+30. **Never force a house onto a slope.** Its footing takes at most 1.2 m of fall and its door opens onto firm ground at its sill; otherwise the house moves or is left out. Regenerate from data; never move a house by hand.
+31. **Never let two surfaces cross nearly level.** Where a bridge's deck runs over the bank under its road, the ground is pressed well under the deck, so the two do not cut each other in a ragged, crawling line.
 
 ---
 

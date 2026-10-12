@@ -81,7 +81,7 @@ The range goes on past the north and east edges as three receding ridgelines: ne
 
 - **Spawn:** on a road, on a low rise (9 m above the ground around it on seed 3), facing the main lake, with forest to one side and the range behind.
 - **Fort:** on a rise near the main lake (on seed 3, 172 m from it and 12 m above its surroundings). Since phase 3a the site must be seen from the spawn, over the land and the forest: the keep's top or a tower's (the next best site if not; any site if none is). 14 of 65 seeds checked moved their fort for it; seed 3's did not.
-- **Villages:** three, on flat ground near water.
+- **Villages:** three, on flat ground near water; since phase 3b each is built (below), one of each pattern.
 - **Viewpoints:** four, on high ground with long views, each moved (phase 2a) to the brow of its hill: within 90 m, no more than 18 m lower, where the ground falls away soonest in the direction it looks, so its own slope does not fill the view (on seed 3, 205, 195, 219 and 35 m above the sea).
 
 ## Buildings (phase 3a)
@@ -105,4 +105,34 @@ The building kit's sizes, in `SCALE.kit`. Heights are above the ground a piece s
 **The fort:** 4 to 6 towers at the corners of a rough polygon (square and round mixed, at least one of each), 53–64 m across on the five check seeds, its yard 1,100–2,000 m². The gate is in the side facing where the road arrives; the keep stands against the far wall; one or two timber houses and a well stand in the yard; stairs go up to the walk in at least two places. Seed 3's fort: 6 towers (3 round), 2 stairs, 2 houses, a well, 26 torches and 10 lit windows in 294 shapes; 63.6 m across, its yard 1,984 m².
 
 **Its site:** the platform is levelled to the median ground under it, with banks of 1 in 2.4 out to the land; water within its footprint is filled. Where its road could not come in at 8% or gentler from any point of the old road nearby, the platform is moved toward the road's height by up to 2.5 m (seed 3: 2.1 m lower than its ground). The road's last stretch is replaced by a curve into the gate, graded evenly, and the ground along it brought to it on banks of 1 in 2.6. Trees and bushes are cleared from the fort and 24 m beyond its walls.
+
+## Villages (phase 3b)
+
+The village pieces' sizes, in `SCALE.kit`, and the rules a village is composed by, in `SCALE.village`. Half widths unless said.
+
+| | | |
+|---|---|---|
+| Cottage | 2.6–3.4 by 2.1–2.6 m, eaves at 2.6 m, roof pitch 1 (45 degrees), walls 0.3 m | One room under a thatch or shingle roof, a chimney, a door 1.2 by 2.2 m. |
+| Larger house (hall) | 3.6–4.5 by 2.6–3.1 m, eaves at 4.5 m with an upper storey at 2.6 m | Two rows of windows, so it reads as two floors from the road. |
+| Barn | 4.8–6.2 by 3.3–4 m, eaves at 3.6 m, a doorway 3–3.3 m wide | Dark boards, at the village's edge, one or two to a village. |
+| Chapel | 4.4–5.2 by 2.6–3 m, eaves at 4.2 m, pitch 1.3, walls 0.6 m; a bellcote on its gable, or a tower 1.7 m (half) and 9 m tall | Dressed stone, the tallest roof in a village, so it reads from a viewpoint. |
+| Market shelter | 2.6–3.4 by 1.9–2.3 m, eaves at 2.5 m, on posts | On the green. |
+| Jetty | 0.85 m wide (half), 0.55 m over the water, 8–16 m long, posts every 2.4 m | On the shore village's water, slid along the shore until clear. |
+| Fence | 1.2 m high, posts every 2.4 m, rails at 0.5 and 1 m; a gate gap 3 m | Rails and posts are held at two cells while at least 0.35 of that, else not drawn. |
+| Dry-stone wall | 0.95 m high, 0.64 m thick | Rough courses; the joints between stones are left out (they blink). |
+| Signpost | 2.4 m high, arms 0.72 m long | Where the village's road meets the main road; the footpaths keep 2.8 m from it. |
+| Haystack, bench | a haystack 3.4 by 2.4 m, 2.6 m to its ridge; a bench 1.6 m long, seat at 0.46 m | |
+| Inside a house | a hearth 1.4 by 0.8 m and 0.55 m high (its glow lights the room at night), a table 0.76 m high, a bed, a shelf 1.7 m high | In the houses one can enter (two to four a village) and, after phase 3b, in the keep's hall and one tower room. |
+| Footing | rubble from the lowest ground to the floor; the ground may fall at most 1.2 m across a house, and its door's ground must lie between 0.5 m under the floor and the floor | A house that cannot meet this moves, or is dropped. |
+| Bridge | 4.7 m wide; timber: a deck 0.28 m thick, 1 m over the water, rails 1 m high, posts every 3 m; stone: level, its arches springing over the water, parapets 0.8 m high | Timber where a road crosses up to 8 m of water, stone (1–3 arches) where it crosses more. |
+
+| Composition | | |
+|---|---|---|
+| Houses | 8 to 20 a village | Seed 3: 12, 19 and 10. |
+| Setback from the lane | 2.5–6 m; at least 3.2 m between houses; turned up to 0.13 rad off the lane | Space to walk between and to see sky. |
+| Lanes and paths | lanes 3 m wide, footpaths 1.4 m | |
+| Green | 12–17 m radius, the well and the market shelter on it | The green pattern only. |
+| Shore | houses 14 m back from the water, facing it | The shore pattern only. |
+| Lit windows | 80% of houses | |
+| Fields | 3 to 5 blocks a village, 22–40 by 16–28 m, on ground no steeper than 10%, strips 6–11 m wide along the contour | Crop, stubble and fallow strips. |
 
