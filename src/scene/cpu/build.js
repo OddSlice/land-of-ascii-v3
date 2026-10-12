@@ -28,7 +28,7 @@
 //   cells wide takes the light of the face it is cut into.
 import { MAT, MAT_SHELTER, HIT_STRIDE, REC } from '../../contract.js';
 import { LOOK } from '../../look.js';
-import { PT, HT, PF, TX, P, H, P_STRIDE, H_STRIDE, zoneAt, roomBit, shelterOf, inMerlon } from '../../world/kit.js';
+import { PT, HT, PF, TX, P, H, P_STRIDE, H_STRIDE, HOLD_MIN, zoneAt, roomBit, shelterOf, inMerlon } from '../../world/kit.js';
 
 // The share of a footprint f wide, centred at u, that falls on joints w wide
 // centred on every multiple of P: the joint pattern box-filtered over the cell.
@@ -82,10 +82,17 @@ const methods = {
     const u0 = ox * ca + oz * sa, w0 = -ox * sa + oz * ca, du = dx * ca + dz * sa, dw = -dx * sa + dz * ca;
     kp.u0 = u0; kp.w0 = w0; kp.du = du; kp.dw = dw; kp.ca = ca; kp.sa = sa; kp.dx = dx; kp.dz = dz;
     kp.type = t;
-    const grow = (S[q + P.FLAGS] & PF.GROW) !== 0;
+    const fl = S[q + P.FLAGS], grow = (fl & (PF.GROW | PF.HOLD)) !== 0;
     let hx = S[q + P.HX], hz = S[q + P.HZ];
-    if (grow) { if (hx < minR) hx = minR; if (hz < minR) hz = minR; }
     kp.y0 = S[q + P.Y0]; kp.y1 = S[q + P.Y1];
+    if (fl & PF.HOLD) {
+      // (phase 3b) a thin part: held at two cells and two rows while it is
+      // at least HOLD_MIN of that, else gone
+      const th = hx < hz ? hx : hz, ht = kp.y1 - kp.y0;
+      if (th < HOLD_MIN * minR || ht < HOLD_MIN * 2 * rowH) { kp.miss = true; return; }
+      if (ht < 2 * rowH) { const yc = (kp.y0 + kp.y1) / 2; kp.y0 = yc - rowH; kp.y1 = yc + rowH; }
+    }
+    if (grow) { if (hx < minR) hx = minR; if (hz < minR) hz = minR; }
     if (t === PT.PANE) {
       // a window's light: at least two cells wide and two rows tall, faded
       // by how much of that it really is
@@ -486,7 +493,8 @@ const methods = {
       } else tu = x * -nz + z * nx;
     }
     const seed = S[q + P.SEED];
-    if (tex === TX.MASONRY && hit.kind === 0) {
+    const ashlar = tex === TX.ASHLAR;
+    if ((tex === TX.MASONRY || ashlar) && hit.kind === 0) {
       // courses 0.55 m high, blocks 1.1 m long, offset every course (after
       // phase 3a). The courses' joints are drawn dark, at least about a row
       // wide, darkening each cell by how much of it they cover, so they
@@ -497,13 +505,29 @@ const methods = {
       // walking sweeps sideways across the cells, are drawn only near (they
       // fade before they get thinner than two cells), and the blocks are
       // one tone: further out, either blinked more than the lab's wall.
-      const fy = D * len * len * v.rowAngle;
+      // (ashlar, phase 3b: a wall seen along its length spans a cell's
+      // width of heights too, the ray's slope times the cell's footprint
+      // along the wall; its joints are blurred by that, which kept them
+      // blinking as you walk along a wall, a bridge's parapet say)
+      const fy = D * len * len * v.rowAngle + (ashlar ? Math.abs(s) * fp : 0);
       const by = y - S[q + P.BASE], row = Math.floor(by / 0.55);
       const kv = smooth(1.5, 2.5, 0.55 / fy);
       const jy = kv > 0 ? kv * jointCover(by, 0.55, Math.min(0.21, Math.max(0.05, 0.9 * fy)), fy) : 0;
       const cu = (tu + (row & 1) * 0.55) / 1.1, fu = cu - Math.floor(cu);
-      const head = Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
-      tone = -jy - (1 - jy) * 0.85 * head - 0.3 * (1 - kv);
+      // (ashlar, the villages' and bridges' stone, has no heads: walking
+      // sweeps them sideways across the cells faster than a joint is wide,
+      // so they blink however they are drawn; its blocks differ in tone
+      // instead, near, which a block is far too wide to blink)
+      const head = ashlar ? 0 : Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
+      const block = ashlar ? 0.22 * (((Math.imul(row * 73856093 ^ Math.floor(cu) * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.05, 0.14, fp)) : 0;
+      tone = -jy - (1 - jy) * 0.85 * head - 0.3 * (1 - kv) + (1 - jy) * block;
+    } else if (tex === TX.PAVING || (ashlar && hit.kind !== 0)) {
+      // (phase 3b) paving as FLAGS without the joints, which walking sweeps
+      // across the rows faster than they are wide: only the slabs' tones,
+      // and the joints' average darkness
+      const ix = Math.floor(x / 0.9), iz = Math.floor((z + (ix & 1) * 0.45) / 0.9);
+      const slabT = ((Math.imul(ix * 73856093 ^ iz * 19349663, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
+      tone = -0.1 + 0.3 * slabT * (1 - smooth(0.06, 0.25, fp)) * smooth(4, 6, 0.9 / Math.max(1e-4, fp));
     } else if (tex === TX.FLAGS || (tex === TX.MASONRY && hit.kind !== 0)) {
       // paving: slabs about 0.9 m square, fixed to the world
       const fx = x / 0.9, fz = z / 0.9 + (Math.floor(x / 0.9) & 1) * 0.5;
@@ -512,7 +536,7 @@ const methods = {
       const joint = (jx < 0.04 + fp * 0.8 || jz < 0.04 + fp * 0.8) ? 1 : 0;
       const slabT = ((Math.imul(ix * 73856093 ^ iz * 19349663, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
       tone = -0.7 * joint * (1 - smooth(0.035, 0.09, fp)) + 0.3 * slabT * (1 - smooth(0.06, 0.25, fp));
-    } else if (tex === TX.FRAME && hit.kind === 0) {
+    } else if ((tex === TX.FRAME || tex === TX.TIMBERED) && hit.kind === 0) {
       // a timber frame over plaster: posts every 1.6 m, a sill, a rail and a
       // head; drawn while a beam is at least about two cells wide, else the
       // wall only darkens by the share the beams cover
@@ -522,9 +546,22 @@ const methods = {
       const onRail = by < bw || Math.abs(by - 1.1) < bw / 2 || by > H - bw;
       // (posts drawn while at least two columns wide, rails while at least
       // two rows tall: a row is twice a column)
-      const kp1 = smooth(bw / 1.6, bw / 2.4, fp), kr = smooth(bw / 3.2, bw / 4.8, fp);
-      if ((onPost && kp1 > 0.5) || (onRail && kr > 0.5)) { mat = MAT.TIMBER; tone = 0.2 * Math.sin(by * 9 + tu * 2); }
-      else tone = -0.35 * (1 - kp1) * 0.3 + 0.12 * ((Math.imul(Math.floor(tu * 2) * 73856093 ^ Math.floor(by * 2) * 19349663, 0x9e3779b1) >>> 0) / 4294967296 - 0.5) * (1 - smooth(0.2, 0.6, fp));
+      // (timbered, the villages': posts drawn while four columns wide, as
+      // turning sweeps them two a frame; the beams' grain only up and down;
+      // the plaster's mottle while a patch is four columns wide)
+      const tb = tex === TX.TIMBERED;
+      const kp1 = tb ? smooth(bw / 3, bw / 4.5, fp) : smooth(bw / 1.6, bw / 2.4, fp), kr = smooth(bw / 3.2, bw / 4.8, fp);
+      if ((onPost && kp1 > 0.5) || (onRail && kr > 0.5)) { mat = MAT.TIMBER; tone = 0.2 * Math.sin(by * 9 + (tb ? 0 : tu * 2)); }
+      else tone = -0.35 * (1 - kp1) * 0.3 + 0.12 * ((Math.imul(Math.floor(tu * 2) * 73856093 ^ Math.floor(by * 2) * 19349663, 0x9e3779b1) >>> 0) / 4294967296 - 0.5) * (1 - (tb ? smooth(0.06, 0.12, fp) : smooth(0.2, 0.6, fp)));
+    } else if (tex === TX.TILES && hit.kind === 1) {
+      // (phase 3b) the villages' shingles: as SHINGLE, the courses' edges by
+      // how much of the cell they cover, the tiles' tones while a tile is
+      // five columns wide (turning sweeps them two a frame)
+      const ca = S[q + P.CA], sa = S[q + P.SA], ox = x - S[q + P.CX], oz = z - S[q + P.CZ];
+      const u = ox * ca + oz * sa, w = Math.abs(-ox * sa + oz * ca), row = Math.floor(w / 0.3);
+      const col = Math.floor((u + (row & 1) * 0.22) / 0.45), f = Math.max(1e-4, fp);
+      const tile = ((Math.imul(row * 73856093 ^ col * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
+      tone = -0.6 * jointCover(w - 0.027, 0.3, 0.054, f) * (1 - smooth(0.04, 0.1, fp)) + 0.35 * tile * smooth(4, 6, 0.45 / f);
     } else if (tex === TX.SHINGLE && hit.kind === 1) {
       // shingle courses 0.3 m apart down the slope, staggered tiles 0.45 m
       // wide; they fade with the footprint
@@ -535,21 +572,47 @@ const methods = {
       const edge = fr < 0.18 ? 1 : 0;
       const tile = ((Math.imul(row * 73856093 ^ col * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
       tone = (-0.6 * edge) * (1 - smooth(0.04, 0.1, fp)) + 0.35 * tile * (1 - smooth(0.08, 0.3, fp));
+    } else if (tex === TX.THATCH && hit.kind === 1) {
+      // (phase 3b) thatch: coarse courses 0.4 m apart down the slope and a
+      // streaky grain along it, both fading with the footprint
+      const ca = S[q + P.CA], sa = S[q + P.SA], ox = x - S[q + P.CX], oz = z - S[q + P.CZ];
+      const u = ox * ca + oz * sa, w = Math.abs(-ox * sa + oz * ca);
+      const cw = w / 0.4, row = Math.floor(cw), fr = cw - row;
+      const streak = ((Math.imul(Math.floor(u / 0.18) * 73856093 ^ row * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
+      // (the courses' edges by how much of the cell they cover; the streaks,
+      // 0.18 m wide, while four columns wide)
+      void fr;
+      tone = -0.45 * jointCover(w - 0.044, 0.4, 0.088, Math.max(1e-4, fp)) * (1 - smooth(0.05, 0.13, fp)) + 0.3 * streak * smooth(4, 6, 0.18 / Math.max(1e-4, fp)) + 0.15 * Math.sin(u * 0.9 + seed) * (1 - smooth(0.3, 0.8, fp));
+    } else if (tex === TX.RUBBLE && hit.kind === 0) {
+      // (phase 3b) a dry-stone wall: uneven stones in rough courses. The
+      // courses' joints are drawn by how much of the cell they cover, while a
+      // course is at least two and a half rows tall (as the masonry's); the
+      // joints between stones are left out, as the ashlar's heads are, since
+      // walking sweeps them across the cells faster than they are wide; the
+      // stones' tones fade a little later
+      const by = y - S[q + P.BASE], row = Math.floor(by / 0.28), Lc = 0.42 + 0.12 * ((row * 7) % 3);
+      const col = Math.floor((tu + row * 0.37) / Lc), fy = D * len * len * v.rowAngle + Math.abs(s) * fp;
+      const joint = smooth(1.5, 2.5, 0.28 / fy) * jointCover(by, 0.28, Math.min(0.1, Math.max(0.05, 0.9 * fy)), fy);
+      const stone = ((Math.imul(row * 73856093 ^ col * 19349663 ^ seed * 83492791, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
+      tone = -0.8 * joint * (1 - smooth(0.03, 0.08, fp)) + 0.35 * stone * (1 - smooth(0.05, 0.16, fp)) * smooth(4, 6, Lc / Math.max(1e-4, fp));
     } else if (tex === TX.BOARDS) {
       // boards 0.22 m wide along u
       const ca = S[q + P.CA], sa = S[q + P.SA], ox = x - S[q + P.CX], oz = z - S[q + P.CZ];
       const w = hit.kind === 0 ? tu : -ox * sa + oz * ca;
-      const b = w / 0.22, row = Math.floor(b), fr = b - row;
-      const gap = Math.min(fr, 1 - fr) * 0.22 < 0.02 + fp * 0.6 ? 1 : 0;
+      const row = Math.floor(w / 0.22);
+      // (phase 3b: no gaps, which walking sweeps across the cells faster
+      // than they are wide, so they blinked; the boards read by their own
+      // tones while a board is five columns wide, which turning, two columns
+      // a frame, cannot blink, and the gaps' average darkness)
       const plank = ((Math.imul(row * 73856093 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
-      tone = -0.6 * gap * (1 - smooth(0.03, 0.08, fp)) + 0.3 * plank * (1 - smooth(0.06, 0.25, fp));
+      tone = -0.12 + 0.3 * plank * smooth(4, 6, 0.22 / Math.max(1e-4, fp));
     } else {
       // plain: a faint grain fixed to the world
       tone = 0.15 * (((Math.imul(Math.floor(x * 1.7) * 73856093 ^ Math.floor(y * 1.7) * 19349663 ^ Math.floor(z * 1.7) * 83492791, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.15, 0.5, fp));
     }
     // (the fort's dressed stone darkens more with tone than other stone, for
     // its joints: its paving and plain faces keep the stone's own strength)
-    if (mat === MAT.MASONRY && !(tex === TX.MASONRY && hit.kind === 0)) tone *= SOFT;
+    if (mat === MAT.MASONRY && !((tex === TX.MASONRY || ashlar) && hit.kind === 0)) tone *= SOFT;
     // a reveal (an opening's side, a merlon's side) seen nearly edge on is a
     // sliver: under about two and a half cells wide it takes the light of the
     // face it is cut into, so it cannot blink as it narrows and widens
@@ -572,7 +635,7 @@ const methods = {
     // (a doorway's or a window's sides are lit as the wall's face outside;
     // the gate's deep passage is a room)
     const room = hit.rev === 1 && K.holes[hit.revO + H.DEPTH] > 0 && K.holes[hit.revO + H.DEPTH] < 2 ? -1 : hit.room;
-    const zone = room >= 0 ? roomBit(room) | (K.rooms[room] && K.rooms[room].open ? zoneAt(K, x + nx * 0.6, z + nz * 0.6) : 0) : zoneAt(K, x + nx * 0.6, z + nz * 0.6);
+    const zone = room >= 0 ? roomBit(K, room) | (K.rooms[room] && K.rooms[room].open ? zoneAt(K, x + nx * 0.6, z + nz * 0.6) : 0) : zoneAt(K, x + nx * 0.6, z + nz * 0.6);
     const glow = m.glowAt(x, y, z, lx, ly, lz, zone, true);
     m.write(ci, slot, mat, lam, shadow, room >= 0 ? 0 : cloud, glow, tone, leg);
     if (slot === 0 && room >= 0) {

@@ -10,6 +10,7 @@ import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
 import { vnoise, hash2 } from '../../world/noise.js';
 import { SEED } from '../../world/layout.js';
 import { LOOK } from '../../look.js';
+import { SCALE } from '../../world/scale.js';
 import { zoneAt, ZONE_ALL } from '../../world/kit.js';
 
 const MEADOW = LOOK.meadow, FAR = LOOK.far, COAST = LOOK.coast;
@@ -18,6 +19,7 @@ const SEA_LEVEL = 20;          // (the generated world's; water at it is the sea
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 // detail of a given size fades as the cell's footprint grows past it
+const PATH_W = SCALE.village.path, WEAR_W = 2.6;
 const fadeOf = (size, fp) => 1 - smooth(size * 0.3, size * 1.1, fp);
 const NRM = [0, 0];
 
@@ -88,7 +90,7 @@ const methods = {
       const d = Math.sqrt(d2);
       const f = 1 - d / TORCH_RANGE;
       const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
-      sum += f * f * (strict ? (c > 0 ? c : 0) : 0.35 + 0.65 * Math.max(0, c)) * t.power;
+      sum += f * f * (strict ? (c > 0 ? c : 0) : 0.35 + 0.65 * Math.max(0, c)) * t.power * t.light;
     }
     return sum;
   },
@@ -153,8 +155,17 @@ const methods = {
     else if (open) mat = T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter ? MAT.FLOOR : MAT.GRASS;
     else if ((thin ? this.thinW(T.wWaterL, lv, L, beta, x, z) : bilU8(T.wWater, x, z, N, NN)) > 0.5) mat = MAT.WATER;
     else if (T.wRoad && (thin ? this.thinW(T.wRoadL, lv, L, beta, x, z) : bilU8(T.wRoad, x, z, N, NN)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
-    // (phase 3a) a courtyard's packed earth
-    else if (T.wYard && (thin ? this.thinW(T.wYardL, lv, L, beta, x, z) : bilU8(T.wYard, x, z, N, NN)) > 0.5 + 0.2 * jitter) mat = MAT.YARD;
+    // (phase 3b) a footpath, near only: it fades before it is thin enough to
+    // break into dashes (its weight scaled down as the cell's footprint
+    // passes about its width)
+    else if (T.wPath && !thin && code !== 3 && bilU8(T.wPath, x, z, N, NN) * (1 - smooth(0.45 * PATH_W, 0.9 * PATH_W, fp)) > 0.5 + 0.22 * jitter) mat = MAT.DIRT;
+    // (phase 3a) a courtyard's packed earth; (phase 3b) worn darker along
+    // the ways across it, near only, as a footpath
+    else if (T.wYard && (thin ? this.thinW(T.wYardL, lv, L, beta, x, z) : bilU8(T.wYard, x, z, N, NN)) > 0.5 + 0.2 * jitter) {
+      mat = T.wWear && !thin && code !== 3 && bilU8(T.wWear, x, z, N, NN) * (1 - smooth(0.6 * WEAR_W, 1.2 * WEAR_W, fp)) > 0.5 + 0.22 * jitter ? MAT.DIRT : MAT.YARD;
+    }
+    // (phase 3b) a field's strips
+    else if (T.wField && code !== 3 && (thin ? this.thinW(T.wFieldL, lv, L, beta, x, z) : bilU8(T.wField, x, z, N, NN)) > 0.5 + 0.2 * jitter) mat = this.fieldMat(T, x, z, fp);
     else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
     else if (this.weight(T.wSnow, T.wSnowL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
     else if (this.weight(T.wRock, T.wRockL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
@@ -199,6 +210,9 @@ const methods = {
       }
       // (judged by the cell's footprint along the view, where rows are tall)
       if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
+      // (phase 3b) a field's furrows, along its strips, by how much of the
+      // cell each covers; gone once they are under about three cells apart
+      if (mat === MAT.CROP || mat === MAT.STUBBLE || mat === MAT.FALLOW) tone = 0.4 * tone + this.furrows(T, x, z, fp, mat);
     }
     const glow = this.glowAt(x, y, z, nx, ny, nz, this.zoneOf(x, z));
     this.write(ci, into >= 0 ? into : rs.slot, mat, lam, shadow, cloud, glow, tone, this.legOf(rs, r, D, len));
@@ -230,6 +244,35 @@ const methods = {
     let w = bil2U8(lv[L], A[L], x, z);
     if (beta > 0 && L + 1 < lv.length) w += (bil2U8(lv[L + 1], A[L + 1], x, z) - w) * beta;
     return w;
+  },
+
+  // (phase 3b) Which of a field's materials is here: its strip's, while a
+  // strip is at least three cells across, else its block's main one (so far
+  // strips cannot break into blinking cells).
+  fieldMat(T, x, z, fp) {
+    const NN = this.NN, i = Math.round(x), k = Math.round(z);
+    const j = (k < 0 ? 0 : k > this.N ? this.N : k) * NN + (i < 0 ? 0 : i > this.N ? this.N : i);
+    let id = T.fieldId[j], kd = T.fieldKind[j];
+    if (!id) return MAT.CROP;
+    const b = (id - 1) * 4;
+    if (fp * 3 > T.fieldTable[b + 3]) kd = T.fieldTable[b + 2];
+    return kd === 2 ? MAT.STUBBLE : kd === 3 ? MAT.FALLOW : MAT.CROP;
+  },
+
+  // The furrows' tone at (x, z): lines along the block's length every 0.9 m.
+  furrows(T, x, z, fp, mat) {
+    const i = Math.round(x), k = Math.round(z), j = (k < 0 ? 0 : k > this.N ? this.N : k) * this.NN + (i < 0 ? 0 : i > this.N ? this.N : i);
+    const id = T.fieldId[j];
+    if (!id) return 0;
+    const f = fadeOf(0.3, fp);
+    if (f <= 0) return 0;
+    const b = (id - 1) * 4, ca = T.fieldTable[b], sa = T.fieldTable[b + 1];
+    const w = -x * sa + z * ca, P = 0.9, half = 0.18, ff = fp > 1e-3 ? fp : 1e-3;
+    // the share of the footprint on a furrow (box filtered)
+    const I = (t) => { const n = Math.floor(t / P), r = t - n * P; return n * 2 * half + (r < half ? r : half) + (r > P - half ? r - (P - half) : 0); };
+    const cov = (I(w + ff / 2) - I(w - ff / 2)) / ff;
+    const depth = mat === MAT.CROP ? 0.8 : mat === MAT.STUBBLE ? 0.45 : 0.6;
+    return -depth * f * (cov - 2 * half / P);
   },
 
   // Meadow mottling (LOOK.meadow): soft patches several metres across and,
@@ -272,7 +315,9 @@ const methods = {
     const g = rippleSlope(x, z, this.t, this.dx, this.dz, fp, wp.rain > 0 ? 1 - CALM_K * wp.rain : 1) + (sea ? swellSlope(x, z, this.t, this.dx, this.dz, fp) * wp.swell : 0);
     // (rain's rings: the share of mirror takes their whole tilt, the rays
     // only up to RING_TILT, which the mirrored objects' culling allows for)
-    const ring = wp.rain > 0 ? wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp) : 0;
+    // (phase 3b: none under a bridge or a jetty, where no rain falls)
+    const roofed = T.roof && T.roof[Math.round(z < 0 ? 0 : z > this.N ? this.N : z) * this.NN + Math.round(x < 0 ? 0 : x > this.N ? this.N : x)];
+    const ring = wp.rain > 0 && !roofed ? wp.rain * ringSlope(x, z, this.t, this.dx, this.dz, fp) : 0;
     const wr = waterRays(s, ring === 0 ? g : g + (ring > RING_TILT ? RING_TILT : ring < -RING_TILT ? -RING_TILT : ring));
     const sr = wr.sr, st = wr.st, F = ring === 0 ? wr.F : waterRays(s, g + ring).F;
     const glow = this.glowAt(x, W, z, 0, 1, 0);

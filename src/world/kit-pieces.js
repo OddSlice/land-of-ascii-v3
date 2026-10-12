@@ -17,14 +17,17 @@
 // torches and its windows. The sizes not given come from SCALE.kit
 // (docs/scale.md). Nothing here is drawn or walked directly: compileKit()
 // makes the tables everything else reads.
-import { PT, HT, PF, TX, ZONE_OUT, ZONE_YARD, roomBit } from './kit.js';
+import { PT, HT, PF, TX, ZONE_OUT, ZONE_YARD } from './kit.js';
 import { MAT } from '../contract.js';
 import { SCALE } from './scale.js';
+import { buildVillagePiece, furnish } from './kit-village.js';
 
 const K = SCALE.kit;
+const PASSAGE_LIGHT = 0.45;
+const VILLAGE_KINDS = new Set(['cottage', 'hall', 'barn', 'chapel', 'shelter', 'jetty', 'fence', 'drystone', 'gateposts', 'haystack', 'bench', 'signpost', 'lantern', 'bridge']);
 const D2 = Math.PI / 2;
 
-function frame(x, z, a) {
+export function frame(x, z, a) {
   const ca = Math.cos(a), sa = Math.sin(a);
   return { x, z, a, ca, sa, at: (u, w) => [x + u * ca - w * sa, z + u * sa + w * ca], dir: (u, w) => [u * ca - w * sa, u * sa + w * ca] };
 }
@@ -67,7 +70,7 @@ function squareTurn(inward, walls) {
 
 // A window: a recess `depth` deep in a wall whose outer face is at local w
 // = face (outward +w) of frame F, at u, sill at y, with a lit pane at its back.
-function windowIn(b, F, u, face, y, holes, room, seed, through = 0, lit = true) {
+export function windowIn(b, F, u, face, y, holes, room, seed, through = 0, lit = true) {
   const Wn = K.window, depth = through || Wn.depth;
   const [hx, hz] = F.at(u, face - depth / 2 + 0.05);
   holes.push({ type: HT.BOX, x: hx, z: hz, a: F.a, hx: Wn.width / 2, hz: depth / 2 + 0.05, y0: y, y1: y + Wn.height, room, close: 1, depth });
@@ -80,11 +83,13 @@ function windowIn(b, F, u, face, y, holes, room, seed, through = 0, lit = true) 
 
 // A torch on a bracket by a wall: the flame `off` metres out from the wall
 // face at (x, z), its outward normal (nx, nz), at height y; or on a post.
-function bracketTorch(b, x, z, nx, nz, y, mask, phase, off = 0.32) {
-  b.torch({ x: x + nx * off, z: z + nz * off, base: y - 0.18 - 0.36, h: 0.36, flameY: y, phase, mask, mount: 'bracket' });
+// (`rooms`: the rooms it lights, besides the zones in `mask`; `light`: how
+// strongly it lights what is round it, its flame as bright whatever this is)
+export function bracketTorch(b, x, z, nx, nz, y, mask, phase, off = 0.32, rooms = [], light = 1) {
+  b.torch({ x: x + nx * off, z: z + nz * off, base: y - 0.18 - 0.36, h: 0.36, flameY: y, phase, mask, rooms, mount: 'bracket', ...(light !== 1 ? { light } : {}) });
 }
-export function postTorch(b, x, z, base, mask, phase) {
-  b.torch({ x, z, base, h: 2.1, flameY: base + 2.1 + 0.18, phase, mask, mount: 'post' });
+export function postTorch(b, x, z, base, mask, phase, rooms = []) {
+  b.torch({ x, z, base, h: 2.1, flameY: base + 2.1 + 0.18, phase, mask, rooms, mount: 'post' });
 }
 
 // ---- the pieces -------------------------------------------------------------------
@@ -129,7 +134,9 @@ export function gatehouse(b, p) {
     const [x, z] = F.at(sgn * (G.width / 2 + 1.1), out * G.depth / 2);
     bracketTorch(b, x, z, fnx, fnz, base + 3.0, ZONE_OUT, 0.7 + sgn);
     const [px, pz] = F.at(sgn * G.width / 2, 0), [snx, snz] = F.dir(-sgn, 0);
-    bracketTorch(b, px, pz, snx, snz, base + 2.7, ZONE_OUT | ZONE_YARD | roomBit(room), 2.3 + sgn, 0.25);
+    // (phase 3b: the passage's own two light it at less than half strength, so
+    // at night it is warm and readable but no brighter than the courtyard)
+    bracketTorch(b, px, pz, snx, snz, base + 2.7, ZONE_OUT | ZONE_YARD, 2.3 + sgn, 0.25, [room], PASSAGE_LIGHT);
   }
   const [ix, iz] = F.at(G.width / 2 + 1.1, -out * G.depth / 2), [inx, inz] = F.dir(0, -out);
   bracketTorch(b, ix, iz, inx, inz, base + 3.0, ZONE_YARD, 4.1);
@@ -170,7 +177,7 @@ export function tower(b, p) {
   // the ground door: in face A on the yard's side of its wall (or, where the
   // walls leave through opposite faces, in the middle of the face toward the yard)
   const D0 = K.door, yd = [Math.cos(inward), Math.sin(inward)];
-  let kG = kA, dc = 0;
+  let kG = kA, dc = 0, doorAt = null;
   if (opposite) {
     kG = [0, 1, 2, 3].filter((k) => k !== kA && k !== kB).reduce((p0, k) => (Math.abs(wrap(k * D2 + a - inward)) < Math.abs(wrap(p0 * D2 + a - inward)) ? k : p0));
   } else {
@@ -181,6 +188,7 @@ export function tower(b, p) {
   {
     const FF = faceFrame(kG), sY = Math.sign(dc) || 1;
     const [x, z] = FF.at(size - wt / 2, dc);
+    doorAt = [x, z];
     holes.push({ type: HT.ARCH, x, z, a: FF.a + D2, hx: D0.width / 2, hz: wt / 2 + 0.5, y0: base - 0.4, y1: base + D0.height, room, close: 1, depth: wt });
     const [nx, nz] = FF.dir(-1, 0);
     ops.push({ x, y: base + 1.3, z, nx, ny: 0, nz, area: D0.width * D0.height });
@@ -195,6 +203,24 @@ export function tower(b, p) {
   const SF = frame(p.at[0], p.at[1], a + kS * D2 + Math.PI);
   const sw = Math.abs(wrap(SF.a + D2 - (a + kA * D2))) < 0.1 ? -1 : 1;
   const at = (u, w) => SF.at(u, sw * w);
+  // (phase 3b) a table and a shelf against the wall facing the stair, at
+  // the end away from the ground door, clear of the way to the stair's foot
+  if (p.furnish) {
+    const Tb = K.table, Sh = K.shelf, inside = PF.INSIDE | PF.WALK;
+    const c0 = size - wt;
+    const spots = [-1, 1].map((sg) => ({ sg, pos: SF.at(c0 - Tb.d - 0.12, sg * (c0 - Tb.w - 0.35)) }))
+      .sort((p1, p2) => Math.hypot(p2.pos[0] - doorAt[0], p2.pos[1] - doorAt[1]) - Math.hypot(p1.pos[0] - doorAt[0], p1.pos[1] - doorAt[1]));
+    const t = spots[0];
+    if (Math.hypot(t.pos[0] - doorAt[0], t.pos[1] - doorAt[1]) > 2.6) {
+      b.add({ type: PT.BOX, x: t.pos[0], z: t.pos[1], a: SF.a + D2, hx: Tb.w, hz: Tb.d, y0: base + Tb.h - 0.06, y1: base + Tb.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 90 });
+      for (const sg of [-1, 1]) {
+        const [lx, lz] = SF.at(c0 - Tb.d - 0.12, t.sg * (c0 - Tb.w - 0.35) + sg * (Tb.w - 0.12));
+        b.add({ type: PT.BOX, x: lx, z: lz, a: SF.a + D2, hx: 0.05, hz: Tb.d * 0.75, y0: base, y1: base + Tb.h - 0.06, mat: MAT.TIMBER, tex: TX.PLAIN, room, flags: inside | PF.GROW, seed: seed + 91 });
+      }
+      const sp = SF.at(c0 - Sh.d - 0.02, -t.sg * (c0 - Sh.w - 0.4));
+      if (Math.hypot(sp[0] - doorAt[0], sp[1] - doorAt[1]) > 2.2) b.add({ type: PT.BOX, x: sp[0], z: sp[1], a: SF.a + D2, hx: Sh.w, hz: Sh.d, y0: base, y1: base + Sh.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 92 });
+    }
+  }
   // the stair: a solid flight up the back strip from the -w end, a landing,
   // a flight of slabs back along the next strip to a landing at the walk's
   // height, then slabs up over the first flight to a hatch in the top
@@ -366,10 +392,13 @@ export function keep(b, p) {
       ops.push({ x, y: base + 2.7, z, nx, ny: 0, nz, area: slit.width * slit.height * 1.4 });
     }
   }
+  // (phase 3b) the hall furnished as a house is: a hearth at one end, a
+  // table, a bed along the back wall, a shelf
+  furnish(b, frame(p.at[0], p.at[1], F.a - D2), hw - wt, hd - wt, base + 0.06, room, MAT.TIMBER, seed + 500, 1, seed * 0.29);
   // torches in the hall, on its back wall
   {
     const [nx, nz] = F.dir(1, 0);
-    for (const sgn of [-1, 1]) { const [x, z] = F.at(-hd + wt, sgn * (hw - wt) * 0.5); bracketTorch(b, x, z, nx, nz, base + 2.6, roomBit(room), seed * 0.13 + sgn, 0.3); }
+    for (const sgn of [-1, 1]) { const [x, z] = F.at(-hd + wt, sgn * (hw - wt) * 0.5); bracketTorch(b, x, z, nx, nz, base + 2.6, 0, seed * 0.13 + sgn, 0.3, [room]); }
   }
   // lit windows high on its faces
   const lights = [];
@@ -472,7 +501,10 @@ export function buildStructure(b, desc) {
         if (pc.mount === 'bracket') bracketTorch(b, pc.at[0], pc.at[1], pc.normal[0], pc.normal[1], pc.y, pc.mask === undefined ? ZONE_OUT | ZONE_YARD : pc.mask, pc.phase || 0);
         else postTorch(b, pc.at[0], pc.at[1], pc.base, pc.mask === undefined ? ZONE_OUT | ZONE_YARD : pc.mask, pc.phase || 0);
         out.push(null); break;
-      default: throw new Error(`no such piece: ${pc.kind}`);
+      default:
+        // (phase 3b) the villages' pieces
+        if (!VILLAGE_KINDS.has(pc.kind)) throw new Error(`no such piece: ${pc.kind}`);
+        out.push(buildVillagePiece(b, pc) || null);
     }
   }
   if (desc.yards) for (const y of desc.yards) b.yards.push(y);

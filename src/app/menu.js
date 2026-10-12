@@ -194,11 +194,59 @@ export class Menu {
       h('div', { class: 'opts' }, [['world', 'the generated world'], ['lab', 'the Look Lab'], ['stress', 'the stress scene'], ['yard', 'the building yard']].map(([s, t]) =>
         h('button', { type: 'button', 'aria-pressed': String(g.scene === s), onclick: () => g.goScene(s) }, t))),
       h('h3', { class: 'part' }, 'workers'),
-      h('p', { class: 'line' }, workers));
+      h('p', { class: 'line' }, workers),
+      this.benchPart());
 
     this.pane.append(...TABS.map(([id]) => sections[id]));
     this.sections = sections;
     this.select(this.tab, false);
+  }
+
+  // (phase 3b) The benchmark: run, cancel, the table, copy it as text. It
+  // never starts by itself; closing the menu cancels it (main.js).
+  benchPart() {
+    const g = this.game, B = g.bench;
+    const status = h('p', { class: 'words', 'aria-live': 'polite' }, `${g.cameras.length} cameras, in fair weather and rain, at this detail level: about ${Math.round(g.cameras.length * 2 * 1.6 / 10) * 10} seconds. The clock, the weather and the camera are put back after.`);
+    const table = h('table', { class: 'bench', hidden: true });
+    const copied = h('span', { class: 'note', 'aria-live': 'polite' });
+    const copyBtn = h('button', { type: 'button', disabled: true, onclick: async () => { copied.textContent = (await g.copyText(B.text())) ? 'copied' : 'could not copy'; setTimeout(() => { copied.textContent = ''; }, 2500); } },
+      icon('copy', 15), h('span', {}, 'copy as text'));
+    const fill = () => {
+      const inf = B.info || {};
+      const cams = [...new Set(B.rows.map((r) => r.cam))];
+      const cell = (r) => (r ? r.worker.toFixed(2) : '');
+      table.replaceChildren(
+        h('caption', {}, `${inf.browser} · ${inf.workers} · shared memory ${inf.shared ? 'yes' : 'no'} · ${inf.detail}, ${inf.cells}`),
+        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'camera'), h('th', { scope: 'col' }, 'fair ms'), h('th', { scope: 'col' }, 'rain ms'))),
+        h('tbody', {}, cams.map((c) => {
+          const a = B.rows.find((r) => r.cam === c && r.weather === 'fair'), b = B.rows.find((r) => r.cam === c && r.weather === 'rain');
+          return h('tr', {}, h('th', { scope: 'row' }, `${c + 1} ${(a || b).name}`), h('td', {}, cell(a)), h('td', {}, cell(b)));
+        })));
+      table.hidden = !B.rows.length;
+    };
+    const idle = () => { runBtn.disabled = false; stopBtn.disabled = true; copyBtn.disabled = !B.rows.length; fill(); };
+    // (cancelled from here or by closing the menu: at once, whatever the run was waiting for)
+    B.onCancel = () => { idle(); status.textContent = 'cancelled; everything is back as it was'; if (this.open) runBtn.focus(); };
+    const runBtn = h('button', { type: 'button', onclick: async () => {
+      runBtn.disabled = true; stopBtn.disabled = false; copyBtn.disabled = true;
+      stopBtn.focus();
+      status.textContent = 'starting';
+      const run = B.run((done, total, row) => { status.textContent = `${done} of ${total}: ${row.name}, ${row.weather}, ${row.worker.toFixed(2)} ms`; fill(); });
+      const mine = B.gen, rows = await run;
+      // (only the latest run, not cancelled, speaks)
+      if (!rows || mine !== B.gen) return;
+      idle();
+      const w = rows.reduce((m, r) => (r.worker > m.worker ? r : m));
+      status.textContent = `done: the slowest frame ${w.worker.toFixed(2)} ms (${w.cam + 1} ${w.name}, ${w.weather}). Everything is back as it was.`;
+      copyBtn.focus();
+    } }, icon('gauge', 15), h('span', {}, 'run the benchmark'));
+    const stopBtn = h('button', { type: 'button', disabled: true, onclick: () => B.cancel() }, icon('stop', 15), h('span', {}, 'cancel'));
+    return [
+      h('h3', { class: 'part' }, 'benchmark'),
+      this.row('frame time per camera', status, h('div', { class: 'inline' }, runBtn, stopBtn), { wide: true }),
+      table,
+      h('div', { class: 'inline' }, copyBtn, copied),
+    ];
   }
 
   // A setting: its name and a line of plain words on the left, its control

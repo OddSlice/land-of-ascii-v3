@@ -44,6 +44,16 @@ export const SCALE = {
   // open lowland, at least `apart` metres apart, trees `spacing` apart
   copses: { count: 32, trees: [5, 30], apart: 140, spacing: 4.5 },
   road: { width: 4, maxSlope: 0.12 },
+  // (phase 3b) the villages (docs/scale.md): lanes and footpaths `lane` and
+  // `path` wide; a green `green` in radius; the shore lane `shoreBack` from
+  // the water; houses set back `setback` from their way, at least `gap`
+  // apart, turned up to `turn` radians off square, their door no more than
+  // `doorDrop` above the ground in front; a share `lit` of the houses with
+  // lit windows; a jetty `jetty` long; `fields` blocks of fields round each
+  // village, `fieldL` by `fieldW` (half), no steeper than `fieldSlope`,
+  // cut into strips `strip` wide
+  village: { lane: 3, path: 1.4, green: [12, 17], shoreBack: 14, setback: [2.5, 6], gap: 3.2, turn: 0.13, doorDrop: 0.5, lit: 0.8,
+    jetty: [8, 16], fields: [3, 5], fieldL: [22, 40], fieldW: [16, 28], fieldSlope: 0.1, strip: [6, 11] },
   wall: { length: 120, thick: 3, height: 6, gate: 4 },
 
   // the building kit (phase 3a; docs/scale.md): metres, heights above the
@@ -82,6 +92,40 @@ export const SCALE = {
     // over the ground inside the ring: just under the rim, so it reads as a hole)
     well: { r: 1.0, height: 0.85, wallT: 0.3, shaft: 0.65 },
     window: { width: 0.7, height: 1.1, depth: 0.35 },
+    // (phase 3b) the villages' pieces; `w` and `d` are half sizes, heights
+    // above the floor (a house's floor stands on its footing)
+    cottage: { w: [2.6, 3.4], d: [2.1, 2.6], eave: 2.6, pitch: 1.0, overhang: 0.4, wallT: 0.3 },
+    // a larger house: an upper storey under the eaves, its floor at `upper`
+    hall: { w: [3.6, 4.5], d: [2.6, 3.1], eave: 4.5, upper: 2.6, pitch: 1.05, overhang: 0.45, wallT: 0.32 },
+    barn: { w: [4.8, 6.2], d: [3.3, 4.0], eave: 3.6, pitch: 0.9, overhang: 0.4, wallT: 0.25, door: [3.0, 3.3] },
+    // a chapel: its nave; a bellcote on its front gable or a short tower
+    // `tower` (half) across and `towerH` high in front of it
+    chapel: { w: [4.4, 5.2], d: [2.6, 3.0], eave: 4.2, pitch: 1.3, overhang: 0.35, wallT: 0.6, tower: 1.7, towerH: 9 },
+    shelter: { w: [2.6, 3.4], d: [1.9, 2.3], eave: 2.5, pitch: 0.7, post: 0.12 },
+    // a jetty: planks `width` (half) wide, `above` over the water, on posts every `span`
+    jetty: { width: 0.85, above: 0.55, plank: 0.15, span: 2.4, post: 0.12 },
+    chimney: { half: 0.32, above: 0.7 },
+    // a fence: posts `post` (half) square every `span`, two rails `rail` (half) thick and
+    // `railH` tall, their middles at `rails` above the ground; `height` its posts
+    // (rails and arms at least 9 cm thick: the body is tested at points 7.8 cm
+    // apart round its edge, and a thinner part could slip between them)
+    fence: { height: 1.2, post: 0.07, span: 2.4, rail: 0.045, railH: 0.11, rails: [0.5, 1.0], gate: 3 },
+    // a low dry-stone wall, its pieces at most `piece` long
+    drystone: { half: 0.32, height: 0.95, piece: 4 },
+    haystack: { w: 1.7, d: 1.2, h: 1.7, roof: 0.9 },
+    signpost: { height: 2.4, post: 0.075, arm: 0.36, armH: 0.13, armT: 0.05 },
+    bench: { half: 0.8, depth: 0.22, seat: 0.46 },
+    // inside the houses one can enter
+    hearth: { w: 0.7, d: 0.4, h: 0.55 },
+    table: { w: 0.6, d: 0.42, h: 0.76 },
+    bed: { w: 0.98, d: 0.5, h: 0.48 },
+    shelf: { w: 0.6, d: 0.16, h: 1.7 },
+    // bridges: a timber deck `deck` thick on posts every `span`, rails `rail`
+    // above it; a stone bridge's parapets `parapet` thick and `parapetH` high
+    bridge: { half: 2.35, deck: 0.28, span: 3.0, post: 0.13, rail: 1.0, parapet: 0.4, parapetH: 0.8, clear: 1.0 },
+    // a village house's footing: the most the ground may fall across it
+    // (else the house moves or is dropped), and its floor's least height
+    footing: { rise: 1.2, above: 0.15 },
   },
 
   // the backdrop (phase 2a): the range going on past the north and east

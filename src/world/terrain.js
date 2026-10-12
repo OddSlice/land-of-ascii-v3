@@ -8,17 +8,25 @@ export const LEVELS = 4;           // level L has nodes every 2^L metres
 // For each 1 m square: 1 if it is grass and nothing else at all four
 // corners, 2 if it is forest floor and nothing else, 0 if materials mix.
 // Lets ground shading skip the material weights where there is no choice to
-// make (the choice comes out the same either way).
+// make (the choice comes out the same either way). (Phase 3b: 3 if they mix
+// but none of them is a field, a footpath or the yard's wear, so shading
+// skips those three weights there, which are nothing over nearly all the land.)
 export function materialCode(T) {
   const { N, NN } = T;
-  const others = [T.wWater, T.wRoad, T.wSand, T.wSnow, T.wRock, T.wYard].filter(Boolean);
+  const late = [T.wField, T.wPath, T.wWear].filter(Boolean);
+  const others = [T.wWater, T.wRoad, T.wSand, T.wSnow, T.wRock, T.wYard, ...late].filter(Boolean);
   const code = new Uint8Array(N * N);
   for (let k = 0; k < N; k++) {
     for (let i = 0; i < N; i++) {
       const j = k * NN + i, js = [j, j + 1, j + NN, j + NN + 1];
       let clear = true;
       for (const w of others) { for (const q of js) if (w[q]) { clear = false; break; } if (!clear) break; }
-      if (!clear) continue;
+      if (!clear) {
+        let any = false;
+        for (const w of late) { for (const q of js) if (w[q]) { any = true; break; } if (any) break; }
+        if (!any && late.length) code[k * N + i] = 3;
+        continue;
+      }
       const f = T.wFloor;
       let fl = 0;
       if (f) for (const q of js) fl += f[q] === 255 ? 1 : f[q] === 0 ? 0 : 0.5;

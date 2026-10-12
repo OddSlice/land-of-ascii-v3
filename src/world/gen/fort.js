@@ -19,6 +19,7 @@ import { SCALE } from '../scale.js';
 import { KIND } from './water.js';
 import { ZONE_OUT, ZONE_YARD } from '../kit.js';
 import { towerInside } from '../kit-pieces.js';
+import { MinHeap } from './heap.js';
 
 const K = SCALE.kit, W = K.wall;
 const TAU = Math.PI * 2;
@@ -51,7 +52,7 @@ export function polyDist(poly, x, z) {
   return inPoly(poly, x, z) ? -d : d;
 }
 // a convex polygon (counter-clockwise or not) moved out by d (in, if d < 0)
-function offsetPoly(poly, d) {
+export function offsetPoly(poly, d) {
   const n = poly.length, c = poly.reduce((s, p) => add(s, p), [0, 0]).map((v) => v / n);
   const lines = poly.map((p, i) => {
     const q = poly[(i + 1) % n], e = norm(sub(q, p));
@@ -149,7 +150,9 @@ export function planFort({ H, N, kind, wetDist, site, arrive, seed, base: given 
     const walls = [Math.atan2(prev[1] - p[1], prev[0] - p[0]), Math.atan2(next[1] - p[1], next[0] - p[0])];
     return { at: p, size, round: round[k], inward, walls };
   });
-  towers.forEach((t, k) => pieces.push({ kind: 'tower', shape: t.round ? 'round' : 'square', at: t.at, size: t.size, base, inward: t.inward, walls: t.walls, seed: 2000 + k * 37 }));
+  // (phase 3b: the first square tower's ground floor furnished)
+  const furnished = towers.findIndex((t) => !t.round);
+  towers.forEach((t, k) => pieces.push({ kind: 'tower', shape: t.round ? 'round' : 'square', at: t.at, size: t.size, base, inward: t.inward, walls: t.walls, seed: 2000 + k * 37, furnish: k === furnished }));
   // the curtain walls, from tower to tower: each runs on to the towers'
   // middles, with the towers' insides cut out of it, so it meets a tower
   // cleanly at any angle
@@ -340,19 +343,130 @@ export function yardWeight(N, plan) {
 // are brought to its new start. `roads[k]` is the fort's road (its index 0
 // at the fort), cut at `q0`; returns the new stretch's length, its grade
 // and whether it keeps clear of the walls.
-export function routeIntoFort(roads, k, plan, q0) {
+// (phase 3b) A way up to the gate that winds with the land: the cheapest
+// path on a 2 m grid from the gate's front out to the old road, refusing
+// steps steeper than `steep` and charging heavily for slope (so it contours
+// round a rise rather than climbing it straight), kept clear of the walls
+// and of every tower by the tower's size and a margin. Returns { q0, path }
+// (path: points from the old road's point q0 to the gate's front), or null.
+// (`grade`: a road point is reached only by a way long enough to climb or
+// fall from it to the platform no steeper than this)
+export function windToFort(H, N, kind, plan, rd, qFrom, qTo, steep = 0.065, grade = 0.075) {
+  const NN = N + 1, S = 3;
+  const front = [plan.front.x, plan.front.z], o = plan.gate.out;
+  const big = Math.max(...plan.towers.map((t) => t.size)) + SCALE.road.width / 2 + 3;
+  const keep = offsetPoly(plan.poly, big);
+  const R = 240, x0 = Math.max(2, Math.floor((front[0] - R) / S) * S), z0 = Math.max(2, Math.floor((front[1] - R) / S) * S);
+  const n = Math.floor((2 * R) / S) + 1, cells = n * n;
+  const hAt = new Float32Array(cells), pen = new Float32Array(cells);
+  for (let k = 0; k < n; k++) for (let i = 0; i < n; i++) {
+    const x = x0 + i * S, z = z0 + k * S, c = k * n + i;
+    if (x >= N - 1 || z >= N - 1) { pen[c] = Infinity; continue; }
+    const j = Math.round(z) * NN + Math.round(x);
+    hAt[c] = H[j];
+    let p = kind[j] !== KIND.NONE ? Infinity : 1;
+    // clear of the fort: only the straight run out of the gate comes near it
+    const t = (x - front[0]) * o[0] + (z - front[1]) * o[1], across = Math.abs(-(x - front[0]) * o[1] + (z - front[1]) * o[0]);
+    const corridor = t > -2 && t < 10 && across < 4;
+    const pd = polyDist(keep, x, z);
+    if (!corridor && pd < 0) p = Infinity;
+    // and kept a little off the margin round it
+    else if (!corridor) p += 4 * smoothstep(12, 0, pd);
+    pen[c] = p;
+  }
+  const node = (x, z) => { const i = Math.round((x - x0) / S), k = Math.round((z - z0) / S); return i < 0 || k < 0 || i >= n || k >= n ? -1 : k * n + i; };
+  // the goal: the old road's points from qFrom to qTo
+  const goal = new Map();
+  for (let q = qFrom; q <= Math.min(qTo, rd.n - 1); q++) { const c = node(rd.x[q], rd.z[q]); if (c >= 0 && pen[c] !== Infinity && !goal.has(c)) goal.set(c, q); }
+  // states: a cell and the heading it was entered by (eight of them), so a
+  // turn costs by how sharp it is and the way keeps long legs and real bends
+  const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  const TURN = [0, 4, 30, 160, Infinity];
+  const outDir = Math.round(Math.atan2(o[1], o[0]) / (Math.PI / 4));
+  const d0 = ((outDir % 8) + 8) % 8;
+  const start = node(front[0] + o[0] * 9, front[1] + o[1] * 9);
+  if (start < 0 || !goal.size) return null;
+  const NS = cells * 8;
+  const dist = new Float64Array(NS).fill(Infinity), prev = new Int32Array(NS).fill(-1), glen = new Float32Array(NS);
+  const heap = new MinHeap(8192);
+  const s0 = start * 8 + d0;
+  dist[s0] = 0; glen[s0] = 9; heap.push(s0, 0);
+  let hit = -1;
+  while (heap.size) {
+    const d = heap.topKey(), st = heap.pop();
+    if (d > dist[st]) continue;
+    const c = st >> 3, dir = st & 7;
+    if (goal.has(c) && Math.abs(rd.y[goal.get(c)] - plan.base) <= grade * glen[st]) { hit = st; break; }
+    const ci = c % n, ck = (c - ci) / n;
+    for (let nd = 0; nd < 8; nd++) {
+      let turn = Math.abs(nd - dir); if (turn > 4) turn = 8 - turn;
+      const tc = TURN[turn];
+      if (tc === Infinity) continue;
+      const [di, dk] = DIRS[nd], i = ci + di, k = ck + dk;
+      if (i < 0 || k < 0 || i >= n || k >= n) continue;
+      const m = k * n + i, p = pen[m];
+      if (p === Infinity) continue;
+      const L = S * Math.hypot(di, dk), sl = Math.abs(hAt[m] - hAt[c]) / L;
+      // (near the gate the ground is graded to the road anyway: steeper
+      // allowed there, at its cost)
+      if (sl > (glen[st] < 26 ? 0.3 : steep)) continue;
+      const ms = m * 8 + nd, cost = d + L * (p + 900 * sl * sl) + tc;
+      if (cost < dist[ms]) { dist[ms] = cost; prev[ms] = st; glen[ms] = glen[st] + L; heap.push(ms, cost); }
+    }
+  }
+  if (hit < 0) return null;
+  // from the road's point to the gate's front
+  const path = [];
+  for (let st = hit; st >= 0; st = prev[st]) { const c = st >> 3; path.push([x0 + (c % n) * S, z0 + Math.floor(c / n) * S]); }
+  path.push(front);
+  return { q0: goal.get(hit >> 3), path };
+}
+
+// Smooth a path (a moving average, then corners cut), keeping its ends.
+function smoothPath(P) {
+  let Q = P.map((p, q) => {
+    let sx = 0, sz = 0, w = 0;
+    for (let r = Math.max(0, q - 3); r <= Math.min(P.length - 1, q + 3); r++) { const k = 4 - Math.abs(r - q); sx += P[r][0] * k; sz += P[r][1] * k; w += k; }
+    return [sx / w, sz / w];
+  });
+  Q[0] = P[0]; Q[Q.length - 1] = P[P.length - 1];
+  for (let r = 0; r < 2; r++) {
+    const T = [Q[0]];
+    for (let q = 0; q + 1 < Q.length; q++) T.push(lerp2(Q[q], Q[q + 1], 0.25), lerp2(Q[q], Q[q + 1], 0.75));
+    T.push(Q[Q.length - 1]);
+    Q = T;
+  }
+  return Q;
+}
+
+// (`way`, phase 3b: the winding path from windToFort, used instead of the
+// curve straight in)
+export function routeIntoFort(roads, k, plan, q0, way = null) {
   const rd = roads[k];
   // other roads ending on the stretch to be replaced end at the cut instead
   const front = [plan.front.x, plan.front.z], inner = [plan.inner.x, plan.inner.z];
   const P = [rd.x[q0], rd.z[q0]], y0 = rd.y[q0];
   const dir = norm([rd.x[q0] - rd.x[Math.min(rd.n - 1, q0 + 6)], rd.z[q0] - rd.z[Math.min(rd.n - 1, q0 + 6)]]);
   const L = len(sub(front, P));
-  const B1 = add(P, mul(dir, L / 3)), B2 = add(front, mul(plan.gate.out, L / 3));
-  const pts = [];
-  const steps = Math.max(2, Math.ceil(L * 1.2));
-  for (let s = 0; s <= steps; s++) {
-    const t = s / steps, u = 1 - t;
-    pts.push([u * u * u * P[0] + 3 * u * u * t * B1[0] + 3 * u * t * t * B2[0] + t * t * t * front[0], u * u * u * P[1] + 3 * u * u * t * B1[1] + 3 * u * t * t * B2[1] + t * t * t * front[1]]);
+  let pts = [];
+  if (way) {
+    // the old road's own last few metres before the cut lead into it, so it
+    // leaves the old road on its line, without a kink
+    const lead = [];
+    for (let q = Math.min(rd.n - 1, q0 + 10); q > q0; q--) lead.push([rd.x[q], rd.z[q]]);
+    const sm = smoothPath([...lead, ...way]);
+    // (from the cut on: drop the lead-in again)
+    let from = 0, bd = Infinity;
+    for (let i = 0; i < sm.length; i++) { const d = len(sub(sm[i], P)); if (d < bd) { bd = d; from = i; } }
+    pts = sm.slice(from);
+    pts[0] = P;
+  } else {
+    const B1 = add(P, mul(dir, L / 3)), B2 = add(front, mul(plan.gate.out, L / 3));
+    const steps = Math.max(2, Math.ceil(L * 1.2));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps, u = 1 - t;
+      pts.push([u * u * u * P[0] + 3 * u * u * t * B1[0] + 3 * u * t * t * B2[0] + t * t * t * front[0], u * u * u * P[1] + 3 * u * u * t * B1[1] + 3 * u * t * t * B2[1] + t * t * t * front[1]]);
+    }
   }
   // (keeping clear of the walls until it turns in to the gate)
   const foot = offsetPoly(plan.poly, W.thick / 2 + 4);
@@ -373,6 +487,7 @@ export function routeIntoFort(roads, k, plan, q0) {
     need = u - l;
   }
   // heights: the platform through the gate, then graded evenly to the road's
+  // (the length along the way, not the count of points)
   const m = xs.length, y = new Float32Array(m);
   const dFront = (i) => len(sub([xs[i], zs[i]], front));
   let iFront = 0;
@@ -414,7 +529,7 @@ export function routeIntoFort(roads, k, plan, q0) {
     roads[o] = { id: ro.id, to: ro.to, steep: ro.steep, x: Float32Array.from(ax), z: Float32Array.from(az), y: Float32Array.from(ay), n: ax.length };
   }
   const run = Math.max(1, m - iFront);
-  return { q0, rise: y0 - plan.base, run, slope: Math.abs(y0 - plan.base) / run, m, clear };
+  return { q0, rise: y0 - plan.base, run, slope: Math.abs(y0 - plan.base) / run, m, clear, wound: !!way };
 }
 
 // The ground along the new approach, before the road is pressed into it:
@@ -441,4 +556,41 @@ export function levelApproach(H, N, kind, rd, m, slope = 0.38) {
     if (d >= wdt) continue;
     H[j] += dh * (d <= half + 1 ? 1 : smoothstep(wdt, half + 1, d));
   }
+}
+
+// (phase 3b) A road that runs through where the fort now stands (its search
+// was made before the fort was planned) goes round it instead: from where it
+// enters a ring clear of the walls and towers to where it leaves it, along
+// the ring the shorter way, heights eased between. (A road that ends there is
+// routeIntoFort's to bring to the new road.)
+export function detourFort(roads, plan, skip) {
+  const big = Math.max(...plan.towers.map((t) => t.size)) + W.thick / 2 + 8;
+  const ring = offsetPoly(plan.poly, big), zone = offsetPoly(plan.poly, big - 2);
+  roads.forEach((rd, k) => {
+    if (k === skip) return;
+    let qa = -1, qb = -1;
+    for (let q = 0; q < rd.n; q++) if (inPoly(zone, rd.x[q], rd.z[q])) { if (qa < 0) qa = q; qb = q; }
+    if (qa <= 0 || qb >= rd.n - 1) return;
+    const A = [rd.x[qa - 1], rd.z[qa - 1]], B = [rd.x[qb + 1], rd.z[qb + 1]];
+    // the ring as a closed line, densely
+    const pts = [];
+    for (let i = 0; i < ring.length; i++) { const p = ring[i], q = ring[(i + 1) % ring.length], L = len(sub(q, p)); for (let s = 0; s < L; s += 1) pts.push(lerp2(p, q, s / L)); }
+    const nearest = (P) => { let b = 0, bd = Infinity; pts.forEach((p, i) => { const d = len(sub(p, P)); if (d < bd) { bd = d; b = i; } }); return b; };
+    const ia = nearest(A), ib = nearest(B), n = pts.length;
+    const fwd = (ib - ia + n) % n, back = (ia - ib + n) % n;
+    const way = [A];
+    if (fwd <= back) for (let s = 0; s <= fwd; s++) way.push(pts[(ia + s) % n]);
+    else for (let s = 0; s <= back; s++) way.push(pts[(ia - s + n) % n]);
+    way.push(B);
+    const sm = smoothPath(way);
+    // a point a metre
+    const xs = [], zs = [];
+    for (let i = 0; i + 1 < sm.length; i++) { const L = len(sub(sm[i + 1], sm[i])), m = Math.max(1, Math.round(L)); for (let s = 0; s < m; s++) { const p = lerp2(sm[i], sm[i + 1], s / m); xs.push(p[0]); zs.push(p[1]); } }
+    const y0 = rd.y[qa - 1], y1 = rd.y[qb + 1], m = xs.length;
+    const ys = xs.map((_, i) => y0 + (y1 - y0) * i / Math.max(1, m - 1));
+    const nx = [...Array.from(rd.x).slice(0, qa - 1), ...xs, ...Array.from(rd.x).slice(qb + 2)];
+    const nz = [...Array.from(rd.z).slice(0, qa - 1), ...zs, ...Array.from(rd.z).slice(qb + 2)];
+    const ny = [...Array.from(rd.y).slice(0, qa - 1), ...ys, ...Array.from(rd.y).slice(qb + 2)];
+    roads[k] = { ...rd, x: Float32Array.from(nx), z: Float32Array.from(nz), y: Float32Array.from(ny), n: nx.length, low: undefined, g: undefined };
+  });
 }

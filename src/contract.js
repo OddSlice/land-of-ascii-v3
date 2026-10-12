@@ -30,6 +30,11 @@ export const MAT = {
   WINDOW: 24,                      // a window: a dark opening by day, lit at night (emissive)
   MASONRY: 25,                     // the fort's dressed stone, in courses (after phase 3a)
   SHAFT: 26,                       // the dark inside a well, seen from above (after phase 3a)
+  // phase 3b: the villages and their fields
+  THATCH: 27,                      // thatched roofs
+  PLASTER2: 28, PLASTER3: 29,      // plaster in two more tints
+  TIMBER2: 30, TIMBER3: 31,        // timber in two more tints
+  CROP: 32, STUBBLE: 33, FALLOW: 34, // a field's strips (ground)
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;

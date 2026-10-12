@@ -71,7 +71,7 @@ export class ObjectPass {
       for (let i = 0; i < this.kit.np; i++) {
         const q = i * P_STRIDE, t = S[q + KP.TYPE], pane = t === PT.PANE;
         list.push({ kind: PRIM, o: q, x: S[q + KP.CX], z: S[q + KP.CZ], R: reachOf(S, q) + 0.05, y0: S[q + KP.Y0] - 0.05, y1: S[q + KP.Y1] + 0.05,
-          grow: pane ? 2.3 : (S[q + KP.FLAGS] & PF.GROW ? 1.5 : 0), up: pane ? 1 : 0 });
+          grow: pane ? 2.3 : (S[q + KP.FLAGS] & (PF.GROW | PF.HOLD) ? 1.5 : 0), up: pane || S[q + KP.FLAGS] & PF.HOLD ? 1 : 0 });
       }
     }
     this.list = list;

@@ -301,3 +301,65 @@ export function fortCameras(world) {
   }
   return cams;
 }
+
+// (phase 3b) The villages' cameras, from their plans: each village from its
+// road as it comes in and from its centre; inside a house one can enter;
+// and a bridge from its bank.
+export function villageCameras(world) {
+  const { sites, roads } = world, eye = SCALE.eye, cams = [];
+  const H = world.terrain.ground, N = world.N, NN = N + 1;
+  const g = (x, z) => H[Math.round(z) * NN + Math.round(x)];
+  const wet = (x, z) => world.terrain.wWater[Math.round(z) * NN + Math.round(x)] > 127;
+  const times = ['day', 'dusk', 'day'];
+  sites.villages.forEach((v, q) => {
+    const p = v.plan, c = p.centre, name = `village ${q + 1} (${p.pattern})`;
+    // its road, about 70 m out from the nearest house
+    const rd = roads.find((r) => r.to === `village ${q + 1}`);
+    let k = 0;
+    for (let i = 0; i < rd.n; i++) {
+      const d = Math.min(...p.houses.map((h) => Math.hypot(h.x - rd.x[i], h.z - rd.z[i])));
+      if (d >= 70) { k = i; break; }
+      k = i;
+    }
+    const tx = p.chapel ? p.chapel.x : c.x, tz = p.chapel ? p.chapel.z : c.z;
+    cams.push({ name: `${name}, the road in`, x: rd.x[k], z: rd.z[k], yaw: deg(Math.atan2(tx - rd.x[k], tz - rd.z[k])), pitch: 2, time: 'day' });
+    // its centre: at the well, or the middle of its green, looking at the chapel
+    const at = p.green ? [p.green.x + p.green.r * 0.15, p.green.z - p.green.r * 0.25] : p.well ? [p.well.x + 2.4, p.well.z + 2.4] : [c.x, c.z];
+    let best = null;
+    for (let t = 0; t < 16; t++) {
+      const a = t / 16 * Math.PI * 2, x = at[0] + Math.cos(a) * 3, z = at[1] + Math.sin(a) * 3;
+      if (wet(x, z) || p.rects.some(([rx, rz, ra, hw, hd]) => { const dx = x - rx, dz = z - rz, ca = Math.cos(ra), sa = Math.sin(ra); return Math.abs(dx * ca + dz * sa) < hw + 1 && Math.abs(-dx * sa + dz * ca) < hd + 1; })) continue;
+      best = [x, z]; break;
+    }
+    const [cx, cz] = best || at;
+    const look = p.chapel && Math.hypot(p.chapel.x - cx, p.chapel.z - cz) > 12 ? [p.chapel.x, p.chapel.z] : p.houses.length ? [p.houses[0].x, p.houses[0].z] : [c.x + 10, c.z];
+    cams.push({ name: `${name}, its centre`, x: cx, z: cz, y: g(cx, cz) + eye, stand: true, yaw: deg(Math.atan2(look[0] - cx, look[1] - cz)), pitch: 4, time: times[q] });
+  });
+  // inside a house one can enter: the first village's first, just in from
+  // its door, looking toward the hearth
+  {
+    const v = sites.villages.find((x) => x.plan.enter.length) || null;
+    if (v) {
+      const h = v.plan.enter[0], ca = Math.cos(h.a), sa = Math.sin(h.a);
+      const S = h.kind === 'hall' ? SCALE.kit.hall : SCALE.kit.cottage;
+      const lu = -h.side * (h.w - S.wallT - 0.7), lw = h.d - S.wallT - 0.6;
+      const x = h.x + lu * ca - lw * sa, z = h.z + lu * sa + lw * ca;
+      const hu = h.side * (h.w - S.wallT - 0.5), hx = h.x + hu * ca, hz = h.z + hu * sa;
+      cams.push({ name: 'inside a house, by the hearth', x, z, y: h.floor + 0.02 + eye, stand: true, yaw: deg(Math.atan2(hx - x, hz - z)), pitch: -8, time: 'dusk' });
+    }
+  }
+  // a bridge, from its bank, a little downstream
+  if (sites.bridges && sites.bridges.length) {
+    const b = sites.bridges[0], nx = -Math.sin(b.a), nz = Math.cos(b.a);
+    let spot = null;
+    for (const d of [16, 20, 24, 13, 28]) for (const sg of [1, -1]) for (const along of [-0.5, 0.5, -0.8, 0.8]) {
+      if (spot) break;
+      const x = b.x + nx * sg * d + Math.cos(b.a) * b.len * along, z = b.z + nz * sg * d + Math.sin(b.a) * b.len * along;
+      if (x < 2 || z < 2 || x > N - 2 || z > N - 2 || wet(x, z)) continue;
+      if (roads.some((r) => { for (let i = 0; i < r.n; i += 3) if (Math.hypot(r.x[i] - x, r.z[i] - z) < 4) return true; return false; })) continue;
+      spot = [x, z];
+    }
+    if (spot) cams.push({ name: `the ${b.style} bridge from its bank`, x: spot[0], z: spot[1], y: g(spot[0], spot[1]) + eye, stand: true, yaw: deg(Math.atan2(b.x - spot[0], b.z - spot[1])), pitch: 2, time: 'day' });
+  }
+  return cams;
+}

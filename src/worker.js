@@ -34,7 +34,7 @@ self.onmessage = (e) => {
         }
         world = unpackWorld(msg.world);
         if (msg.shared) opts = { shared: msg.shadows };
-      } else if (msg.scene === 'yard') world = buildYard({ proto: !!msg.proto });
+      } else if (msg.scene === 'yard') world = buildYard();
       else world = buildWorld();
       renderer = createStripeRenderer(world, opts);
       self.postMessage({ type: 'ready', id: msg.id, buildMs: world.buildMs });

@@ -4,7 +4,7 @@
 // ?lab=1 is the Look Lab's fixed valley (phases 0a-0c), ?stress=1 (or X
 // from the lab) the stress scene, a big world for measuring the renderer,
 // and ?yard=1 (phase 3a) the building yard, every piece of the building kit
-// standing alone (&proto=1 adds the prototypes the kit was chosen by).
+// standing alone.
 import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
@@ -32,6 +32,7 @@ import { layout, cellWidth, TARGETS } from './app/grid.js';
 import { MAX_PITCH } from './scene/cpu/view.js';
 import { weatherFor, forecastOf, mainKind, KINDS } from './weather.js';
 import { Menu } from './app/menu.js';
+import { BenchRun, browserName } from './app/benchrun.js';
 import { loadDisplay, saveDisplay, seenCard, markCardSeen } from './app/settings.js';
 import { moonLit } from './world/sky.js';
 
@@ -42,7 +43,6 @@ const CLOCK_RATE = 1 / 3600;    // real time: one game hour per real hour (after
 
 const STRESS = params.get('stress') === '1';
 const YARD = !STRESS && params.get('yard') === '1';
-const PROTO = YARD && params.get('proto') === '1';
 const LAB = !STRESS && !YARD && params.get('lab') === '1';
 const WORLD = !STRESS && !LAB && !YARD;
 const SEED = WORLD ? (params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED) : 0;
@@ -115,7 +115,7 @@ function worldProgress(stage, p) {
 if (THREADS > 0 && !WORLD) {
   pool = new Pool(THREADS, fail, {
     scene: STRESS ? 'stress' : YARD ? 'yard' : 'default',
-    init: YARD ? { proto: PROTO } : {},
+    init: {},
     onProgress: (p) => { progress.workers = p; showProgress(); },
   });
   if (STRESS) pool.whenReady.then(() => { progress.workers = 1; });
@@ -148,7 +148,7 @@ async function makeWorld() {
     }
     return w;
   }
-  if (YARD) return buildYard({ proto: PROTO });
+  if (YARD) return buildYard();
   if (!STRESS) return buildWorld();
   const gen = buildStressWorld({ render: THREADS === 0 });
   let r;
@@ -467,13 +467,14 @@ const game = {
   newWorld(seed) { const q = new URLSearchParams(location.search); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
   goScene(sc) {
     const q = new URLSearchParams(location.search);
-    q.delete('lab'); q.delete('stress'); q.delete('yard'); q.delete('proto');
+    q.delete('lab'); q.delete('stress'); q.delete('yard');
     if (sc === 'lab') q.set('lab', '1'); else if (sc === 'stress') q.set('stress', '1'); else if (sc === 'yard') q.set('yard', '1');
     reload(q);
   },
   // A link to this exact world (its seed), to the clipboard.
-  async copyLink() {
-    const link = `${location.href.split(/[?#]/)[0]}?seed=${SEED}`;
+  copyLink() { return this.copyText(`${location.href.split(/[?#]/)[0]}?seed=${SEED}`); },
+  // Some text to the clipboard (the benchmark's result too).
+  async copyText(link) {
     try { await navigator.clipboard.writeText(link); return true; } catch { /* try the old way */ }
     try {
       const t = document.createElement('textarea');
@@ -507,6 +508,29 @@ const game = {
   },
   close({ recapture }) { closeMenu(recapture); },
 };
+// (phase 3b) the benchmark in the menu (src/app/benchrun.js)
+const DETAIL_NAMES = ['coarse', 'medium', 'fine', 'finest'];
+game.bench = new BenchRun({
+  cameras: CAMS,
+  save: () => ({ hour: state.hour, t: state.t, day: state.day, running: state.running, frozen: state.frozen, weather: state.weather, cam: state.cam, camName: state.camName, held: state.held,
+    x: player.x, z: player.z, feet: player.feet, yaw: player.yaw, pitch: player.pitch, vy: player.vy, eyeLag: player.eyeLag }),
+  restore: (s) => {
+    Object.assign(state, { hour: s.hour, t: s.t, day: s.day, running: s.running, frozen: s.frozen, weather: s.weather, cam: s.cam, camName: s.camName, held: s.held });
+    Object.assign(player, { x: s.x, z: s.z, feet: s.feet, yaw: s.yaw, pitch: s.pitch, vy: s.vy, eyeLag: s.eyeLag });
+  },
+  useCamera: (i) => useCamera(i),
+  setWeather: (w) => { state.weather = w; },
+  freeze: () => { state.frozen = true; state.running = false; },
+  whenIdle: () => lab.whenIdle(),
+  timings: (n) => lab.timings(n),
+  info: () => ({
+    when: new Date().toISOString().slice(0, 16).replace('T', ' '), browser: browserName(),
+    workers: THREADS ? `${THREADS} workers` : 'no workers', shared: SHARED,
+    detail: DETAIL_NAMES[state.preset] || String(state.preset), cells: `${grid.cells} cells, ${grid.cols} x ${grid.rows}`,
+    scene: game.scene, seed: WORLD ? SEED : undefined, screen: `${innerWidth} x ${innerHeight} at ${devicePixelRatio}`,
+  }),
+});
+lab.bench = game.bench;   // (for the tools)
 const menu = new Menu($('menu'), game);
 let menuNext = 0, menuOpenedAt = 0, releasing = false;
 
@@ -524,6 +548,8 @@ function openMenu() {
 // else that closes it does not.
 function closeMenu(recapture = false) {
   if (!menu.open) return;
+  // (a benchmark under way stops, and puts everything back)
+  game.bench.cancel();
   menu.hide();
   input.clear();
   if (recapture) input.capture();

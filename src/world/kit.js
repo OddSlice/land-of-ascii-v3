@@ -33,9 +33,20 @@ export const PF = {
   GROW: 2,              // held at least two cells across far away (thin parts)
   INSIDE: 4,            // every surface of it is inside its room (a floor, a stair in a tower)
   WALK: 8,              // its top can be walked on (for the tools)
+  // (phase 3b) a thin part (a fence rail or post, a signpost's arm, a
+  // chimney's pot): held at least two cells across and two rows tall far
+  // away, as GROW, but only while it really is at least HOLD_MIN of that;
+  // smaller still, it is not drawn at all
+  HOLD: 16,
 };
+export const HOLD_MIN = 0.35;
 // what a surface's texture is
-export const TX = { PLAIN: 0, MASONRY: 1, FRAME: 2, SHINGLE: 3, BOARDS: 4, FLAGS: 5 };
+// (ASHLAR, PAVING, TIMBERED and TILES, phase 3b: the villages' and bridges'
+// dressed stone, paving, timber framing and shingle roofs, as MASONRY, FLAGS,
+// FRAME and SHINGLE but without
+// the detail that blinks as you walk right past or turn (see primShade); the
+// fort keeps its own)
+export const TX = { PLAIN: 0, MASONRY: 1, FRAME: 2, SHINGLE: 3, BOARDS: 4, FLAGS: 5, THATCH: 6, RUBBLE: 7, ASHLAR: 8, PAVING: 9, TIMBERED: 10, TILES: 11 };
 
 // shape table: P_STRIDE numbers per shape
 export const P_STRIDE = 28;
@@ -66,10 +77,14 @@ export const H = {
 };
 
 // Light zones: which torches light a surface. Bit 0 outside, bit 1 a yard,
-// bit 2 + r room r. A torch lights only surfaces sharing a bit with its mask.
+// and one of the next 29 bits for each room. A torch lights only surfaces
+// sharing a bit with its mask. (Phase 3b: there are more rooms than bits, so
+// compileKit gives two rooms the same bit only when they are far enough
+// apart that no torch can reach both: kit.roomBits.)
 export const ZONE_OUT = 1, ZONE_YARD = 2;
-export const roomBit = (r) => (r >= 0 && r < 29 ? 1 << (2 + r) : 0);
 export const ZONE_ALL = 0x7fffffff;
+const ROOM_BITS = 29, ROOM_APART = 60;
+export const roomBit = (kit, r) => (r >= 0 && kit.roomBits && r < kit.roomBits.length ? kit.roomBits[r] : 0);
 
 // ---- building up a kit -------------------------------------------------------
 
@@ -102,8 +117,9 @@ export class KitBuilder {
   }
 
   // A torch: on a post (`mount: 'post'`) or on a bracket from a wall (`nx`,
-  // `nz`: the wall's outward normal), its flame at height `y`; `mask`: which
-  // zones it lights.
+  // `nz`: the wall's outward normal), or a hearth's fire (`mount:
+  // 'hearth'`), its flame at height `y`; `mask`: which zones it lights (the
+  // yard, outside), and `rooms`: which rooms.
   torch(t) { this.torches.push(t); }
 }
 
@@ -147,10 +163,26 @@ export function compileKit(b) {
     holes[q + H.CLOSE] = h.close ? 1 : 0;
     holes[q + H.DEPTH] = h.depth || 0;
   });
+  // each room's light bit: the lowest no room within ROOM_APART metres has
+  const roomBits = [], at = b.rooms.map((r) => {
+    const o = r.openings;
+    return o.length ? [o.reduce((a, p) => a + p.x, 0) / o.length, o.reduce((a, p) => a + p.z, 0) / o.length] : [0, 0];
+  });
+  at.forEach((p, r) => {
+    let used = 0;
+    for (let q = 0; q < r; q++) if (Math.hypot(at[q][0] - p[0], at[q][1] - p[1]) < ROOM_APART) used |= roomBits[q];
+    let k = 0;
+    while (k < ROOM_BITS && used & (1 << (2 + k))) k++;
+    roomBits.push(k < ROOM_BITS ? 1 << (2 + k) : 0);
+  });
   const kit = {
-    prims, holes, np, nh,
+    prims, holes, np, nh, roomBits,
     rooms: b.rooms.map((r) => ({ open: r.open, ops: Float64Array.from(r.openings.flatMap((o) => [o.x, o.y, o.z, o.nx, o.ny, o.nz, o.area])) })),
-    torches: b.torches.map((t) => ({ ...t })),
+    torches: b.torches.map((t) => {
+      let mask = t.mask || 0;
+      for (const r of t.rooms || []) mask |= r >= 0 && r < roomBits.length ? roomBits[r] : 0;
+      return { ...t, mask };
+    }),
     yards: b.yards.map((p) => p.map((v) => [v[0], v[1]])),
     cleared: b.cleared.map((p) => p.map((v) => [v[0], v[1]])),
     box: np ? { x0, x1, z0, z1, top } : { x0: 0, x1: 0, z0: 0, z1: 0, top: -Infinity },
@@ -353,6 +385,9 @@ export function bodyBlocked(kit, x, z, lo, hi, r) {
     for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
       const o = h * H_STRIDE, hy0 = Hs[o + H.Y0], hy1 = Hs[o + H.Y1], hr = hy1 - Hs[o + H.R];
       add(hy0 + 0.01, lo, hi); add(hy0 - 0.01, lo, hi); add(hy1 + 0.01, lo, hi); add(hy1 - 0.01, lo, hi); add(hr + 0.01, lo, hi); add(hr - 0.01, lo, hi);
+      // (phase 3b: under an arch's curve, every 10 cm, so the body cannot
+      // slip into its haunch between two samples; a bridge's arches, by the bank)
+      if (Hs[o + H.TYPE] === HT.ARCH) for (let y = Math.max(hr, lo) + 0.05; y < Math.min(hy1, hi); y += 0.1) add(y, lo, hi);
     }
   }
   for (let j = 0, m = ym; j < m; j++) {
@@ -414,28 +449,28 @@ export function shelterOf(kit, r, x, y, z, nx, ny, nz) {
 // through that top there (a round tower's inside); crenels count as half.
 export function raiseOccluders(kit, occ, N, NN) {
   if (!kit || !kit.np) return;
-  const b = kit.box, S = kit.prims, Hs = kit.holes;
-  for (let z = Math.max(0, Math.floor(b.z0)); z <= Math.min(N, Math.ceil(b.z1)); z++) {
-    for (let x = Math.max(0, Math.floor(b.x0)); x <= Math.min(N, Math.ceil(b.x1)); x++) {
-      const list = near(kit, x, z, NEAR_TMP);
-      let top = -Infinity;
-      for (const i of list) {
-        const q = i * P_STRIDE, t = S[q + P.TYPE];
-        if (t === PT.PANE) continue;
-        const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
-        const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
+  // (shape by shape over its own footprint, phase 3b: the kit's box now
+  // spans the villages too; the same heights as node by node)
+  const S = kit.prims, Hs = kit.holes;
+  for (let i = 0; i < kit.np; i++) {
+    const q = i * P_STRIDE, t = S[q + P.TYPE];
+    if (t === PT.PANE) continue;
+    const R = reachOf(S, q), cx = S[q + P.CX], cz = S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
+    const cren = (S[q + P.FLAGS] & PF.CRENEL) !== 0;
+    for (let z = Math.max(0, Math.ceil(cz - R)); z <= Math.min(N, Math.floor(cz + R)); z++) {
+      for (let x = Math.max(0, Math.ceil(cx - R)); x <= Math.min(N, Math.floor(cx + R)); x++) {
+        const dx = x - cx, dz = z - cz, u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
         let y = topAt(kit, q, u, w);
-        if (y === -Infinity || y <= top) continue;
-        if (S[q + P.FLAGS] & PF.CRENEL) y = S[q + P.Y1] - S[q + P.MH] * (1 - S[q + P.MW]);
+        const j = z * NN + x;
+        if (y === -Infinity || y <= occ[j]) continue;
+        if (cren) y = S[q + P.Y1] - S[q + P.MH] * (1 - S[q + P.MW]);
         let cut = false;
         for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
           const o = h * H_STRIDE;
           if (Hs[o + H.Y1] >= S[q + P.Y1] - 1e-6 && inHole(kit, h, x, Hs[o + H.Y1] - 1e-3, z)) { cut = true; break; }
         }
-        if (!cut && y > top) top = y;
+        if (!cut && y > occ[j]) occ[j] = y;
       }
-      const j = z * NN + x;
-      if (top > occ[j]) occ[j] = top;
     }
   }
 }

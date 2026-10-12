@@ -181,8 +181,16 @@ export class Player {
   }
 
   update(dt, keys) {
-    const f0 = this.feet;
+    const f0 = this.feet, x0 = this.x, z0 = this.z;
     if (this.rules === 'world') this.updateWorld(dt, keys); else this.updateLab(dt, keys);
+    // (phase 3b) a last guard: a frame never ends with the body in a shape
+    // it was clear of when the frame began (a walk, a slide or a fall can
+    // each meet the edge of an arch's haunch or a footing a step high in a
+    // way the others did not test); it stays where it was across the ground,
+    // and drops only if that is clear
+    if (this.kit && !this.flying && (this.x !== x0 || this.z !== z0) && this.blocked(this.x, this.z, this.feet) && !this.blocked(x0, z0, f0)) {
+      if (!this.blocked(x0, z0, this.feet)) { this.x = x0; this.z = z0; } else { this.x = x0; this.z = z0; this.feet = f0; }
+    }
     // a step up or down a building's steps (not the ground's slope): the
     // eye stays where it was and catches up within about a tenth of a second
     const df = this.feet - f0;
@@ -344,10 +352,12 @@ export class Player {
       // (and where it would come to rest, if it steps off something: on
       // whatever is under any part of the body, phase 3a; so it steps off
       // an edge, the wall walk's say, once clear of it, and falls)
-      if (this.blocked(nx, nz, Math.max(g, this.feet)) || (g < this.feet - 0.05 && this.blocked(nx, nz, this.landAt(nx, nz)))) continue;
       // follow the ground down (not while rising from a jump); a drop
       // steeper than this is a fall instead
       const follow = rise > 0 || (this.vy <= 0 && -rise < Math.max(0.15, 2 * run));
+      // (phase 3b: and where the feet end up, following the ground down
+      // beside something a step high, which is above a step from there)
+      if (this.blocked(nx, nz, Math.max(g, this.feet)) || (follow && g < this.feet && this.blocked(nx, nz, g)) || (g < this.feet - 0.05 && this.blocked(nx, nz, this.landAt(nx, nz)))) continue;
       // (nor onto the edge of something a step up that the head has no room
       // to rise onto, with nothing under the body at its own height: it
       // would fall with that thing inside it)

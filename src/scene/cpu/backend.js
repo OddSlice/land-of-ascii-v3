@@ -37,7 +37,7 @@ export function createCpuBackend(world, opts = {}) {
       // nothing met yet (so a record says only what this frame found), and no
       // reflected or refracted hit until a water cell fills them
       for (let i = 0, o = 0; i < rays.cells; i++, o += HIT_STRIDE) { hits[o] = MAT_NONE; hits[o + REC] = MAT_NONE; hits[o + 2 * REC] = MAT_NONE; }
-      const torches = world.objects.torches.map((T) => ({ x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t + T.phase), mask: T.mask !== undefined ? T.mask : ZONE_ALL }));
+      const torches = world.objects.torches.map((T) => ({ x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t + T.phase), light: T.light !== undefined ? T.light : 1, mask: T.mask !== undefined ? T.mask : ZONE_ALL }));
       // (phase 3a) the buildings first, so the march stops behind them
       marcher.begin(v, rays, hits, frame, torches);
       objects.buildings(v, rays, marcher, frame, torches);

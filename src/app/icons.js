@@ -33,6 +33,10 @@ const PATHS = {
   link: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>',
   dice: `<rect x="4" y="4" width="16" height="16" rx="3"/>${dot(8.5, 8.5)}${dot(15.5, 8.5)}${dot(12, 12)}${dot(8.5, 15.5)}${dot(15.5, 15.5)}`,
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  // (phase 3b) the benchmark: a gauge, stop, copy
+  gauge: '<path d="M4.2 17.5a8.5 8.5 0 1 1 15.6 0"/><path d="M12 13.5l4-4.5"/><circle cx="12" cy="13.5" r="1.4"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="1.75"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
 };
 
 export function icon(name, size = 16) {

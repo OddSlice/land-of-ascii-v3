@@ -13,7 +13,7 @@ import { buildClouds, worldCloudList } from './sky.js';
 import { LEVELS } from './terrain.js';
 
 // the weights kept filtered for the coarser levels (as gen/world.js makes them)
-const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock', 'wYard'];
+const FILTERED = ['wWater', 'wRoad', 'wSand', 'wSnow', 'wRock', 'wYard', 'wField'];
 
 const TREE_F = 15;        // numbers per tree in the tree table
 const BUSH_F = 6;
@@ -35,7 +35,7 @@ export function packWorld(world, Shared = null) {
   if (T.farCode) put('farCode', T.farCode);
   if (T.shoreSq) put('shoreSq', T.shoreSq);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
-  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard']) put(k, T[k]);
+  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard', 'wField', 'fieldKind', 'fieldId', 'fieldTable', 'wPath', 'wWear', 'roof']) if (T[k]) put(k, T[k]);
   for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
   // trees: a table of numbers, and their tiers in one pool
   const trees = world.objects.trees;
@@ -56,8 +56,9 @@ export function packWorld(world, Shared = null) {
   const meta = {
     kind: 'world', seed: world.seed, N: world.N, NN: world.NN, viewDist: world.viewDist, sea: world.sea, center: world.center,
     toneK: T.toneK, maxH: T.maxH, pool,
-    // (phase 3a) the fort, as the kit's description: every thread compiles it again
-    fortDesc: world.fortDesc,
+    // (phase 3a) the fort, as the kit's description: every thread compiles it
+    // again; (phase 3b) the villages' and the bridges' pieces with it, in kitDesc
+    fortDesc: world.fortDesc, kitDesc: world.kitDesc || world.fortDesc,
     sites: world.sites, cameras: world.cameras, start: world.start,
     roads: world.roads.map((r) => ({ id: r.id, to: r.to, n: r.n, x: Array.from(r.x), z: Array.from(r.z), y: Array.from(r.y) })),
     rivers: world.rivers.map((r) => ({ n: r.n, x: Array.from(r.x), z: Array.from(r.z), level: Array.from(r.level), hw: Array.from(r.hw), lake: Array.from(r.lake) })),
@@ -85,6 +86,7 @@ export function unpackWorld(packed) {
   const terrain = {
     N, NN, ground: a.ground, levels, wWater: a.wWater, wRoad: a.wRoad, wSand: a.wSand, wRock: a.wRock, wSnow: a.wSnow,
     wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH, wYard: a.wYard,
+    wField: a.wField || null, fieldKind: a.fieldKind || null, fieldId: a.fieldId || null, fieldTable: a.fieldTable || null, wPath: a.wPath || null, wWear: a.wWear || null, roof: a.roof || null,
     form: a.form || null, shore: a.shore || null, farCode: a.farCode || null, shoreSq: a.shoreSq || null,
   };
   for (const k of FILTERED) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
@@ -104,12 +106,12 @@ export function unpackWorld(packed) {
   }
   const spans = emptySpans();
   const kb = new KitBuilder();
-  buildStructure(kb, m.fortDesc);
+  buildStructure(kb, m.kitDesc || m.fortDesc);
   const kit = compileKit(kb);
   const f32 = (r, keys) => { const o = { ...r }; for (const k of keys) o[k] = Float32Array.from(r[k]); return o; };
   return {
     kind: 'world', seed: m.seed, N, NN, center: m.center, viewDist: m.viewDist, openEdge: true, sea: m.sea,
-    terrain, spans, kit, fortDesc: m.fortDesc, objects: { trees, bushes, torches: kit.torches.map((t) => ({ ...t })), water: m.sea },
+    terrain, spans, kit, fortDesc: m.fortDesc, kitDesc: m.kitDesc, objects: { trees, bushes, torches: kit.torches.map((t) => ({ ...t })), water: m.sea },
     clouds: buildClouds(0, worldCloudList(m.seed, N)),
     sites: m.sites, cameras: m.cameras, start: m.start,
     roads: m.roads.map((r) => f32(r, ['x', 'z', 'y'])),

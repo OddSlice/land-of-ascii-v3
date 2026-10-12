@@ -180,8 +180,113 @@ export function joinRoads(roads) {
   }
 }
 
+// (phase 3b) Bridges where the roads cross rivers: each run of a road's
+// points over river water, from bank to bank, becomes a bridge, a timber
+// one on posts for a narrow crossing (up to V_TIMBER metres of water) and a
+// stone one with one to three arches for a wide one. The road's height is
+// lifted over it (a timber deck `clear` over the water, a stone bridge's
+// level road high enough for its arches) and ramps down to the land either
+// side no steeper than the road's steepest; its points over the bridge are
+// marked (`bridged`), so laying the road leaves the river's bed alone.
+// Returns the bridges: { road, q0, q1, style, arches, water, bed, pts }.
+const V_TIMBER = 8;
+export function bridgeRoads(N, roads, kind, level, H) {
+  const NN = N + 1, Bg = SCALE.kit.bridge, out = [];
+  roads.forEach((rd, ri) => {
+    rd.bridged = new Uint8Array(rd.n);
+    // (any water: a road that crosses a river where it meets a lake clips the lake too)
+    const wet = (q) => { const j = Math.round(rd.z[q]) * NN + Math.round(rd.x[q]); return kind[j] !== KIND.NONE; };
+    // the runs over water, joined where they are only a few metres apart (one bridge)
+    const runs = [];
+    for (let q = 0; q < rd.n; q++) {
+      if (!wet(q)) continue;
+      let e = q;
+      for (let k = q + 1; k < rd.n && k <= e + 7; k++) if (wet(k)) e = k;
+      runs.push([q, e]);
+      q = e;
+    }
+    const spans = runs.map(([q, e]) => {
+      const a = Math.max(0, q - 3), b = Math.min(rd.n - 1, e + 3), width = e - q + 1;
+      let water = -Infinity, bed = Infinity, bank = -Infinity;
+      for (let k = q; k <= e; k++) { const j = Math.round(rd.z[k]) * NN + Math.round(rd.x[k]); if (kind[j] !== KIND.NONE) { water = Math.max(water, level[j]); bed = Math.min(bed, H[j]); } }
+      for (const k of [a, b]) bank = Math.max(bank, H[Math.round(rd.z[k]) * NN + Math.round(rd.x[k])]);
+      const style = width <= V_TIMBER ? 'timber' : 'stone';
+      const arches = style === 'stone' ? (width <= 12 ? 1 : width <= 22 ? 2 : 3) : 0;
+      // the road over it: a timber deck at least `clear` over the water; a
+      // stone bridge level, high enough for its arches over the water
+      const need = style === 'timber' ? water + Bg.clear + Bg.deck : Math.max(bank, water + Math.min(3.2, 1.2 + width / (2 * Math.max(1, arches)) * 0.45) + Bg.deck);
+      return { a, b, width, water, bed, style, arches, need };
+    });
+    // (straight over each: a stone bridge is one straight body)
+    for (const sp of spans) {
+      const ax = rd.x[sp.a], az = rd.z[sp.a], bx = rd.x[sp.b], bz = rd.z[sp.b];
+      for (let k = sp.a + 1; k < sp.b; k++) { const t = (k - sp.a) / (sp.b - sp.a); rd.x[k] = ax + (bx - ax) * t; rd.z[k] = az + (bz - az) * t; }
+    }
+    // lift the road over each, then the ramps down to the land either side
+    for (const sp of spans) {
+      let top = sp.need;
+      if (sp.style === 'stone') for (let k = sp.a; k <= sp.b; k++) top = Math.max(top, rd.y[k]);
+      for (let k = sp.a; k <= sp.b; k++) { rd.y[k] = sp.style === 'stone' ? top : Math.max(rd.y[k], sp.need); rd.bridged[k] = 1; }
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k = 1; k < rd.n; k++) if (!rd.bridged[k] && rd.y[k - 1] - rd.y[k] > LIM) rd.y[k] = rd.y[k - 1] - LIM;
+      for (let k = rd.n - 2; k >= 0; k--) if (!rd.bridged[k] && rd.y[k + 1] - rd.y[k] > LIM) rd.y[k] = rd.y[k + 1] - LIM;
+    }
+    // (the decks from the road's final heights)
+    for (const sp of spans) {
+      const pts = [];
+      for (let k = sp.a; k <= sp.b; k += sp.style === 'stone' ? Math.max(1, sp.b - sp.a) : 2) pts.push([rd.x[k], rd.z[k], rd.y[k] - 0.1]);
+      if (pts.length < 2 || pts[pts.length - 1][0] !== rd.x[sp.b]) pts.push([rd.x[sp.b], rd.z[sp.b], rd.y[sp.b] - 0.1]);
+      out.push({ road: ri, q0: sp.a, q1: sp.b, style: sp.style, arches: sp.arches, water: sp.water, bed: sp.bed, width: sp.width, pts });
+    }
+  });
+  return out;
+}
+
+// (phase 3b) After the bridges have lifted their roads: a road that joins
+// another near a bridge is eased onto that road's height there again, as
+// joinRoads did, but leaving the bridges as they are.
+export function rejoinRoads(roads) {
+  for (let r = 1; r < roads.length; r++) {
+    const rd = roads[r], e = rd.n - 1;
+    let best = Infinity, yj = rd.y[e];
+    for (let o = 0; o < roads.length; o++) {
+      if (o === r) continue;
+      const ro = roads[o];
+      for (let q = 0; q < ro.n; q++) { const d = Math.hypot(ro.x[q] - rd.x[e], ro.z[q] - rd.z[e]); if (d < best) { best = d; yj = ro.y[q]; } }
+    }
+    const dy = yj - rd.y[e];
+    if (best > 3 || Math.abs(dy) < 0.02) continue;
+    const L = Math.min(e, Math.max(40, Math.ceil(Math.abs(dy) / (0.5 * SCALE.road.maxSlope))));
+    for (let q = e - L; q <= e; q++) if (!rd.bridged || !rd.bridged[q]) rd.y[q] += dy * smoothstep(e - L, e, q);
+  }
+}
+
+// (phase 3b) Two roads that cross (on the search's 4 m grid two diagonal
+// steps can cross without sharing a node) meet at one height there: each
+// is eased to the middle of the two over a stretch long enough to stay
+// within half the roads' steepest.
+export function meetRoads(roads) {
+  for (let a = 0; a < roads.length; a++) for (let b = a + 1; b < roads.length; b++) {
+    const A = roads[a], B = roads[b];
+    let bi = -1, bk = -1, bd = 2.5;
+    for (let i = 0; i < A.n; i++) for (let k = 0; k < B.n; k++) {
+      if (Math.abs(A.x[i] - B.x[k]) > bd || Math.abs(A.z[i] - B.z[k]) > bd) continue;
+      const d = Math.hypot(A.x[i] - B.x[k], A.z[i] - B.z[k]);
+      if (d < bd && Math.abs(A.y[i] - B.y[k]) > 0.6) { bd = d; bi = i; bk = k; }
+    }
+    if (bi < 0) continue;
+    const mid = (A.y[bi] + B.y[bk]) / 2;
+    for (const [R, c] of [[A, bi], [B, bk]]) {
+      const dy = mid - R.y[c], L = Math.max(20, Math.ceil(Math.abs(dy) / (0.5 * SCALE.road.maxSlope)));
+      for (let q = Math.max(0, c - L); q <= Math.min(R.n - 1, c + L); q++) R.y[q] += dy * (1 - smoothstep(0, L, Math.abs(q - c)));
+    }
+  }
+}
+
 // Press the roads into the ground (H, in place) and paint them (wRoad). Water
-// nodes keep their bed: a road crosses a river through the ford.
+// nodes keep their bed: a road crosses a river through the ford (or, phase
+// 3b, over a bridge, which leaves the bed alone).
 export function layRoads(N, H, kind, level, roads) {
   const NN = N + 1, cells = NN * NN, half = SCALE.road.width / 2, R = half + 4.5;
   const best = new Float32Array(cells).fill(Infinity), near = new Int32Array(cells).fill(-1);
@@ -189,7 +294,7 @@ export function layRoads(N, H, kind, level, roads) {
   roads.forEach((rd, ri) => {
     for (let q = 0; q < rd.n; q++) {
       const p = all.length;
-      all.push([rd.x[q], rd.z[q], rd.y[q]]);
+      all.push([rd.x[q], rd.z[q], rd.y[q], rd.bridged ? rd.bridged[q] : 0]);
       const x = rd.x[q], z = rd.z[q];
       for (let k = Math.max(0, Math.floor(z - R)); k <= Math.min(N, Math.ceil(z + R)); k++) {
         for (let i = Math.max(0, Math.floor(x - R)); i <= Math.min(N, Math.ceil(x + R)); i++) {
@@ -209,7 +314,7 @@ export function layRoads(N, H, kind, level, roads) {
     wRoad[j] = Math.round(255 * (1 - smoothstep(half - 0.35, half + 0.35, r)));
     if (kind[j] !== KIND.NONE) {
       // a ford: the river's bed rises to wading depth across the road
-      if (kind[j] === KIND.RIVER && r < half + 2.5) H[j] = Math.max(H[j], level[j] - SCALE.river.ford * 0.7);
+      if (kind[j] === KIND.RIVER && r < half + 2.5 && !all[p][3]) H[j] = Math.max(H[j], level[j] - SCALE.river.ford * 0.7);
       continue;
     }
     const w = r <= half + 0.6 ? 1 : smoothstep(R, half + 0.6, r);
@@ -221,6 +326,7 @@ export function layRoads(N, H, kind, level, roads) {
   for (let pass = 0; pass < 3; pass++) {
     for (let j = NN; j < cells - NN; j++) {
       if (near[j] < 0 || kind[j] !== KIND.NONE) continue;
+      if (all[near[j]][3]) continue;
       for (const q of [j - 1, j + 1, j - NN, j + NN]) {
         if (kind[q] === KIND.RIVER && level[q] > H[j] + 0.02) { kind[j] = KIND.RIVER; level[j] = level[q]; break; }
       }
