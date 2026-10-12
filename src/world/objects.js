@@ -22,11 +22,10 @@ export function groundAt(T, x, z) {
 export const TIER = 9;
 
 // A conifer from its identity `s`: everything about its shape comes from it.
-// It carries both treatments' tiers, so the look can be switched live.
 // `narrow` scales the crown: trees grown close together are narrower.
 export function conifer(x, z, base, s, tall = 1, narrow = 1) {
   const r = (n) => hash2(s, n, SEED + 31);
-  const P = LOOK.trees, PB = P.B;
+  const P = LOOK.trees;
   const lerp = ([a, b], f) => a + (b - a) * f;
   const h = lerp(P.height, r(1)) * tall * (r(11) < P.emergent[0] ? P.emergent[1] : 1);
   const R = lerp(P.crown, r(2)) * narrow;
@@ -35,26 +34,19 @@ export function conifer(x, z, base, s, tall = 1, narrow = 1) {
   const la = r(7) * Math.PI * 2, lean = P.lean * r(6);
   const span = h - c0;
   const env = (f) => R * Math.pow(1 - f, 0.9) + 0.22;
-  const A = [], B = [];
+  const A = [];
   for (let t = 0; t < T; t++) {
     const f0 = t / T, f1 = Math.min(1, (t + 1.5) / T);
     const ya = base + c0 + f0 * span, yb = base + c0 + f1 * span;
     const last = t === T - 1;
     A.push(ya, yb, env(f0) * (0.92 + 0.16 * r(10 + t)), last ? 0.1 : env(f0) * 0.3, 0, 0, -1, 0, yb);
-    // B: uneven reach, shifted off the axis, some cut short, some notched
-    const cut = !last && r(50 + t) < PB.gaps ? 0.35 + 0.25 * r(55 + t) : 1;
-    const off = R * PB.asym * r(80 + t), oa = r(90 + t) * Math.PI * 2;
-    const notch = r(100 + t) < PB.notches;
-    B.push(ya, yb, env(f0) * (0.76 + 0.44 * r(60 + t)), last ? 0.1 : env(f0) * (0.22 + 0.22 * r(70 + t)),
-      Math.cos(oa) * off, Math.sin(oa) * off, notch ? r(105 + t) * PB.sectors : -1, notch ? 0.45 + 0.4 * r(110 + t) : 0,
-      ya + (yb - ya) * cut);
   }
   return {
     x, z, base, top: base + h, R: R + 0.4, trunkTop: base + c0 + 0.6,
     trunkR: lerp(P.trunk, r(5)), tierH: 1.5 * span / T,
     leanX: Math.cos(la) * lean, leanZ: Math.sin(la) * lean,
     tone: r(8) * 2 - 1, bark: r(9) * 2 - 1,
-    tiers: Float32Array.from(A), tiersB: Float32Array.from(B), seed: s,
+    tiers: Float32Array.from(A), seed: s,
   };
 }
 

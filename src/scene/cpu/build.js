@@ -20,13 +20,24 @@
 //   three rows tall;
 // - a window's light is held at two rows, faded by how much of that it
 //   really is, as a flame is;
-// - masonry joints, timber framing, shingle courses and paving fade with a
+// - the masonry's course joints darken a cell by how much of it they
+//   cover, and fade once a course is under two and a half rows; the joints
+//   between blocks, timber framing, shingle courses and paving fade with a
 //   cell's footprint before they can blink (in primShade);
 // - a reveal (an opening's or a merlon's side) under about two and a half
 //   cells wide takes the light of the face it is cut into.
 import { MAT, MAT_SHELTER, HIT_STRIDE, REC } from '../../contract.js';
+import { LOOK } from '../../look.js';
 import { PT, HT, PF, TX, P, H, P_STRIDE, H_STRIDE, zoneAt, roomBit, shelterOf, inMerlon } from '../../world/kit.js';
 
+// The share of a footprint f wide, centred at u, that falls on joints w wide
+// centred on every multiple of P: the joint pattern box-filtered over the cell.
+function jointCover(u, P, w, f) {
+  const hw = w / 2, e = P - hw;
+  const I = (x) => { const n = Math.floor(x / P), r = x - n * P; return n * w + (r < hw ? r : hw) + (r > e ? r - e : 0); };
+  return (I(u + f / 2) - I(u - f / 2)) / f;
+}
+const SOFT = LOOK.materials.stone.tone / LOOK.materials.masonry.tone;
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const NEAR = 0.05;
 const MAXH = 24;
@@ -476,16 +487,23 @@ const methods = {
     }
     const seed = S[q + P.SEED];
     if (tex === TX.MASONRY && hit.kind === 0) {
-      // courses 0.55 m high, blocks 1.1 m long, offset every course; joints
-      // and block-to-block variation fade before they get thinner than two cells
-      const cy = (y - S[q + P.BASE]) / 0.55, row = Math.floor(cy);
-      const cu = (tu + (row & 1) * 0.55) / 1.1, col = Math.floor(cu);
-      const ju = Math.min(cu - col, 1 - (cu - col)) * 1.1, jy = Math.min(cy - row, 1 - (cy - row)) * 0.55;
-      const jw = 0.05 + fp * 0.8;
-      const joint = (ju < jw || jy < jw) ? 1 : 0;
-      const block = ((Math.imul(row * 73856093 ^ col * 19349663 ^ seed * 83492791, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
-      const kJoint = 1 - smooth(0.035, 0.09, fp), kBlock = 1 - smooth(0.06, 0.2, fp);
-      tone = -0.9 * joint * kJoint + 0.35 * block * kBlock;
+      // courses 0.55 m high, blocks 1.1 m long, offset every course (after
+      // phase 3a). The courses' joints are drawn dark, at least about a row
+      // wide, darkening each cell by how much of it they cover, so they
+      // slide across the cells as you move instead of blinking; they stay
+      // while a course is at least two and a half rows tall, fading out by
+      // one and a half (a row is twice a column), and further off the wall
+      // keeps their average darkness. The joints between blocks, which
+      // walking sweeps sideways across the cells, are drawn only near (they
+      // fade before they get thinner than two cells), and the blocks are
+      // one tone: further out, either blinked more than the lab's wall.
+      const fy = D * len * len * v.rowAngle;
+      const by = y - S[q + P.BASE], row = Math.floor(by / 0.55);
+      const kv = smooth(1.5, 2.5, 0.55 / fy);
+      const jy = kv > 0 ? kv * jointCover(by, 0.55, Math.min(0.21, Math.max(0.05, 0.9 * fy)), fy) : 0;
+      const cu = (tu + (row & 1) * 0.55) / 1.1, fu = cu - Math.floor(cu);
+      const head = Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
+      tone = -jy - (1 - jy) * 0.85 * head - 0.3 * (1 - kv);
     } else if (tex === TX.FLAGS || (tex === TX.MASONRY && hit.kind !== 0)) {
       // paving: slabs about 0.9 m square, fixed to the world
       const fx = x / 0.9, fz = z / 0.9 + (Math.floor(x / 0.9) & 1) * 0.5;
@@ -529,6 +547,9 @@ const methods = {
       // plain: a faint grain fixed to the world
       tone = 0.15 * (((Math.imul(Math.floor(x * 1.7) * 73856093 ^ Math.floor(y * 1.7) * 19349663 ^ Math.floor(z * 1.7) * 83492791, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.15, 0.5, fp));
     }
+    // (the fort's dressed stone darkens more with tone than other stone, for
+    // its joints: its paving and plain faces keep the stone's own strength)
+    if (mat === MAT.MASONRY && !(tex === TX.MASONRY && hit.kind === 0)) tone *= SOFT;
     // a reveal (an opening's side, a merlon's side) seen nearly edge on is a
     // sliver: under about two and a half cells wide it takes the light of the
     // face it is cut into, so it cannot blink as it narrows and widens

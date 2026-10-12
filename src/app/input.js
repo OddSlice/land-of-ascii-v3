@@ -7,6 +7,14 @@ import { LOOK } from '../look.js';
 // start card is up) the game takes no other key and no mouse look, so typing
 // in the menu never moves anything. `sensitivity` and `invert` are the
 // menu's mouse choices.
+//
+// (after phase 3a) Chromium is asked for the mouse's raw movement while it
+// holds the mouse (pointer lock with `unadjustedMovement`): with the
+// system's pointer acceleration in the way, Chromium on Windows now and
+// then reports one movement of hundreds of pixels while the mouse is
+// moved fast, and the view skipped. Where raw movement is refused the
+// plain lock is taken, and either way a lone jump far bigger than the
+// movements just before it is dropped (MoveFilter).
 export class Input {
   constructor(target, actions) {
     this.keys = {};
@@ -18,6 +26,7 @@ export class Input {
     this.blocked = () => false;
     this.sensitivity = 1;
     this.invert = false;
+    this.filter = new MoveFilter();
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' || e.key === 'Escape') { if (!e.repeat && actions.escape) actions.escape(e); return; }
       if (this.blocked()) return;
@@ -32,17 +41,15 @@ export class Input {
       if (e.button !== 0 || this.blocked()) return;
       this.dragging = true;
       this.lastX = e.clientX; this.lastY = e.clientY;
-      if (!this.locked && target.requestPointerLock) {
-        try {
-          const p = target.requestPointerLock();
-          if (p && p.catch) p.catch(() => {});
-        } catch { /* refused: dragging still looks */ }
-      }
+      this.capture();
     });
     addEventListener('mouseup', () => { this.dragging = false; });
     addEventListener('mousemove', (e) => {
       if (this.blocked()) return;
-      if (this.locked) { this.look.dx += e.movementX; this.look.dy += e.movementY; return; }
+      if (this.locked) {
+        if (this.filter.take(e.movementX, e.movementY, e.timeStamp)) { this.look.dx += e.movementX; this.look.dy += e.movementY; }
+        return;
+      }
       // dragging: from the cursor's own positions (some engines report no movementX)
       if (this.dragging) {
         this.look.dx += e.clientX - this.lastX; this.look.dy += e.clientY - this.lastY;
@@ -52,6 +59,7 @@ export class Input {
     document.addEventListener('pointerlockchange', () => {
       const was = this.locked;
       this.locked = document.pointerLockElement === target;
+      this.filter.reset();
       if (was && !this.locked && actions.unlocked) actions.unlocked();
     });
     document.addEventListener('pointerlockerror', () => { this.locked = false; });
@@ -73,6 +81,7 @@ export class Input {
       case 'KeyL': a.toggleLook(); break;
       case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
       case 'KeyM': if (a.toggleMap) a.toggleMap(); break;
+      case 'Space': if (a.jump) a.jump(); break;
       default: {
         // the look panel's keys (LOOK.choices)
         for (const [name, c] of Object.entries(LOOK.choices)) if (e.code === `Digit${c.key}`) a.cycleLook(name);
@@ -83,10 +92,17 @@ export class Input {
     }
   }
 
-  // Take the mouse for looking (needs a click or key press to have just happened).
+  // Take the mouse for looking (needs a click or key press to have just
+  // happened): its raw movement where the browser gives it, else the plain
+  // lock; refused, dragging still looks.
   capture() {
-    if (this.locked || !this.target.requestPointerLock) return;
-    try { const p = this.target.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* refused: dragging still looks */ }
+    const t = this.target;
+    if (this.locked || !t.requestPointerLock) return;
+    const plain = () => { try { const p = t.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* refused */ } };
+    try {
+      const p = t.requestPointerLock({ unadjustedMovement: true });
+      if (p && p.catch) p.catch((err) => { if (err && err.name === 'NotSupportedError') plain(); });
+    } catch { plain(); }
   }
 
   // Forget held keys and mouse movement (the menu has opened).
@@ -102,5 +118,24 @@ export class Input {
     if (this.keys.ArrowUp) pitch += 1.1 * dt;
     if (this.keys.ArrowDown) pitch -= 1.1 * dt;
     return { yaw, pitch };
+  }
+}
+
+// Drops a lone mouse movement far bigger than those just before it (the
+// largest in the last `WINDOW` ms): more than `JUMP` pixels and `RATIO`
+// times that. A real fast flick builds up over several movements, so it
+// passes; and a dropped one is remembered, so a second big one right after
+// it passes too.
+const WINDOW = 80, JUMP = 150, RATIO = 6;
+export class MoveFilter {
+  constructor() { this.reset(); }
+  reset() { this.t = new Float64Array(8); this.m = new Float64Array(8); this.k = 0; }
+  // true: use this movement
+  take(dx, dy, now) {
+    const m = Math.max(Math.abs(dx), Math.abs(dy));
+    let recent = 0;
+    for (let i = 0; i < 8; i++) if (now - this.t[i] <= WINDOW && this.m[i] > recent) recent = this.m[i];
+    this.t[this.k] = now; this.m[this.k] = m; this.k = (this.k + 1) & 7;
+    return !(m > JUMP && m > RATIO * Math.max(recent, 4));
   }
 }

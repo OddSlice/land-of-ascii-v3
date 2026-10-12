@@ -134,11 +134,11 @@ try {
   check('invert vertical look: on takes effect', s.invert === true);
 
   // ---- the menu holds the game ----
-  const t0 = (await st(page)).t;
+  const { t: t0, hour: h0 } = await st(page);
   await page.keyboard.press('KeyW'); await page.keyboard.press('Digit3');
   await page.waitForTimeout(500);
   s = await st(page);
-  check('while open the clock stands still and game keys do nothing', s.t === t0 && s.hour === 14 && s.menu, `t ${t0} -> ${s.t}, hour ${s.hour}`);
+  check('while open the clock stands still and game keys do nothing', s.t === t0 && s.hour === h0 && s.menu, `t ${t0} -> ${s.t}, hour ${h0} -> ${s.hour}`);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   s = await st(page);
@@ -148,7 +148,7 @@ try {
   await page.keyboard.press('Digit2');
   await page.waitForTimeout(100);
   s = await st(page);
-  check('closed, the game has its keys back (2: dusk)', Math.abs(s.hour - 17.85) < 1e-9, `${s.hour}`);
+  check('closed, the game has its keys back (2: dusk)', Math.abs(s.hour - 17.85) < 1e-3, `${s.hour}`);
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
   await page.mouse.click(30, 450);
   await page.waitForTimeout(300);
@@ -166,7 +166,7 @@ try {
   check('after a reload the start card stays away (seen once)', !s.m.card);
   check('after a reload the Display choices are back', s.preset === 1 && s.glyphs === false && s.m.hud === 'full' && Math.abs(s.sensitivity - 1.5) < 1e-9 && s.invert === true,
     `density ${s.preset + 1}, glyphs ${s.glyphs}, statistics ${s.m.hud}, sensitivity ${s.sensitivity}, invert ${s.invert}`);
-  check('after a reload the seed, the time and the weather are the default ones', s.hour === 14 && s.weather === 'auto' && (await page.evaluate(() => window.lab.seed)) === 3, `hour ${s.hour}, weather ${s.weather}`);
+  check('after a reload the seed, the time and the weather are the default ones', Math.abs(s.hour - 14) < 0.01 && s.weather === 'auto' && (await page.evaluate(() => window.lab.seed)) === 3, `hour ${s.hour}, weather ${s.weather}`);
   await lab.check();
   await lab.ctx.close();
 

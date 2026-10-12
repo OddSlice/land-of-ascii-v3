@@ -28,7 +28,7 @@ export function serve(root = ROOT, { isolated = true } = {}) {
   });
 }
 
-// "tree=B,cloud=B" -> { tree: 'B', cloud: 'B' }
+// "cloud=B,meadow=1" -> { cloud: 'B', meadow: '1' }
 export function parseLook(s) {
   return s ? Object.fromEntries(String(s).split(',').filter(Boolean).map((kv) => kv.split('='))) : null;
 }

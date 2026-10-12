@@ -38,7 +38,7 @@ import { moonLit } from './world/sky.js';
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const DEG = Math.PI / 180;
-const CLOCK_RATE = 1 / 60;      // T: one game hour per real minute
+const CLOCK_RATE = 1 / 3600;    // real time: one game hour per real hour (after phase 3a the default)
 
 const STRESS = params.get('stress') === '1';
 const YARD = !STRESS && params.get('yard') === '1';
@@ -66,7 +66,7 @@ const state = {
   // the day count (?day=), which the moon's phase follows; it moves on as
   // the clock passes midnight
   day: params.has('day') ? (parseInt(params.get('day'), 10) || 0) : LOOK.moon.startDay,
-  running: false,            // T: time of day moves
+  running: true,             // T: time of day moves (at real time from the start, after phase 3a)
   rate: CLOCK_RATE,          // how fast it moves, game hours a second (the menu)
   frozen: false,             // lab.freeze: every clock stands still
   held: false,               // lab.setCamera with a height: no walking or falling
@@ -191,9 +191,9 @@ addEventListener('resize', relayout);
 function standAt(x, z, yawDeg, pitchDeg, eyeY) {
   player.place(x, z, yawDeg * DEG, pitchDeg * DEG, eyeY !== undefined ? eyeY - EYE : undefined);
 }
+// (the clock goes on running from there, if it was)
 function setTime(name) {
   state.hour = LOOK.hours[name];
-  state.running = false;
 }
 function useCamera(i) {
   const c = CAMS[i];
@@ -214,6 +214,7 @@ const input = new Input(canvas, {
   time: setTime,
   toggleClock: () => { state.running = !state.running; state.frozen = false; },
   nextCamera: () => useCamera((state.cam + 1) % CAMS.length),
+  jump: () => player.jump(),
   toggleGlyphs: () => setDisplay('glyphs', !display.glyphs),
   // R: in the lab, the reference frame (the stress scene has none); in the
   // world, a new world from a new seed (the page reloads with it, so the

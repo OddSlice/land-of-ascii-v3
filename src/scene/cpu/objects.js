@@ -32,10 +32,10 @@ const CS = new Float64Array(24);          // a box's corners in view space
 const NEAR = 0.01;
 const BUCKET = 64;
 const TREE = 0, BUSH = 1, TORCH = 2, PRIM = 3;
-const TA = LOOK.trees.A, TB = LOOK.trees.B, TF = LOOK.trees.trunkFade, TL = LOOK.trees.tierLight;
+const TT = LOOK.trees, TF = TT.trunkFade, TL = TT.tierLight;
 
-// How far a treatment's tiers can reach from the trunk: the lean, the shift
-// off the axis and the ragged edge at its widest.
+// How far a conifer's tiers can reach from the trunk: the lean and the
+// ragged edge at its widest.
 function treeReach(t, tiers, jag) {
   let r = t.R;
   for (let k = 0; k < tiers.length; k += TIER) {
@@ -57,11 +57,11 @@ export class ObjectPass {
     // every object as one list, with its bounds
     const list = [];
     const { trees, bushes, torches } = world.objects;
-    // a conifer's reach under either treatment (culling allows for both)
-    for (const t of trees) { t.reachA = treeReach(t, t.tiers, TA.jag); t.reachB = treeReach(t, t.tiersB, TB.jag); }
+    // a conifer's reach
+    for (const t of trees) t.reach = treeReach(t, t.tiers, TT.jag);
     // `grow`: how many cell widths (at the object's distance) its floors can
     // add to its size; a flame's floor is two rows, about four widths
-    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: Math.max(t.reachA, t.reachB), y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
+    trees.forEach((t) => list.push({ kind: TREE, o: t, x: t.x, z: t.z, R: t.reach, y0: t.base - 0.4, y1: t.top + 0.2, grow: 1, up: 0 }));
     bushes.forEach((b) => list.push({ kind: BUSH, o: b, x: b.x, z: b.z, R: b.rx, y0: b.base - 0.2, y1: b.base + b.ry * 1.6, grow: 1, up: 0 }));
     torches.forEach((T, i) => list.push({ kind: TORCH, o: T, x: T.x, z: T.z, R: 0.4, y0: T.base, y1: T.flameY + 0.5, ti: i, grow: 2.3, up: 1 }));
     // (phase 3a) the building kit's shapes, each an object of its own
@@ -124,7 +124,6 @@ export class ObjectPass {
     const mk = wp.rain > 0 ? 1 - (1 - LOOK.weather.rain.mirror.objects) * wp.rain : 1;
     this.objCap = this.world.openEdge ? LOOK.water.objectsCap * mk : Infinity;
     this.objFar = this.world.openEdge ? LOOK.water.objectsFar * mk : this.world.viewDist;
-    this.treat = frame.look && frame.look.tree === 'B' ? 'B' : 'A';
     this.wp = wp;
   }
 
@@ -185,8 +184,8 @@ export class ObjectPass {
     this.margin = 0;
   }
 
-  // How far an object reaches from its axis (a conifer, under the treatment in use).
-  reachOf(it) { return it.kind === TREE ? (this.treat === 'B' ? it.o.reachB : it.o.reachA) : it.R; }
+  // How far an object reaches from its axis.
+  reachOf(it) { return it.R; }
 
   // Screen box of a box of world space, clipped to this stripe; false if
   // none of it shows. Fills this.bb = [cxa, cxb, cya, cyb]. A box reaching
@@ -433,49 +432,42 @@ export class ObjectPass {
     m.write(ci, slot, hit.mat, lam, shadow, cloud, glow, tone, leg);
   }
 
-  // Foliage tone: the tree's own and the height in its tier; B adds clumps
-  // (by tier and sector round it), which melt away with the ragged edge.
+  // Foliage tone: the tree's own and the height in its tier.
   foliageTone() {
-    const { hit, cp } = this, t = hit.tree;
-    let tone = 0.3 * t.tone + 0.55 * (hit.f * 2 - 1);
-    if (cp.B) {
-      // smoothly joined between sectors, so a clump has no hard edge
-      const as = (Math.atan2(hit.hz, hit.hx) / (Math.PI * 2) + 0.5) * TB.clumps, s0 = Math.floor(as), sf = as - s0;
-      const clump = (hash2(hit.tier * 31 + s0, t.seed, 13) * (1 - sf) + hash2(hit.tier * 31 + s0 + 1, t.seed, 13) * sf) * 2 - 1;
-      tone = 0.25 * t.tone + 0.45 * (hit.f * 2 - 1) + TB.clump * clump * cp.jagK;
-    }
+    const t = this.hit.tree;
+    const tone = 0.3 * t.tone + 0.55 * (this.hit.f * 2 - 1);
     return tone < -1 ? -1 : tone > 1 ? 1 : tone;
   }
 
   // A conifer: a bare trunk under a stack of overlapping cone tiers, each
   // wide at its foot and narrow at its top (a sawtooth outline), with a
-  // ragged edge that turns with the angle round the trunk. Treatment B also
-  // shifts tiers off the axis, cuts some short and notches some.
+  // ragged edge that turns with the angle round the trunk (the tidy tiers:
+  // after phase 3a the only treatment).
   //
   // Distance: no part may get thinner than about two cells, except a tip,
   // which tapers to one cell, so a far treeline keeps a jagged top of single
-  // tips; under about two rows a tier melts into a smooth cone, and B's
-  // gaps, notches and shifts close up before they get under two cells.
+  // tips; under about two rows a tier melts into a smooth cone.
   //
   // Everything that depends only on the vertical plane of the ray (how near
   // it passes each tier, the ragged radii) is worked out once per plane;
   // coniferRay then intersects one ray of that plane.
   coniferPlane(t, dx, dz, minR, far, rowH) {
     const { v, cp } = this;
-    const B = this.treat === 'B', P = B ? TB : TA;
-    const tiers = B ? t.tiersB : t.tiers, T = tiers.length / TIER;
+    const P = TT;
+    const tiers = t.tiers, T = tiers.length / TIER;
     const ox = v.ex - t.x, oz = v.ez - t.z;
     const D0 = -(ox * dx + oz * dz);
     const b2 = ox * ox + oz * oz - D0 * D0;
-    const Rmax = (B ? t.reachB : t.reachA) + minR;
+    const Rmax = t.reach + minR;
     cp.ox = ox; cp.oz = oz; cp.dx = dx; cp.dz = dz; cp.D0 = D0; cp.b2 = b2; cp.Rmax = Rmax; cp.minR = minR;
-    cp.tiers = tiers; cp.T = T; cp.far = far; cp.B = B;
+    cp.tiers = tiers; cp.T = T; cp.far = far;
     cp.miss = b2 > Rmax * Rmax || D0 + Rmax < 0;
     if (cp.miss) return;
     // the ragged edge fades once a sector round the trunk is under ~3 cells across
     const jagK = smooth(1.5, 3.5, (Math.PI * 2 * (t.R - 0.4) / P.sectors) / Math.max(minR, 1e-6));
     cp.jagK = jagK;
-    // where each tier's axis is: the lean, and B's shift (which closes up with distance)
+    // where each tier's axis is: the lean (and a tier's own shift, none in
+    // the tidy tiers, which would close up with distance)
     const shiftK = 1 - 0.7 * far;
     for (let k = 0; k < T; k++) {
       const q = k * TIER, ym = (tiers[q] + tiers[q + 1]) / 2 - t.base;
@@ -494,8 +486,6 @@ export class ObjectPass {
       ang = (Math.atan2(az, ax) / (Math.PI * 2) + 0.5) * S;
       a0 = Math.floor(ang); af = ang - a0;
     }
-    // a notch closes up once it is under about two cells across
-    const notchK = B ? smooth(2, 4, 2.2 * Math.PI * 2 * t.R / S / Math.max(minR, 1e-6)) : 0;
     const top = t.top;
     for (let k = 0; k < T; k++) {
       const q = k * TIER;
@@ -506,11 +496,6 @@ export class ObjectPass {
       if (jagK !== 0) {
         const jg = hash2(a0 + k * 13, t.seed, 7) * (1 - af) + hash2(a0 + 1 + k * 13, t.seed, 7) * af;
         jag = 1 + (jg - 0.5) * P.jag * jagK;
-        if (notchK > 0 && tiers[q + 6] >= 0) {
-          let da = Math.abs(ang - tiers[q + 6]);
-          if (da > S / 2) da = S - da;
-          jag *= 1 - tiers[q + 7] * notchK * (1 - smooth(0.6, 1.6, da));
-        }
       }
       let Ra = tiers[q + 2] * jag, Rb = tiers[q + 3];
       if (k + 1 < T) Rb += (tiers[q + TIER + 2] * 0.92 - Rb) * far;
@@ -616,7 +601,7 @@ export class ObjectPass {
     if (bmat === MAT.CONIFER) {
       // where on the tree, for its tone (worked out in shade, only if drawn)
       hit.tree = t; hit.tier = bk; hit.hx = bhx; hit.hz = bhz;
-      hit.lamK = cp.B ? TB.darken : TA.darken;
+      hit.lamK = TT.darken;
     }
     hit.D = best; hit.nx = bnx; hit.ny = bny; hit.nz = bnz; hit.f = bf; hit.mat = bmat;
     return true;

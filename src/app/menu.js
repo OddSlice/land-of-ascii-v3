@@ -36,8 +36,8 @@ function keyGroups(scene) {
     ['moving', 'move', [
       [['W', 'A', 'S', 'D'], 'walk'],
       [['Shift'], 'run, while held'],
+      [['Space'], world ? 'jump; rise, while flying' : 'jump'],
       world && [['F'], 'fly on or off'],
-      world && [['Space'], 'rise, while flying'],
     ]],
     ['looking', 'eye', [
       [['mouse'], 'look round: click the picture to take the mouse, Esc gives it back'],
@@ -46,7 +46,7 @@ function keyGroups(scene) {
     ]],
     ['time', 'clock', [
       [['1', '2', '3', '4'], 'day, dusk, night, dawn'],
-      [['T'], 'start or stop the clock'],
+      [['T'], 'stop or start the clock'],
     ]],
     ['world', 'map', [
       world ? [['R'], 'a new world from a new seed'] : [['R'], 'the reference frame beside the picture (the Look Lab)'],
@@ -57,7 +57,7 @@ function keyGroups(scene) {
     ]],
     ['views', 'camera', [
       [['C'], 'the next fixed camera'],
-      [['L'], 'the look panel; 5 6 7 8 9 0 cycle its choices'],
+      [['L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
       [['H'], 'full statistics on or off'],
       [['Esc'], 'this menu'],
     ]],

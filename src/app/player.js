@@ -1,6 +1,7 @@
-// Moving through the world. WASD walks at 4.5 m/s (Shift runs at 8), gravity
-// pulls, the wall and tree trunks block, the gate can be walked through and
-// the wall's top walked along.
+// Moving through the world. WASD walks at 4.5 m/s (Shift runs at 8), Space
+// jumps (about 1.1 m, after phase 3a), gravity pulls, the wall and tree
+// trunks block, the gate can be walked through and the wall's top walked
+// along, and stepped off.
 //
 // The lab and the stress scene keep their simple rules: walking speed is
 // horizontal and water deeper than half a metre stops you.
@@ -23,6 +24,12 @@ import { SCALE } from '../world/scale.js';
 import { supportAt as kitSupport, bodyBlocked } from '../world/kit.js';
 
 const WALK = 4.5, RUN = 8, RADIUS = 0.3, STEP = 0.6, HEAD = 1.8, GRAVITY = 18;
+// a jump: rising this fast takes the feet about 1.1 m up (onto a parapet's
+// breastwork, a metre high, from the walk); a press of Space up to `BUFFER`
+// seconds before landing still jumps on landing
+const JUMP = Math.sqrt(2 * GRAVITY * 1.1), BUFFER = 0.15;
+// how fast the eye catches up with a step (seconds to come about two thirds of the way)
+const EYE_EASE = 0.06;
 // (phase 3a) points round the body's edge: on a building's edge you stand
 // on whatever any part of you is over, and step off only once clear of it
 const RING8 = Array.from({ length: 8 }, (_, k) => [Math.cos(k * Math.PI / 4) * (RADIUS - 0.02), Math.sin(k * Math.PI / 4) * (RADIUS - 0.02)]);
@@ -34,7 +41,9 @@ export class Player {
     this.x = 0; this.z = 0; this.feet = 0; this.vy = 0;
     this.yaw = 0; this.pitch = 0;
     this.flying = false;
-    this.mode = 'walk';           // walk, wade, swim, slide, fly, fall
+    this.mode = 'walk';           // walk, wade, swim, slide, fly, fall, jump
+    this.jumpWait = 0;            // seconds a press of Space still waits to jump
+    this.eyeLag = 0;              // metres the eye is behind the feet's last step
     // trunks in 16 m buckets, so collisions only look at the trees nearby
     const T = world.objects.trees, B = 16, n = Math.ceil(world.N / B);
     this.tb = { B, n, cells: Array.from({ length: n * n }, () => []) };
@@ -47,12 +56,41 @@ export class Player {
     this.kit = world.kit && world.kit.np ? world.kit : null;
   }
 
-  get eye() { return this.feet + EYE; }
+  // (the eye lags a step up or down by a little, so a stair is climbed
+  // smoothly, not in 20 cm jumps: after phase 3a)
+  get eye() { return this.feet + EYE + this.eyeLag; }
 
   place(x, z, yaw, pitch, feet) {
     this.x = x; this.z = z; this.yaw = yaw; this.pitch = pitch;
     this.feet = feet !== undefined ? feet : this.rules === 'world' ? this.restAt(x, z) : this.supportAt(x, z, 1e9);
-    this.vy = 0;
+    this.vy = 0; this.eyeLag = 0;
+  }
+
+  // Space was pressed: jump when next on the ground (within BUFFER seconds).
+  jump() { if (!this.flying) this.jumpWait = BUFFER; }
+
+  // Take a waiting jump, if the feet are on something (`ground`) and it
+  // can (`able`: not swimming): the feet leave it rising, unless the head
+  // has no room to rise.
+  takeJump(dt, ground, able = true) {
+    if (this.jumpWait <= 0) return false;
+    this.jumpWait -= dt;
+    if (!able || this.feet > ground + 1e-3) return false;
+    this.jumpWait = 0;
+    if (this.blocked(this.x, this.z, this.feet + JUMP * dt)) return false;
+    this.vy = JUMP;
+    return true;
+  }
+
+  // Falling, or rising from a jump, to rest on `rest`; the head stops a
+  // rise where it would hit something. True once landed.
+  fall(dt, rest) {
+    this.vy -= GRAVITY * dt;
+    let next = this.feet + this.vy * dt;
+    if (this.vy > 0 && this.blocked(this.x, this.z, next)) { this.vy = 0; next = this.feet; }
+    this.feet = next;
+    if (this.feet <= rest) { this.feet = rest; this.vy = 0; return true; }
+    return false;
   }
 
   toggleFly() {
@@ -89,6 +127,10 @@ export class Player {
     const g = this.supportAt(x, z, feet, true);
     return g > feet + 1e-3 && this.blocked(x, z, g) ? this.supportAt(x, z, feet, true, 1e-3) : g;
   }
+
+  // Where feet at `feet` stepping to (x, z) come to rest: on what is under
+  // any part of the body there, the highest no more than a step up.
+  landAt(x, z, feet = this.feet) { return this.standOn(x, z, feet); }
 
   // Where the feet rest at (x, z): on the ground, or swimming in deep water.
   restAt(x, z) {
@@ -139,7 +181,20 @@ export class Player {
   }
 
   update(dt, keys) {
-    if (this.rules === 'world') { this.updateWorld(dt, keys); return; }
+    const f0 = this.feet;
+    if (this.rules === 'world') this.updateWorld(dt, keys); else this.updateLab(dt, keys);
+    // a step up or down a building's steps (not the ground's slope): the
+    // eye stays where it was and catches up within about a tenth of a second
+    const df = this.feet - f0;
+    if (df !== 0 && this.vy === 0 && !this.flying && Math.abs(df) <= STEP + 1e-6 &&
+      Math.max(f0, this.feet) > groundAt(this.world.terrain, this.x, this.z) + 0.02) this.eyeLag -= df;
+    if (this.eyeLag !== 0) {
+      const k = Math.exp(-dt / EYE_EASE), lag = this.eyeLag * k;
+      this.eyeLag = Math.abs(lag) < 1e-3 || Math.abs(lag) > STEP ? 0 : lag;
+    }
+  }
+
+  updateLab(dt, keys) {
     let f = 0, s = 0;
     if (keys.KeyW) f += 1;
     if (keys.KeyS) f -= 1;
@@ -155,12 +210,11 @@ export class Player {
       const steps = Math.max(1, Math.ceil(Math.hypot(mx, mz) / 0.2));
       for (let i = 0; i < steps; i++) this.tryMove(mx / steps, mz / steps);
     }
-    // gravity and stepping
+    // gravity and stepping (and a jump)
     const ground = this.standOn(this.x, this.z, this.feet);
-    if (this.feet > ground + 1e-3) {
-      this.vy -= GRAVITY * dt;
-      this.feet += this.vy * dt;
-      if (this.feet <= ground) { this.feet = ground; this.vy = 0; }
+    const jumped = this.takeJump(dt, ground);
+    if (this.feet > ground + 1e-3 || jumped) {
+      this.fall(dt, ground);
     } else {
       this.feet = ground;
       this.vy = 0;
@@ -243,12 +297,12 @@ export class Player {
     // past chest depth you float, the eye just above the surface (where the
     // bottom is not yet that deep, the feet stay on it)
     const rest = d2 > SCALE.chest ? Math.max(ground, wl + SCALE.swimEye - EYE) : ground;
-    if (this.feet > rest + 1e-3) {
+    // (a jump from the ground or wading, not swimming)
+    const jumped = this.takeJump(dt, rest, d2 <= SCALE.chest);
+    if (this.feet > rest + 1e-3 || jumped) {
       // falling (no harm done on landing), into water or onto the ground
-      this.vy -= GRAVITY * dt;
-      this.feet += this.vy * dt;
-      if (this.feet <= rest) { this.feet = rest; this.vy = 0; }
-      this.mode = this.feet <= rest ? (d2 > SCALE.chest ? 'swim' : 'walk') : 'fall';
+      const landed = this.fall(dt, rest);
+      this.mode = landed ? (d2 > SCALE.chest ? 'swim' : 'walk') : this.vy > 0 ? 'jump' : 'fall';
       return;
     }
     if (d2 > SCALE.chest) { this.feet = rest; this.vy = 0; this.mode = 'swim'; return; }
@@ -270,22 +324,30 @@ export class Player {
   // shorter across the map, so hills slow you down both ways. Returns the
   // distance used along the ground (0: blocked).
   tryWalk(ux, uz, h) {
-    for (const [ax, az] of [[ux, uz], [ux, 0], [0, uz]]) {
+    for (let tr = 0; tr < 3; tr++) {
+      const ax = tr === 2 ? 0 : ux, az = tr === 1 ? 0 : uz;
       const al = Math.hypot(ax, az);
       if (al < 1e-6) continue;
-      // how steep the way ahead is, then a step that long along it
-      const probe = h * al;
-      const k = (this.supportAt(this.x + ax * h, this.z + az * h, this.feet) - this.feet) / probe;
+      // how steep the way ahead is, then a step that long along it (on the
+      // ground only: a building's steps are walked at walking speed, and a
+      // drop, or the way while in the air, is level; after phase 3a)
+      const probe = h * al, px = this.x + ax * h, pz = this.z + az * h;
+      const g0 = this.supportAt(px, pz, this.feet);
+      let k = (g0 - this.feet) / probe;
+      if (this.vy !== 0 || k < -2 || g0 > groundAt(this.world.terrain, px, pz) + 1e-3) k = 0;
       const run = probe / Math.sqrt(1 + k * k), nx = this.x + ax / al * run, nz = this.z + az / al * run;
       const g = this.supportAt(nx, nz, this.feet);
       const rise = g - this.feet;
       // ground steeper than 45 degrees cannot be walked up (a span's step can)
       const onGround = g <= groundAt(this.world.terrain, nx, nz) + 1e-3;
       if (onGround ? rise > SCALE.climb * run + 1e-3 : rise > STEP) continue;
-      // (and where it would come down, if it steps off something: phase 3a)
-      if (this.blocked(nx, nz, Math.max(g, this.feet)) || (g < this.feet - 0.05 && this.blocked(nx, nz, g))) continue;
-      // follow the ground down; a drop steeper than this is a fall instead
-      const follow = rise > 0 || -rise < Math.max(0.15, 2 * run);
+      // (and where it would come to rest, if it steps off something: on
+      // whatever is under any part of the body, phase 3a; so it steps off
+      // an edge, the wall walk's say, once clear of it, and falls)
+      if (this.blocked(nx, nz, Math.max(g, this.feet)) || (g < this.feet - 0.05 && this.blocked(nx, nz, this.landAt(nx, nz)))) continue;
+      // follow the ground down (not while rising from a jump); a drop
+      // steeper than this is a fall instead
+      const follow = rise > 0 || (this.vy <= 0 && -rise < Math.max(0.15, 2 * run));
       // (nor onto the edge of something a step up that the head has no room
       // to rise onto, with nothing under the body at its own height: it
       // would fall with that thing inside it)

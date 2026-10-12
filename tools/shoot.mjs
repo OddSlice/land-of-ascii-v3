@@ -6,7 +6,7 @@
 //   node tools/shoot.mjs --cams 0,3 --times night --no-sheets
 //   node tools/shoot.mjs --built         shoot the built index.html instead of src/
 //   options: --threads N, --density 1..4, --browser chromium|firefox|webkit, --out dir,
-//            --look tree=B,cloud=B,meadow=2,shallows=blue (the look candidates), --stress (its three cameras),
+//            --look cloud=B,meadow=2,shallows=blue (the look candidates), --stress (its three cameras),
 //            --cam x,z,yaw,pitch --time day --name test  (a free camera)
 //   node tools/shoot.mjs --world [--seed N] [--built]   (phase 2a) the generated
 //       world's views beside the reference's mountain and dusk frames, into

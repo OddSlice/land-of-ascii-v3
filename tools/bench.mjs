@@ -9,7 +9,7 @@
 //
 //   node tools/bench.mjs [--browser chromium,firefox,webkit] [--threads 8,4] [--density 3,4]
 //                        [--scene lab|stress|both|world] [--seed N] [--frames 240] [--built] [--out file.json]
-//                        [--look tree=B,cloud=B,meadow=2,shallows=blue] [--root DIR]
+//                        [--look cloud=B,meadow=2,shallows=blue] [--root DIR]
 //
 // --look sets the look candidates for every run; --root measures another
 // build's folder (for example a copy of an earlier phase) instead of this one.

@@ -24,14 +24,14 @@ export const LOOK = {
   fovY: 60,
 
   // The look candidates (phase 0c), chosen live in the look panel (L), by URL
-  // (?tree=A&cloud=A&meadow=0&shallows=warm) or with lab.setLook(). Each has
+  // (?cloud=A&meadow=0&shallows=warm) or with lab.setLook(). Each has
   // its options with a short name for the panel, the default, and the key
   // that cycles it. Every candidate varies only with world position or an
   // object's own identity, never with the screen or the clock.
-  // Locked in phase 1: the defaults are the settled look (conifers B, clouds
-  // B, meadow 2, blue shallows); the other options stay for comparison.
+  // Locked in phase 1: the defaults are the settled look (clouds B, meadow
+  // 2, blue shallows); the other options stay for comparison. (The conifers
+  // had a choice too, until after phase 3a: only the tidy tiers are kept.)
   choices: {
-    tree:     { label: 'conifers', key: '7', default: 'B', options: { A: 'tidy tiers', B: 'rough and dark' } },
     cloud:    { label: 'clouds',   key: '8', default: 'B', options: { A: 'cumulus', B: 'banks' } },
     meadow:   { label: 'meadow',   key: '9', default: 2,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
     shallows: { label: 'shallows', key: '0', default: 'blue', options: { warm: 'warm bed', blue: 'even blue' } },
@@ -145,6 +145,12 @@ export const LOOK = {
     roof:    { glyphs: ':^=#%',      ink: { lit: -0.26, dark: 0.48 }, tone: 0.16 },
     yard:    { glyphs: '.,:-=',      ink: { lit: -0.24, dark: 0.46 }, tone: 0.10 },
     window:  { glyphs: ':=#▓',       ink: { lit: 0.22, dark: 0.22 }, emissive: true },
+    // (after phase 3a) the fort's dressed stone: paler than the lab's wall
+    // and the tan rock, with mortar joints that darken it strongly (tone),
+    // so the walls read as built from blocks from further off
+    masonry: { glyphs: ':=#▒▓█',     ink: { lit: -0.24, dark: 0.46 }, tone: 0.42 },
+    // the dark down a well's shaft: nearly black at every hour
+    shaft:   { glyphs: ' .:',        ink: { lit: 0.10, dark: 0.10 } },
   },
 
   // The coast (phase 2a, the generated world): a darker wet band where sand
@@ -203,14 +209,11 @@ export const LOOK = {
 
   // Conifers. Each tree's shape comes from its own identity: its height,
   // crown width, how much of it is bare trunk, trunk width and bark tone,
-  // lean (metres per metre of height), tier count and foliage tone.
-  // Treatment A keeps the tidy tiers. Treatment B is rough and dark: tiers
-  // shifted off the axis (`asym`, of the crown radius), some cut short so a
-  // gap shows above them (`gaps`, the share of tiers), some broken by a notch
-  // (`notches`), a deeper ragged outline (`jag` over `sectors` round the
-  // trunk), clumped foliage tone (`clump`, in `clumps` patches round each
-  // tier) and less light (`darken`). All of
-  // it melts away as it gets smaller than about two cells.
+  // lean (metres per metre of height), tier count and foliage tone. The
+  // tiers are tidy (after phase 3a the only treatment; the rough, dark one
+  // was dropped): a ragged outline (`jag` over `sectors` round the trunk)
+  // that melts away as it gets smaller than about two cells, at `darken` of
+  // the light.
   trees: {
     height: [11, 24], crown: [1.3, 2.5], bare: [0.18, 0.42], trunk: [0.15, 0.32], lean: 0.035, tiers: [6, 10],
     // a share of trees stand this much taller, so a far stand has a jagged top
@@ -220,8 +223,7 @@ export const LOOK = {
     trunkFade: 0.25,
     // light across a tier, from its foot to its top (the sawtooth's step)
     tierLight: [0.62, 1],
-    A: { jag: 0.36, sectors: 9, darken: 1, clump: 0, asym: 0, gaps: 0, notches: 0 },
-    B: { jag: 0.62, sectors: 13, darken: 0.72, clump: 0.7, clumps: 5, asym: 0.24, gaps: 0.35, notches: 0.3 },
+    jag: 0.36, sectors: 9, darken: 1,
   },
 
   // Clouds. A: rounded cumulus, sizes varied, undersides soft. B: banks and
@@ -397,6 +399,8 @@ export const LOOK = {
       water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', deep: '#2e3c4a', shallow: '#5f5c49', blue: '#44597a' },
       grassDry: '#859447', grassLush: '#4a6b3c',
       stone:  { lit: '#9a958d', shade: '#4d4b50' },
+      masonry:{ lit: '#b8ae9c', shade: '#56524f' },
+      shaft:  { lit: '#1b1817', shade: '#141211' },
       conifer:{ lit: '#3b4c3a', shade: '#1e271f' },
       trunk:  { lit: '#4c3e33', shade: '#241e1a' },
       bush:   { lit: '#55703a', shade: '#28331f' },
@@ -432,6 +436,8 @@ export const LOOK = {
       water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', deep: '#211f2b', shallow: '#655248', blue: '#383852' },
       grassDry: '#4a4f38', grassLush: '#2e3a33',
       stone:  { lit: '#6e6064', shade: '#3a353c' },
+      masonry:{ lit: '#857373', shade: '#40393f' },
+      shaft:  { lit: '#1a1718', shade: '#131113' },
       conifer:{ lit: '#2c3430', shade: '#1a1f1e' },
       trunk:  { lit: '#352c2a', shade: '#1d1919' },
       bush:   { lit: '#36402e', shade: '#1d221c' },
@@ -467,6 +473,8 @@ export const LOOK = {
       water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a', deep: '#0d0f14', shallow: '#28261f', blue: '#141924' },
       grassDry: '#262b24', grassLush: '#1a221f',
       stone:  { lit: '#29282e', shade: '#141418' },
+      masonry:{ lit: '#302e33', shade: '#16151a' },
+      shaft:  { lit: '#100f11', shade: '#0c0b0d' },
       conifer:{ lit: '#17191c', shade: '#0e0f12' },
       trunk:  { lit: '#1c1a1a', shade: '#0f0e0f' },
       bush:   { lit: '#191c1c', shade: '#0f1011' },
@@ -518,6 +526,8 @@ export const LOOK = {
       water:  { lit: '#3e4a58', shade: '#2c3644', sky: '#8e8ca2', deep: '#2a3444', shallow: '#625a4c', blue: '#4c5a7c' },
       grassDry: '#8e9450', grassLush: '#4e6a40',
       stone:  { lit: '#a49a90', shade: '#4a4850' },
+      masonry:{ lit: '#bcae9e', shade: '#524e52' },
+      shaft:  { lit: '#1c1918', shade: '#141212' },
       conifer:{ lit: '#3c4a38', shade: '#1e2620' },
       trunk:  { lit: '#54443a', shade: '#261f1c' },
       bush:   { lit: '#5a703c', shade: '#283220' },
@@ -554,6 +564,8 @@ export const LOOK = {
       water:  { lit: '#222a38', shade: '#151a24', sky: '#2c3550', deep: '#10141c', shallow: '#2c2c28', blue: '#18202e' },
       grassDry: '#3f4b44', grassLush: '#2c3a38',
       stone:  { lit: '#45464e', shade: '#1c1c22' },
+      masonry:{ lit: '#52535b', shade: '#1f1f25' },
+      shaft:  { lit: '#121214', shade: '#0d0d0f' },
       conifer:{ lit: '#222a2c', shade: '#10141a' },
       trunk:  { lit: '#2a2626', shade: '#141212' },
       bush:   { lit: '#2a3434', shade: '#141a1a' },
@@ -589,6 +601,8 @@ export const LOOK = {
       water:  { lit: '#161b25', shade: '#10141b', sky: '#1a1f30', deep: '#0c0f15', shallow: '#1e1e1c', blue: '#121722' },
       grassDry: '#222a26', grassLush: '#19221f',
       stone:  { lit: '#25262c', shade: '#15161a' },
+      masonry:{ lit: '#2b2b31', shade: '#16171b' },
+      shaft:  { lit: '#0f0f11', shade: '#0b0b0d' },
       conifer:{ lit: '#141a1c', shade: '#0d1013' },
       trunk:  { lit: '#191717', shade: '#100e0f' },
       bush:   { lit: '#182020', shade: '#0f1314' },

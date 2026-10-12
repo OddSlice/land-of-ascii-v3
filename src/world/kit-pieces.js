@@ -36,7 +36,7 @@ function parapet(b, F, u, w, len, t, y0, seed, along = 0, holes = undefined) {
   const W = K.wall, per = W.merlonW + W.crenelW, mw = W.merlonW / per;
   const [x, z] = F.at(u, w);
   // merlons centred on the run's middle
-  return b.add({ type: PT.BOX, x, z, a: F.a + along, hx: len / 2, hz: t / 2, y0, y1: y0 + W.breast + W.merlon, mat: MAT.STONE,
+  return b.add({ type: PT.BOX, x, z, a: F.a + along, hx: len / 2, hz: t / 2, y0, y1: y0 + W.breast + W.merlon, mat: MAT.MASONRY,
     flags: PF.CRENEL | PF.GROW, mh: W.merlon, per, mw, ph: per * mw / 2 + per * 1000, tex: TX.MASONRY, tex2: TX.FLAGS, base: y0 - 6, seed, holes });
 }
 
@@ -96,7 +96,7 @@ export function curtainWall(b, p) {
   const L = Math.hypot(bx - ax, bz - az), a = Math.atan2(bz - az, bx - ax);
   const F = frame((ax + bx) / 2, (az + bz) / 2, a), base = p.base, top = base + W.height;
   const cuts = p.cuts || [];
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: L / 2, hz: W.thick / 2, y0: base - W.foot, y1: top, mat: MAT.STONE, flags: PF.WALK | PF.GROW,
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: L / 2, hz: W.thick / 2, y0: base - W.foot, y1: top, mat: MAT.MASONRY, flags: PF.WALK | PF.GROW,
     tex: TX.MASONRY, tex2: TX.FLAGS, base, seed: p.seed || 1, holes: cuts.map((c) => ({ ...c })) });
   parapet(b, F, 0, p.out * (W.thick / 2 - W.parapet / 2), L, W.parapet, top, (p.seed || 1) + 7, 0, cuts.map((c) => ({ ...c })));
   return { top, L, F };
@@ -114,7 +114,7 @@ export function gatehouse(b, p) {
     return { x: ox, y: base + crown * 0.55, z: oz, nx, ny: 0, nz, area: G.width * (G.spring + G.width * 0.4) };
   });
   const room = b.room(ends, true);
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: G.length / 2, hz: G.depth / 2, y0: base - W.foot, y1: top, mat: MAT.STONE, flags: PF.WALK,
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: G.length / 2, hz: G.depth / 2, y0: base - W.foot, y1: top, mat: MAT.MASONRY, flags: PF.WALK,
     tex: TX.MASONRY, tex2: TX.FLAGS, base, seed: 101,
     holes: [{ type: HT.ARCH, x: F.x, z: F.z, a: F.a, hx: G.width / 2, hz: G.depth / 2 + 0.6, y0: base - W.foot - 0.5, y1: base + crown, room, depth: G.depth }] });
   // parapets: along the front, and on the sides of the part standing out
@@ -206,17 +206,17 @@ export function tower(b, p) {
   const uA = -c + strip / 2, uB = -c + strip * 1.5;
   {
     const L = n1 * S.run, [x, z] = at(uA, -c + foot + L / 2);
-    b.add({ type: PT.STAIR, x, z, a: SF.a + sw * D2, hx: L / 2, hz: strip / 2, y0: base - 0.3, y1: base + n1 * rise, base, rise, run: S.run, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 1 });
+    b.add({ type: PT.STAIR, x, z, a: SF.a + sw * D2, hx: L / 2, hz: strip / 2, y0: base - 0.3, y1: base + n1 * rise, base, rise, run: S.run, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 1 });
   }
   const l1 = n1 * rise, w1 = -c + foot + n1 * S.run;
   {
     const [x, z] = at(-c + strip, (w1 + c) / 2);
-    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip, hz: (c - w1) / 2, y0: base + l1 - slab, y1: base + l1, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 2 });
+    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip, hz: (c - w1) / 2, y0: base + l1 - slab, y1: base + l1, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 2 });
   }
   for (let k = 0; k < n2; k++) {
     const y1 = base + l1 + (k + 1) * rise, wc = w1 - (k + 0.5) * S.run;
     const [x, z] = at(uB, wc);
-    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip / 2, hz: S.run / 2 + 0.03, y0: y1 - slab, y1, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 3 + k });
+    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip / 2, hz: S.run / 2 + 0.03, y0: y1 - slab, y1, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 3 + k });
   }
   const wEnd = w1 - n2 * S.run;            // where the second flight reaches the walk's height
   // the floor at the walk's height: the back corner, and the rest
@@ -231,7 +231,7 @@ export function tower(b, p) {
   for (let k = 0; k < n3; k++) {
     const y1 = base + H + (k + 1) * r3, wc = wEnd + (k + 0.5) * S.run;
     const [x, z] = at(uA, wc);
-    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip / 2, hz: S.run / 2 + 0.03, y0: y1 - slab, y1, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 60 + k });
+    b.add({ type: PT.BOX, x, z, a: SF.a, hx: strip / 2, hz: S.run / 2 + 0.03, y0: y1 - slab, y1, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 60 + k });
   }
   {
     // the hatch: over the slabs a head would meet
@@ -256,9 +256,9 @@ export function tower(b, p) {
   lights.push(windowIn(b, frame(p.at[0], p.at[1], a + ((opposite ? kS : kA + 2) % 4) * D2 - D2), 0, size, base + H + 0.9, holes, room, seed + 80));
   // the body: hollow from the ground to under the top
   holes.push({ type: HT.BOX, x: F.x, z: F.z, a, hx: c, hz: c, y0: base - 0.35, y1: top - slab, room });
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: size, hz: size, y0: base - W.foot, y1: top, mat: MAT.STONE, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: size, hz: size, y0: base - W.foot, y1: top, mat: MAT.MASONRY, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
   // the ground floor
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: c + 0.01, hz: c + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.STONE, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 90 });
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a, hx: c + 0.01, hz: c + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.MASONRY, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 90 });
   // the parapet round the open top (two opposite sides the whole way, the
   // other two between them, so none shares a face)
   for (let k = 0; k < 4; k++) {
@@ -291,7 +291,7 @@ function roundTower(b, p, wa, holes, lights, top) {
   const th0 = 30 * Math.PI / 180;
   const step = (th, y1, s) => {
     const [x, z] = F.at(Math.cos(th) * rm, Math.sin(th) * rm);
-    b.add({ type: PT.BOX, x, z, a: a + th, hx: band / 2 + 0.06, hz: rm * dth / 2 + 0.05, y0: y1 - slab, y1, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: s });
+    b.add({ type: PT.BOX, x, z, a: a + th, hx: band / 2 + 0.06, hz: rm * dth / 2 + 0.05, y0: y1 - slab, y1, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: s });
   };
   for (let k = 0; k < n; k++) step(th0 + (k + 0.5) * dth, base + (k + 1) * rise, seed + 10 + k);
   const thLowEnd = th0 + n * dth;
@@ -328,11 +328,11 @@ function roundTower(b, p, wa, holes, lights, top) {
     lights.push(windowIn(b, frame(...FB.at(0, 0), a + Math.PI - D2), 0, r - 0.05, base + H + 0.9, holes, room, seed + 300));
   }
   holes.push({ type: HT.CYL, x: F.x, z: F.z, a, hx: ri, y0: base - 0.35, y1: top - slab, room });
-  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: r, y0: base - W.foot, y1: top, mat: MAT.STONE, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
-  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: ri + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.STONE, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 90 });
+  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: r, y0: base - W.foot, y1: top, mat: MAT.MASONRY, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
+  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: ri + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.MASONRY, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 90 });
   // the parapet round the top: a ring, its merlons round it
   const Wl = K.wall, per = Math.max(8, Math.round(2 * Math.PI * r / (Wl.merlonW + Wl.crenelW)));
-  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: r, y0: top, y1: top + Wl.breast + Wl.merlon, mat: MAT.STONE, flags: PF.CRENEL | PF.GROW,
+  b.add({ type: PT.CYL, x: F.x, z: F.z, a, hx: r, y0: top, y1: top + Wl.breast + Wl.merlon, mat: MAT.MASONRY, flags: PF.CRENEL | PF.GROW,
     mh: Wl.merlon, per, mw: Wl.merlonW / (Wl.merlonW + Wl.crenelW), ph: 0.5, tex: TX.MASONRY, tex2: TX.FLAGS, base: top - 6, seed: seed + 400,
     holes: [{ type: HT.CYL, x: F.x, z: F.z, a, hx: r - Wl.parapet, y0: top - 0.1, y1: top + Wl.breast + Wl.merlon + 0.1 }] });
   return { top, room, F, walkDoors: wa.length };
@@ -381,8 +381,8 @@ export function keep(b, p) {
     for (const f of us) lights.push(windowIn(b, FF, f * span, ext, hallTop + 2.4, holes, -1, seed + 50 + k * 7 + (f > 0 ? 1 : 0)));
   }
   holes.push({ type: HT.BOX, x: F.x, z: F.z, a: F.a, hx: hd - wt, hz: hw - wt, y0: base - 0.35, y1: base + Kp.hall, room });
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hd, hz: hw, y0: base - W.foot, y1: top, mat: MAT.STONE, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hd - wt + 0.01, hz: hw - wt + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.STONE, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 9 });
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hd, hz: hw, y0: base - W.foot, y1: top, mat: MAT.MASONRY, flags: PF.WALK, tex: TX.MASONRY, tex2: TX.FLAGS, base, seed, holes });
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hd - wt + 0.01, hz: hw - wt + 0.01, y0: base - 0.35, y1: base + 0.06, mat: MAT.MASONRY, tex: TX.FLAGS, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 9 });
   for (let k = 0; k < 4; k++) {
     const FF = frame(p.at[0], p.at[1], F.a + k * D2), ext = k % 2 === 0 ? hd : hw, span = k % 2 === 0 ? hw : hd;
     parapet(b, FF, ext - W.parapet / 2, 0, 2 * span - (k % 2) * 2 * W.parapet, W.parapet, top, seed + 20 + k, D2);
@@ -397,7 +397,7 @@ export function stoneStair(b, p) {
   const n = Math.ceil(H / S.rise), rise = H / n, L = n * S.run;
   const F = frame(p.at[0], p.at[1], p.angle);
   const [x, z] = F.at(L / 2, 0);
-  b.add({ type: PT.STAIR, x, z, a: p.angle, hx: L / 2, hz: S.width / 2, y0: base - 0.5, y1: base + H, base, rise, run: S.run, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, flags: PF.WALK, seed: p.seed || 501 });
+  b.add({ type: PT.STAIR, x, z, a: p.angle, hx: L / 2, hz: S.width / 2, y0: base - 0.5, y1: base + H, base, rise, run: S.run, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, flags: PF.WALK, seed: p.seed || 501 });
   return { top: F.at(L - 0.3, 0), foot: F.at(-0.6, 0), L };
 }
 
@@ -431,13 +431,14 @@ export function house(b, p) {
   return { room, F };
 }
 
-// A well: a stone ring with dark water in it, two posts, a beam and a little roof.
+// A well: a stone ring round a dark shaft, two posts, a beam and a little roof.
 export function well(b, p) {
   const Wl = K.well, base = p.base, seed = p.seed || 701;
   const F = frame(p.at[0], p.at[1], p.angle || 0);
-  b.add({ type: PT.CYL, x: F.x, z: F.z, hx: Wl.r, y0: base - 2, y1: base + Wl.height, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, base: base - 0.25, seed, flags: PF.WALK,
+  b.add({ type: PT.CYL, x: F.x, z: F.z, hx: Wl.r, y0: base - 2, y1: base + Wl.height, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, base: base - 0.25, seed, flags: PF.WALK,
     holes: [{ type: HT.CYL, x: F.x, z: F.z, hx: Wl.r - Wl.wallT, y0: base - 2.5, y1: base + Wl.height + 0.1 }] });
-  b.add({ type: PT.CYL, x: F.x, z: F.z, hx: Wl.r - Wl.wallT + 0.01, y0: base - 2.4, y1: base - 0.55, mat: MAT.WATER, seed: seed + 1 });
+  // the shaft: dark, just above the ground the ring stands on
+  b.add({ type: PT.CYL, x: F.x, z: F.z, hx: Wl.r - Wl.wallT + 0.01, y0: base - 2.4, y1: base + Wl.shaft, mat: MAT.SHAFT, flags: PF.WALK, seed: seed + 1 });
   for (const sgn of [-1, 1]) {
     const [x, z] = F.at(sgn * (Wl.r + 0.05), 0);
     b.add({ type: PT.BOX, x, z, a: F.a, hx: 0.08, hz: 0.08, y0: base - 0.3, y1: base + 2.25, mat: MAT.TIMBER, tex: TX.PLAIN, flags: PF.GROW, seed: seed + 2 + sgn });
@@ -451,7 +452,7 @@ export function windowWall(b, p) {
   const base = p.base, F = frame(p.at[0], p.at[1], p.angle || 0), holes = [];
   windowIn(b, F, 0, 0.6, base + 1.8, holes, -1, p.seed || 801);
   windowIn(b, frame(p.at[0], p.at[1], (p.angle || 0) + Math.PI), 0, 0.6, base + 1.8, holes, -1, (p.seed || 801) + 1);
-  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: 2.4, hz: 0.6, y0: base - 0.5, y1: base + 4, mat: MAT.STONE, tex: TX.MASONRY, tex2: TX.FLAGS, base, holes, seed: p.seed || 801, flags: PF.WALK });
+  b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: 2.4, hz: 0.6, y0: base - 0.5, y1: base + 4, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, base, holes, seed: p.seed || 801, flags: PF.WALK });
 }
 
 // Every piece of a structure's description, in order.

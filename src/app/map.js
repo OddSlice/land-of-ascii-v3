@@ -123,7 +123,7 @@ export class MapView {
         w8(o, mat, lam, tone, 1);
       }
     }
-    const look = { tree: 'B', cloud: 'B', meadow: 0, shallows: 'blue' };
+    const look = { cloud: 'B', meadow: 0, shallows: 'blue' };
     const cells = new Uint8Array(cols * rows * CELL_STRIDE);
     resolveStripe(makePalette(LOOK.hours.day), hits, cells, cols, rows, 0, look);
     // round the map: plain frame colour

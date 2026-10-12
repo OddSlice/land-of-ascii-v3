@@ -265,6 +265,9 @@ export function inPrim(kit, i, x, y, z) {
 }
 
 const NEAR_TMP = [];
+// (the walking tests allocate nothing: they run many times a frame, and
+// garbage made there stalls a frame when collected; after phase 3a)
+const LS = new Int32Array(4096), LB = new Int32Array(4096), YS = new Float64Array(8192);
 
 // Is world point (x, y, z) inside any shape's solid?
 export function solidAt(kit, x, y, z) {
@@ -277,32 +280,45 @@ export function solidAt(kit, x, y, z) {
 // `maxY` (-Infinity if none): a shape's top, a step, a crenel's floor, the
 // sill of an opening.
 export function supportAt(kit, x, z, maxY) {
-  const list = near(kit, x, z, NEAR_TMP).slice();
+  // (only the shapes whose bounds reach the point can hold it up or be over it)
+  const n = within(kit, near(kit, x, z, NEAR_TMP), x, z, 0, -Infinity, Infinity, LS);
   let best = -Infinity;
   const S = kit.prims, Hs = kit.holes;
-  const tryY = (y) => {
-    if (y > maxY || y <= best) return;
-    if (!solidAtList(kit, list, x, y - 0.02, z) || solidAtList(kit, list, x, y + 0.02, z)) return;
-    best = y;
-  };
-  for (const i of list) {
-    const q = i * P_STRIDE, t = S[q + P.TYPE];
+  for (let a = 0; a < n; a++) {
+    const q = LS[a] * P_STRIDE, t = S[q + P.TYPE];
     if (t === PT.PANE) continue;
     const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
     const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
     const top = topAt(kit, q, u, w);
     if (top === -Infinity) continue;
-    tryY(top);
+    if (top <= maxY && top > best && holds(kit, LS, n, x, top, z)) best = top;
     for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
-      const o = h * H_STRIDE;
-      tryY(Hs[o + H.Y0]);
+      const y = Hs[h * H_STRIDE + H.Y0];
+      if (y <= maxY && y > best && holds(kit, LS, n, x, y, z)) best = y;
     }
   }
   return best;
 }
 
-function solidAtList(kit, list, x, y, z) {
-  for (const i of list) if (inPrim(kit, i, x, y, z)) return true;
+// Is there solid just under height y at (x, z), and none just over it?
+function holds(kit, list, n, x, y, z) {
+  return solidAtList(kit, list, n, x, y - 0.02, z) && !solidAtList(kit, list, n, x, y + 0.02, z);
+}
+
+// Of `list`, the shapes whose bounding circle comes within r of (x, z) and
+// whose heights overlap lo..hi, into `out`; how many.
+function within(kit, list, x, z, r, lo, hi, out) {
+  const S = kit.prims;
+  let n = 0;
+  for (let a = 0; a < list.length && n < out.length; a++) {
+    const i = list[a], q = i * P_STRIDE, dx = x - S[q + P.CX], dz = z - S[q + P.CZ], R = reachOf(S, q) + r + 1e-6;
+    if (dx * dx + dz * dz <= R * R && S[q + P.Y0] <= hi && S[q + P.Y1] >= lo) out[n++] = i;
+  }
+  return n;
+}
+
+function solidAtList(kit, list, n, x, y, z) {
+  for (let a = 0; a < n; a++) if (inPrim(kit, list[a], x, y, z)) return true;
   return false;
 }
 
@@ -312,28 +328,37 @@ function solidAtList(kit, list, x, y, z) {
 // in between them; between 12 it could by 8), at lo, hi and every height
 // between where a shape or opening starts or ends, so a slab or a lintel
 // cannot slip between the samples.
-const RING = Array.from({ length: 24 }, (_, k) => [Math.cos(k * Math.PI / 12), Math.sin(k * Math.PI / 12)]);
+// (the heights to sample, gathered by add())
+let ym = 0;
+function add(y, lo, hi) { if (y > lo && y < hi && ym < YS.length) YS[ym++] = y; }
+const RING = Float64Array.from({ length: 48 }, (_, k) => (k & 1 ? Math.sin : Math.cos)((k >> 1) * Math.PI / 12));
 export function bodyBlocked(kit, x, z, lo, hi, r) {
-  const list = near(kit, x, z, NEAR_TMP, r + 0.1).slice();
-  if (!list.length) return false;
+  // (only the shapes whose bounds reach the body, from lo to hi: after
+  // phase 3a, so a stair's many steps are not sampled when it is further off)
+  const n = within(kit, near(kit, x, z, NEAR_TMP, r + 0.1), x, z, r, lo, hi, LB);
+  if (!n) return false;
   const S = kit.prims, Hs = kit.holes;
-  const ys = [lo, hi, (lo + hi) / 2];
-  const addY = (y) => { if (y > lo && y < hi) ys.push(y); };
-  for (const i of list) {
-    const q = i * P_STRIDE;
-    for (const y of [S[q + P.Y0], S[q + P.Y1], S[q + P.Y1] - S[q + P.MH]]) { addY(y + 0.01); addY(y - 0.01); }
+  ym = 0;
+  YS[ym++] = lo; YS[ym++] = hi; YS[ym++] = (lo + hi) / 2;
+  for (let a = 0; a < n; a++) {
+    const q = LB[a] * P_STRIDE;
+    const y0 = S[q + P.Y0], y1 = S[q + P.Y1], yc = y1 - S[q + P.MH];
+    add(y0 + 0.01, lo, hi); add(y0 - 0.01, lo, hi); add(y1 + 0.01, lo, hi); add(y1 - 0.01, lo, hi); add(yc + 0.01, lo, hi); add(yc - 0.01, lo, hi);
     if (S[q + P.TYPE] === PT.STAIR) {
-      const n = Math.round(2 * S[q + P.HX] / S[q + P.RUN]);
-      for (let k = 1; k <= n; k++) addY(S[q + P.BASE] + k * S[q + P.RISE] - 0.01);
+      const k = Math.round(2 * S[q + P.HX] / S[q + P.RUN]), base = S[q + P.BASE], rise = S[q + P.RISE];
+      // (only the steps between lo and hi)
+      const k0 = Math.max(1, Math.floor((lo - base) / rise)), k1 = Math.min(k, Math.ceil((hi - base) / rise));
+      for (let j = k0; j <= k1; j++) add(base + j * rise - 0.01, lo, hi);
     }
     for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) {
-      const o = h * H_STRIDE;
-      for (const y of [Hs[o + H.Y0], Hs[o + H.Y1], Hs[o + H.Y1] - Hs[o + H.R]]) { addY(y + 0.01); addY(y - 0.01); }
+      const o = h * H_STRIDE, hy0 = Hs[o + H.Y0], hy1 = Hs[o + H.Y1], hr = hy1 - Hs[o + H.R];
+      add(hy0 + 0.01, lo, hi); add(hy0 - 0.01, lo, hi); add(hy1 + 0.01, lo, hi); add(hy1 - 0.01, lo, hi); add(hr + 0.01, lo, hi); add(hr - 0.01, lo, hi);
     }
   }
-  for (const y of ys) {
-    if (solidAtList(kit, list, x, y, z)) return true;
-    for (const [cx, cz] of RING) if (solidAtList(kit, list, x + cx * r, y, z + cz * r)) return true;
+  for (let j = 0, m = ym; j < m; j++) {
+    const y = YS[j];
+    if (solidAtList(kit, LB, n, x, y, z)) return true;
+    for (let k = 0; k < 48; k += 2) if (solidAtList(kit, LB, n, x + RING[k] * r, y, z + RING[k + 1] * r)) return true;
   }
   return false;
 }

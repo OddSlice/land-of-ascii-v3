@@ -8,7 +8,7 @@
 // a worker or on the page.
 //   node tools/identity.mjs [--threads 0,1,3,5,8] [--scene lab|stress|both|yard|world|all] [--built]
 //                           [--seed N]                the generated world's seed (default: the page's)
-//                           [--look tree=B,cloud=B]   one look (the rest at their defaults)
+//                           [--look cloud=B]   one look (the rest at their defaults)
 //                           [--looks all]             every combination of the look candidates
 //                           [--weather all]           (phase 2b) every view under each kind of
 //                                                     weather held (or a list: rain,mist); the

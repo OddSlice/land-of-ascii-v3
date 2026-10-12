@@ -22,12 +22,14 @@ export const MAT = {
   BED: 17,                         // the silt of a lake or river bed
   FLOOR: 18,                       // the needle-strewn ground under a stand of trees
   FOAM: 19,                        // foam floating at the waterline (phase 2a; only ever in R2)
-  // phase 3a: the building kit's materials (stone in blocks is STONE)
+  // phase 3a: the building kit's materials (the lab's wall is STONE)
   TIMBER: 20,                      // posts, beams, floorboards
   PLASTER: 21,                     // the infill of a timber frame
   ROOF: 22,                        // shingle roofs
   YARD: 23,                        // the packed earth of a courtyard (ground)
   WINDOW: 24,                      // a window: a dark opening by day, lit at night (emissive)
+  MASONRY: 25,                     // the fort's dressed stone, in courses (after phase 3a)
+  SHAFT: 26,                       // the dark inside a well, seen from above (after phase 3a)
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;

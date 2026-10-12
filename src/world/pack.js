@@ -37,16 +37,16 @@ export function packWorld(world, Shared = null) {
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
   for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard']) put(k, T[k]);
   for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
-  // trees: a table of numbers, and their tiers (both treatments) in one pool
+  // trees: a table of numbers, and their tiers in one pool
   const trees = world.objects.trees;
   const tab = new Float64Array(trees.length * TREE_F);
   let pool = 0;
   for (const t of trees) pool += t.tiers.length;
-  const tiers = new Float32Array(pool * 2);
+  const tiers = new Float32Array(pool);
   let at = 0;
   trees.forEach((t, q) => {
     tab.set([t.x, t.z, t.base, t.top, t.R, t.trunkTop, t.trunkR, t.tierH, t.leanX, t.leanZ, t.tone, t.bark, t.seed, at, t.tiers.length], q * TREE_F);
-    tiers.set(t.tiers, at); tiers.set(t.tiersB, pool + at);
+    tiers.set(t.tiers, at);
     at += t.tiers.length;
   });
   put('trees', tab); put('tiers', tiers);
@@ -94,7 +94,7 @@ export function unpackWorld(packed) {
     trees.push({
       x: tab[o], z: tab[o + 1], base: tab[o + 2], top: tab[o + 3], R: tab[o + 4], trunkTop: tab[o + 5], trunkR: tab[o + 6], tierH: tab[o + 7],
       leanX: tab[o + 8], leanZ: tab[o + 9], tone: tab[o + 10], bark: tab[o + 11], seed: tab[o + 12],
-      tiers: tiers.subarray(at, at + n), tiersB: tiers.subarray(m.pool + at, m.pool + at + n),
+      tiers: tiers.subarray(at, at + n),
     });
   }
   const bushes = [], bt = a.bushes;

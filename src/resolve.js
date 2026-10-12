@@ -297,7 +297,7 @@ for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.SNOW, MAT.FLOOR]) 
 // already wet bed not at all), and the stripe's wetness: how much darker wet
 // ground is, how much sky it mirrors
 const WETM = new Float32Array(32);
-for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.STONE, MAT.FLOOR, MAT.TRUNK, MAT.WOOD, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.YARD]) WETM[m] = 1;
+for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.STONE, MAT.FLOOR, MAT.TRUNK, MAT.WOOD, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.YARD, MAT.MASONRY]) WETM[m] = 1;
 WETM[MAT.CONIFER] = 0.5; WETM[MAT.BUSH] = 0.5;
 let wetDark = 0, wetSheen = 0;
 // the rules of the stripe being resolved: air (aerial perspective and the

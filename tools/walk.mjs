@@ -5,7 +5,7 @@
 // shots/walks/, which is kept out of git.
 //
 //   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort] [--threads 8] [--density 4] [--headed]
-//                       [--look tree=B,cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
+//                       [--look cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to
 // turn. Along the road, W is held and the arrows steer toward the road 15 m

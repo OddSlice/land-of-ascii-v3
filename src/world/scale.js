@@ -78,7 +78,9 @@ export const SCALE = {
     // a timber house: `w` by `d` (half), its eaves at `eave`, the roof
     // rising `pitch` metres for each metre in, reaching `overhang` past the walls
     house: { w: [3.3, 4.2], d: [2.4, 2.9], eave: 3.0, pitch: 0.95, overhang: 0.45, wallT: 0.3 },
-    well: { r: 1.0, height: 0.85, wallT: 0.3 },
+    // (`shaft`: how far above the ground the dark of the shaft is drawn,
+    // over the ground inside the ring: just under the rim, so it reads as a hole)
+    well: { r: 1.0, height: 0.85, wallT: 0.3, shaft: 0.65 },
     window: { width: 0.7, height: 1.1, depth: 0.35 },
   },
 

@@ -159,7 +159,7 @@ function sky(w, seed) {
   const N = w.N, NN = w.NN, G = w.terrain.ground, frame = makeFrame(seed, N), P = {};
   const be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE);
-  const look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const render = (x, z, yawDeg) => {
     const cam = { x, z, y: groundAt(w.terrain, x, z) + SCALE.eye, yaw: yawDeg * Math.PI / 180, pitch: 0 };
     const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 12.5, look };
@@ -198,7 +198,7 @@ function farRead(w, gw) {
   const N = w.N, NN = w.NN, kind = gw.kindMap, level = gw.levelMap, lake = gw.sites.lake;
   const be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE), cells = new Uint8Array(cols * rows * CELL_STRIDE);
-  const look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   // (phase 3a) and from the spawn turned toward the fort, aimed a little
   // over its yard, which must read: its stone, timber, plaster, roofs and
   // windows against the cells round them
@@ -207,7 +207,7 @@ function farRead(w, gw) {
     { name: 'spawn, toward the fort', x: w.start.x, z: w.start.z, yaw: Math.atan2(fort.x - w.start.x, fort.z - w.start.z) * 180 / Math.PI, pitch: Math.atan2(fort.base + 4 - fy, fd) * 180 / Math.PI, fort: true },
     ...w.sites.viewpoints.map((v, i) => ({ name: `viewpoint ${i + 1}`, x: v.x, z: v.z, yaw: v.yaw, pitch: -6 }))];
   const fortFoot = (x, z) => polyDist(fort.poly, x, z) < 8;
-  const KITMAT = new Set([MAT.STONE, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.WINDOW]);
+  const KITMAT = new Set([MAT.STONE, MAT.MASONRY, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.WINDOW]);
   const out = [];
   for (const sp of spots) {
     const cam = { x: sp.x, z: sp.z, y: groundAt(w.terrain, sp.x, sp.z) + SCALE.eye, yaw: sp.yaw * Math.PI / 180, pitch: sp.pitch * Math.PI / 180 };
@@ -321,8 +321,11 @@ function fortChecks(w) {
       const gg = p.supportAt(nx, nz, ft), rise = gg - ft;
       const onGround = gg <= groundAt(T, nx, nz) + 1e-3;
       if (onGround ? rise > SCALE.climb * h + 1e-3 : rise > STEP) return null;
-      if (p.blocked(nx, nz, Math.max(gg, ft)) || (gg < ft - 0.05 && p.blocked(nx, nz, gg))) return null;
-      x = nx; z = nz; ft = gg;
+      // (a step down comes to rest on what is under any part of the body,
+      // as the player does: off an edge once clear of it)
+      const land = gg < ft - 0.05 ? p.landAt(nx, nz, ft) : gg;
+      if (p.blocked(nx, nz, Math.max(gg, ft)) || (gg < ft - 0.05 && p.blocked(nx, nz, land))) return null;
+      x = nx; z = nz; ft = land;
     }
     return [x, z, ft];
   };

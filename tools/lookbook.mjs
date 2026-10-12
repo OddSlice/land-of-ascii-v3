@@ -8,7 +8,7 @@
 //   node tools/lookbook.mjs --phase 0c --ref DIR [--built]   docs/phase0c.md: each look candidate at near, middle
 //       and far distance, and the three fixes before (the build in DIR, e.g. a copy of phase 0b) and after
 //       (shots/phase0c/)
-//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look tree=A,...] [--why]
+//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look cloud=A,...] [--why]
 //       the regression lookbook: the fixed cameras (nine in the lab, three in
 //       the stress scene, the generated world's twelve for the default seed,
 //       phase 3a's building yard's fourteen) at day, dusk and night with every clock frozen and the
@@ -397,12 +397,6 @@ async function phase0c() {
       }
       save(name, await grid(title, options.map((o, k) => `${axis} ${o}: ${names[k]}`), rows.map((r) => r.label), cells, rows[0].crop));
     };
-    await cand('trees.jpg', 'Conifers, treatment A and B: near, middle, far (day)', 'tree', ['A', 'B'], ['tidy tiers', 'rough and dark'], [
-      { label: 'near: inside the far-shore stand, looking out', v: { at: [356, 320, 175, 3] } },
-      { label: 'middle: a stand edge across the meadow (50-90 m)', v: { at: [276, 248, -97, 1] } },
-      { label: 'far: the far-shore stand from the south end (250 m)', v: { at: [345, 60, 4, 1] } },
-      { label: 'stress: in the dense forest', v: { stress: true, cam: 0 } },
-    ]);
     await cand('clouds.jpg', 'Clouds, treatment A and B: overhead, middle sky, horizon, dusk', 'cloud', ['A', 'B'], ['cumulus', 'banks'], [
       { label: 'overhead', v: { at: [300, 120, 170, 45] } },
       { label: 'middle of the sky', v: { at: [262, 225, -8, 12] } },

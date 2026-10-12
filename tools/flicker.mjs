@@ -29,7 +29,7 @@
 //   --weather fair,overcast,wet,rain,mist  (phase 2b) each run under each weather held (wet: fair
 //                                          weather on wet ground); --time 6.6 for another hour
 //                                          (mist lies only round dawn); the default is fair
-//   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look tree=B]
+//   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look cloud=B]
 //
 // step is metres a frame (0.075 m = 4.5 m/s at 60 fps), dir the walking
 // direction in degrees from the way the camera faces (90 = sideways), turn
@@ -43,14 +43,14 @@ const W = { step: 0.075, dir: 90, turn: 0 }, F = { step: 0.075, dir: 0, turn: 0 
 const SETS = {
   look: [
     // trees, near to far, and in the water
-    { axis: 'tree', label: 'forest edge across the meadow, walking sideways', at: [276, 248, -97, 1], ...W },
-    { axis: 'tree', label: 'forest edge across the meadow, turning', at: [276, 248, -97, 1], ...TURN },
-    { axis: 'tree', label: 'inside the stand, walking out', at: [356, 320, 175, 3], ...F },
-    { axis: 'tree', label: 'inside the stand, turning', at: [356, 320, 175, 3], ...TURN },
-    { axis: 'tree', label: 'trees in the lake, walking along the shore', at: [356, 229.6, 2, -12], ...W },
-    { axis: 'tree', label: 'far treeline, walking sideways', at: [345, 60, 4, 1], ...W },
-    { axis: 'tree', label: 'stress forest, walking in', stress: true, cam: 0, ...F },
-    { axis: 'tree', label: 'stress forest, turning', stress: true, cam: 0, ...TURN },
+    { label: 'forest edge across the meadow, walking sideways', at: [276, 248, -97, 1], ...W },
+    { label: 'forest edge across the meadow, turning', at: [276, 248, -97, 1], ...TURN },
+    { label: 'inside the stand, walking out', at: [356, 320, 175, 3], ...F },
+    { label: 'inside the stand, turning', at: [356, 320, 175, 3], ...TURN },
+    { label: 'trees in the lake, walking along the shore', at: [356, 229.6, 2, -12], ...W },
+    { label: 'far treeline, walking sideways', at: [345, 60, 4, 1], ...W },
+    { label: 'stress forest, walking in', stress: true, cam: 0, ...F },
+    { label: 'stress forest, turning', stress: true, cam: 0, ...TURN },
     // clouds, in views with no trees in them (trees would be counted too)
     { axis: 'cloud', label: 'open sky, turning', at: [300, 120, 170, 25], ...TURN },
     { axis: 'cloud', label: 'open sky, walking sideways', at: [300, 120, 170, 25], ...W },
@@ -110,7 +110,7 @@ SETS.fort = [
   { label: 'fort: walking the wall walk', scene: 'world', fort: 'walk', ...F },
   { label: 'fort: turning in the courtyard', scene: 'world', camName: 'the courtyard', ...TURN },
 ];
-const OPTIONS = { tree: ['A', 'B'], cloud: ['A', 'B'], meadow: [0, 1, 2] };
+const OPTIONS = { cloud: ['A', 'B'], meadow: [0, 1, 2] };
 const frames = Number(a.frames || 60);
 
 // ---- the far skyline (phase 2a), in Node --------------------------------------
@@ -124,7 +124,7 @@ async function skyline(root, seed) {
   const CT = await import(`${root}/src/contract.js`), OB = await import(`${root}/src/world/objects.js`);
   const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
   const w = PK.unpackWorld(PK.packWorld(r.value));
-  const cols = 360, rows = 112, n = cols * rows, look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const out = [];
   for (const ci of [0, 1]) {
     const c = w.cameras[ci], be = BE.createCpuBackend(w);
@@ -175,8 +175,8 @@ async function buildings(seed) {
   const lab = buildWorld();
   const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
   const w = PK.unpackWorld(PK.packWorld(r.value)), f = w.sites.fort;
-  const BLD = new Set([CT.MAT.STONE, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
-  const cols = 360, rows = 112, n = cols * rows, look = { tree: 'B', cloud: 'B', meadow: 2, shallows: 'blue' };
+  const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
+  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const o = f.gate.out, deg = (x) => x * 180 / Math.PI;
   // the wall walk: the camera's spot, along its wall
   const wc = w.cameras.find((c) => c.name === 'the wall walk over the valley');
@@ -288,7 +288,7 @@ async function measure(browser, root, list) {
           const L = window.lab;
           // (the look set compares options against the phase 0b look; the
           // world set runs the settled look)
-          if (L.setLook) { if (run.scene === 'world' || run.scene === 'yard') L.resetLook(); else L.setLook({ tree: 'A', cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
+          if (L.setLook) { if (run.scene === 'world' || run.scene === 'yard') L.resetLook(); else L.setLook({ cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
           let s0;
           if (run.camName !== undefined) run.cam = L.cameras.findIndex((c) => c.name === run.camName);
           if (run.fort === 'road') {
