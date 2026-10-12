@@ -269,7 +269,8 @@ So everything has a floor that grows with distance (`minR`, the width of a cell 
 | Buildings: openings | a door, a window, an arrow slit or the gate far off closes once it is under about two cells across or two rows tall, as a notch in a crown does |
 | Buildings: stairs | the steps melt into an even slope once a step is under about three rows tall |
 | Buildings: lit windows | held at two rows, faded by how much of that is really window, as a flame is |
-| Buildings: masonry, framing, shingles, boards, paving | each fades as a cell's footprint on the surface passes its size (a course, a frame bay, a shingle row) |
+| Buildings: masonry's courses (after phase 3a) | a course joint darkens each cell by how much of it the joint covers (the joint drawn at least about a row wide), so it slides across the cells instead of blinking; it fades once a course is under two and a half rows, leaving its average darkness. Joints between blocks are kept near: walking sweeps them sideways across the cells, and drawn further they blinked more than the lab's wall |
+| Buildings: block joints, framing, shingles, boards, paving | each fades as a cell's footprint on the surface passes its size (a block, a frame bay, a shingle row) |
 
 **Time moves only what should move:**
 - the clouds drift;
@@ -330,14 +331,7 @@ Shading:
 The shape: a bare trunk under a stack of overlapping cone tiers, each wide at its foot and narrow at its top (a sawtooth outline), with a ragged edge that turns with the angle round the trunk.
 - Seen from below, a tier's flat underside is darker toward the trunk.
 - Deep in a close stand, crowns grow narrower, so a closed canopy keeps gaps to the sky.
-- **Treatment A (tidy):** the tiered shape as in phase 0b, with the per-tree variation above. Kept in the look panel for comparison only.
-- **Treatment B (rough and dark), the settled look:**
-  - tiers shifted off the axis;
-  - a third of them cut short, so sky or trunk shows above;
-  - some notched;
-  - a deeper ragged outline in 13 sectors;
-  - foliage tone in clumps;
-  - 28% less light.
+- **The tidy tiers (treatment A), the only treatment since after phase 3a:** the tiered shape as in phase 0b, with the per-tree variation above and a ragged outline in 9 sectors. Treatment B (rough and dark: tiers shifted off the axis, some cut short, some notched, a deeper outline, foliage in clumps, 28% less light) was the settled look from phase 1 to phase 3a; Martin asked for the tidy tiers instead, and the choice is gone from the look panel and the URL.
 
 ### Other objects
 
@@ -356,13 +350,14 @@ Every structure is made from one kit of pieces, described as data (`src/world/ki
 - **Keep:** one hall 5 m high, against the far wall, 6 m above the walk; a door from the yard, windows lit at night.
 - **Stair to the walk:** solid stone steps against the wall's inside face.
 - **Timber building:** a framed house (posts and beams with plaster between), a shingle roof, a door.
-- **Well, torch on a bracket or post, lit window.**
+- **Well, torch on a bracket or post, lit window.** The well's shaft is drawn dark, nearly black at every hour, 20 cm under its rim, so looking in shows a hole and not the ground (after phase 3a).
 
-**The materials** (colours by keyframe in `look.js`; stone in blocks is the wall's stone):
+**The materials** (colours by keyframe in `look.js`; after phase 3a the fort's dressed stone is its own material, `masonry`, paler than the lab wall's stone and the tan rock, and its joints darken it more):
 
 | Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | With distance |
 |---|---|---|---|---|---|
-| Stone in blocks | `:=#▒▓█` | `#9a958d` / `#4d4b50` | `#6e6064` | `#45464e` | courses and joints fade with the footprint |
+| Dressed stone (`masonry`) | `:=#▒▓█` | `#b8ae9c` / `#56524f` | `#857373` | `#52535b` | the courses' joints stay dark while a course is at least two and a half rows tall, drawn by how much of each cell they cover, then fade to their average darkness by one and a half; the joints between blocks fade with the footprint (about 15 m), and the blocks are one tone |
+| A well's shaft (`shaft`) | ` .:` | `#1b1817` / `#141211` | `#1a1718` | `#121214` | nearly black at every hour |
 | Timber | `.-=#H` | `#6e573f` / `#30261e` | `#4f3d31` | `#302b23` | posts and beams held two cells; framing fades |
 | Plaster | `.,:;=` | `#b3a994` / `#575450` | `#806d69` | `#504f52` | plain; goes with the frame's fading |
 | Shingle roof | `:^=#%` | `#6d625a` / `#2d2a2c` | `#4d424f` | `#363641` | shingle rows fade |
@@ -445,11 +440,11 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 
 ## 9. Settled choices
 
-Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates. They are the defaults in `look.js` (`choices`); the look panel (L) and the URL (`?tree=A&cloud=A&meadow=0&shallows=warm`) still show the others, for comparison, until a later phase removes them.
+Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates. They are the defaults in `look.js` (`choices`); the look panel (L) and the URL (`?cloud=A&meadow=0&shallows=warm`) still show the others, for comparison, until a later phase removes them. (The conifers' choice was removed after phase 3a, 12 Oct 2026: only the tidy tiers are kept, at Martin's request.)
 
 | Choice (key) | Settled | Why |
 |---|---|---|
-| Conifers (7) | **B, rough and dark** | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. B costs about 3% more than A in a forest and blinks no more than phase 0b walking; turning inside a forest it crawls more than phase 0b did, which Martin accepted. |
+| Conifers (7, removed after phase 3a) | ~~B, rough and dark~~ **A, the tidy tiers** since after phase 3a (Martin's choice) | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. B costs about 3% more than A in a forest and blinks no more than phase 0b walking; turning inside a forest it crawls more than phase 0b did, which Martin accepted. |
 | Clouds (8) | **B, banks** | The reference's clouds are irregular banks and broken bands, flatter and longer at dusk. |
 | Meadow (9) | **2, strong patches** | The reference's meadow is mottled in large soft patches several metres across; strength 1 is barely visible at density 3. |
 | Shallows (0) | **blue, even blue** | The reference's near water is an even blue with no bed showing. |

@@ -375,3 +375,37 @@ Each is a number in `src/look.js`, `src/world/scale.js` or a short rule in the c
 - **The steadiness rules of section 3** trade a little detail for no blinking: parapets seen along their length drawn whole, slanted doorways closed, framing held back. Each is a threshold that can be loosened if a little more blinking is acceptable.
 - **The square towers' size** went up to 4.4–4.9 m half width to fit the ground door beside a wall.
 - **The prototypes stay in the build** behind `?yard=1&proto=1` (about 10 KB), for comparison; a later phase can remove them.
+
+---
+
+## 9. After phase 3a (12 Oct 2026)
+
+Martin's notes after playing it on Windows 11 in Chromium, and what changed:
+
+| He asked | Done |
+|---|---|
+| Make the castle a more distinctive colour, or the gaps between the stones darker, so the blocks stand out from a distance | The fort's stone is its own material, `masonry`: a paler limestone (`#b8ae9c` lit by day) than the lab wall's grey and the tan rock. Its course joints darken it by up to 42% (stone's tone was 18%), drawn at least about a row wide and by how much of each cell they cover, so they read while a course is two and a half rows tall (about 22 m at fine detail on a 16:9 screen) and fade by one and a half (about 37 m); further off the wall keeps their average darkness. The joints between blocks are darker near (85% of a course joint) but still fade by about 15 m. |
+| Let me drop off the wall | Any edge can be stepped off: a step down is now refused only if the body would come to rest inside something, judged where it really comes to rest (on whatever is under any part of the body), not at the ground under its middle. Walking off the walk's open side drops into the yard. |
+| Add jumping | Space jumps about 1.1 m (not while swimming; a press up to 0.15 s before landing still counts; the head stops a rise under a ceiling). From the walk you can jump onto the breastwork in a crenel and drop outside. |
+| Slinging the mouse makes the camera skip (Chromium) | Chromium is asked for the mouse's raw movement (pointer lock with `unadjustedMovement`), and a lone movement over 150 px and six times the largest in the last 80 ms is dropped: Chromium on Windows is known to report such jumps now and then with pointer acceleration on. A real flick builds up over several movements and passes. Where raw movement is refused the plain lock is taken. |
+| The frame rate drops a little walking up the castle's stairs | It was the walking, not the drawing: each step's riser was taken as a near-vertical slope, cutting every step into many tiny ones, each testing the body against every nearby shape at every stair step's height, with fresh arrays each time; the garbage set off collections of up to 7 ms. Now a building's steps are walked at walking speed, the tests skip shapes that cannot touch the body and allocate nothing, and the eye glides over each step instead of jumping 20 cm. |
+| The well should be a black hole | Its shaft is a new near-black material (`shaft`), drawn 20 cm under the rim. |
+| Real time by default | The clock runs from the start at real time (one game hour an hour); 1 2 3 4 set the hour and leave it running; T still stops and starts it. |
+| Conifers tidy only | The rough, dark treatment B is gone (from the look, the look panel, the URL and the tools); every conifer is the tidy tiers. `?tree=` is ignored. |
+
+**Measured** (seed 3 unless said):
+
+| Check | Result |
+|---|---|
+| Blinking on the buildings' own cells (`tools/flicker.mjs --buildings`), glyph / colour flips | road to the gate 0.140% / 0.041%, wall walk 0.326% / 0.215%, turning in the courtyard 0.179% / 0.098%; the lab's wall 0.242% / 0.045%, 0.504% / 0.383%, 0.512% / 0.117%. Every figure under the lab's wall. The first try (joints between blocks drawn to a distance and per-block tones) blinked up to five times as much, which is why those stay near. |
+| Walking up the fort's two stairs, the player's update per frame (Node, after warm-up) | median 0.024 / 0.019 ms, p95 0.08 / 0.07 ms (before: p95 8.5 / 9.3 ms, spikes to 11 ms); the eye moves at most 8 cm a frame on a stair (before 20 cm) |
+| The fort's checks, 60 seeds (`--fort-only --sweep 60`) | 60 of 60 pass; 2,788 of 2,788 places reached and back out; 60,000 random walks, which now step off the walk and fall into the yard: none through a wall, stuck or inside stone. The walker steps down by the same rule as the player. |
+| Step off the walk / jump out through a crenel (Node test, seed 3, every side) | on the four sides tested (seed 3's other two are the gate's and the keep's), walking off the walk's open side drops into the yard, and a jump into a crenel and on out lands outside (from about one place in three along a side: where a crenel is) |
+| The world check, seeds 3, 1, 2, 4, 5 | all pass; the fort from the spawn 17.5, 34, 27.3, 19.1, 34.9 (phase 3a: 21.3, 37, 31, 27.1, 40.5; a visible step is 6): the paler stone stands a little closer to the far haze, while near it stands out more |
+| Identity | 96 of 96 views byte-identical across 0, 1, 3, 5 and 8 workers, shared and fallback |
+| Menu check (built file) | 29 of 29 |
+| The regression set | changed only where the fort or conifers are in view (the lab wall's own frames by 0.1–1%, its treeline); saved again, 114 frames |
+| Frame cost, old against new, alternating on one thread (Node, 384 × 108) | lake shore 27.8 → 21.4 ms (the tidy conifers are cheaper), the fort's four views within ±15% either way; rain the same |
+| Frame times, Chromium, 8 workers, density 3 | fair: slowest worker at most 8.83 ms (the gate passage). Rain measured up to 13 ms, but a Chrome tab on this Mac took nearly three cores throughout, and every view without the fort was slower than phase 3a by the same share; the alternating comparison above shows no new cost. To measure again on a quiet machine. |
+
+**Still open:** the joints between blocks fade by about 15 m (drawn further, walking forward sweeps them sideways across the cells and they blink); the raw mouse movement turns off Windows' pointer acceleration in the game, so the sensitivity may want adjusting (Esc → Display); the Controls tab sits close to scrolling at 1440 × 900, and below that its list scrolls.

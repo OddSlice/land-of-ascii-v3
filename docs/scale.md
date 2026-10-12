@@ -38,11 +38,12 @@ The range goes on past the north and east edges as three receding ridgelines: ne
 | | | |
 |---|---|---|
 | Eye height | 1.7 m above the feet | An adult's eye. Trees, wall and road read at true size against it. |
-| Walking speed | 4.5 m/s, measured along the ground | Brisk game walking: real walking is about 1.4 m/s, which is too slow for a world this size. Measured along the slope, so hills neither speed you up nor slow you down on the map. |
+| Walking speed | 4.5 m/s, measured along the ground | Brisk game walking: real walking is about 1.4 m/s, which is too slow for a world this size. Measured along the slope, so hills neither speed you up nor slow you down on the map. A building's steps are walked at the same speed across the map (after phase 3a), and the eye glides over each step in about a tenth of a second. |
 | Running speed | 8 m/s (Shift) | |
 | Wading | slows smoothly to 45% of walking speed at chest depth | |
 | Swimming | 1.2 m/s, past chest depth (1.3 m of water), with the eye 0.15 m above the surface | |
 | Flying | 50 m/s (F) | For looking round the world. Space climbs. |
+| Jumping | about 1.1 m (Space), not while swimming | After phase 3a. A game's jump, not a person's: enough to get onto a parapet's 1 m breastwork from the walk and out through a crenel. Any edge can be stepped off; falling does no harm. |
 | Climbing | nothing steeper than 45° (1.0) can be walked up | |
 | Sliding | ground steeper than 50° (1.19) slides you down at 6 m/s | |
 | Falling | does no harm | |
@@ -98,7 +99,7 @@ The building kit's sizes, in `SCALE.kit`. Heights are above the ground a piece s
 | A tower's stair | 1.0 m wide (strips of 1.1 m), steps 0.22 m by 0.25 m | Steeper, to fit: two flights and a landing to the walk, slabs on to the top. |
 | Floors | 0.3 m thick; rooms at least 2.6 m high | |
 | Timber house | 3.3–4.2 by 2.4–2.9 m (half), eaves at 3 m, roof pitch 0.95 (about 44 degrees), 0.45 m overhang | A barn or a store against the wall. |
-| Well | 1 m radius, 0.85 m high | |
+| Well | 1 m radius, 0.85 m high, its shaft drawn dark 0.2 m under the rim | After phase 3a: dark, so it reads as a hole. |
 | Window | 0.7 m wide, 1.1 m high, 0.35 m deep | |
 
 **The fort:** 4 to 6 towers at the corners of a rough polygon (square and round mixed, at least one of each), 53–64 m across on the five check seeds, its yard 1,100–2,000 m². The gate is in the side facing where the road arrives; the keep stands against the far wall; one or two timber houses and a well stand in the yard; stairs go up to the walk in at least two places. Seed 3's fort: 6 towers (3 round), 2 stairs, 2 houses, a well, 26 torches and 10 lit windows in 294 shapes; 63.6 m across, its yard 1,984 m².
