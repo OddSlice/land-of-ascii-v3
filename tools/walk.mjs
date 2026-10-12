@@ -4,7 +4,7 @@
 // road (`world-road`, the default seed or --seed). The videos go to
 // shots/walks/, which is kept out of git.
 //
-//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort] [--threads 8] [--density 4] [--headed]
+//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village] [--threads 8] [--density 4] [--headed]
 //                       [--look cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to
@@ -43,6 +43,11 @@ const WALKS = [
   // torches are lit inside (seed 3's road to the gate is 1.4 km, so the walk
   // takes about three and a half minutes)
   { name: 'world-fort', world: true, fort: true, hour: 17.5, rate: 1 / 240 },
+  // phase 3b: four minutes at dusk, from the fort's gate down its new road to
+  // the nearest village by road, through it, and out onto its jetty (or the
+  // nearest bridge), then a slow look round; from 17:40, the clock running
+  // an hour every four minutes, so the lanterns and windows light on the way
+  { name: 'world-village', world: true, village: true, hour: 17.67, rate: 1 / 240, secs: 240 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -80,6 +85,7 @@ try {
     const t0 = Date.now();
     if (w.road) await followRoad(page, w.road);
     else if (w.fort) await walkFort(page, a.seed);
+    else if (w.village) await walkVillage(page, a.seed, w.secs);
     else if (w.pan) {
       // turn at a steady rate, one step each display refresh
       await page.evaluate(({ secs, deg }) => new Promise((res) => {
@@ -210,6 +216,68 @@ async function walkFort(page, seed) {
 // toward the point `ahead` metres on from the walker's place along them (at
 // most 180 degrees a second), that place only ever moving forward; done
 // within 1.2 m of the last point, or after `secs` seconds.
+// (phase 3b) The road graph of a world: every road point, joined along its
+// road and to points of other roads within 2 m; and the shortest way along
+// it between two places.
+function roadGraph(w) {
+  const P = [];
+  for (const rd of w.roads) { const b = P.length; for (let q = 0; q < rd.n; q++) P.push({ x: rd.x[q], z: rd.z[q], nb: [] }); for (let q = 1; q < rd.n; q++) { P[b + q].nb.push(b + q - 1); P[b + q - 1].nb.push(b + q); } }
+  const cell = new Map(), key = (x, z) => `${Math.floor(x / 2)},${Math.floor(z / 2)}`;
+  P.forEach((p, i) => { const k = key(p.x, p.z); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(i); });
+  P.forEach((p, i) => { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const j of cell.get(`${Math.floor(p.x / 2) + dx},${Math.floor(p.z / 2) + dz}`) || []) if (j !== i && Math.hypot(P[j].x - p.x, P[j].z - p.z) < 2) p.nb.push(j); });
+  const near = (x, z) => P.reduce((bi, p, i) => (Math.hypot(p.x - x, p.z - z) < Math.hypot(P[bi].x - x, P[bi].z - z) ? i : bi), 0);
+  const way = (x0, z0, x1, z1) => {
+    const si = near(x0, z0), gi = near(x1, z1);
+    const dist = new Float64Array(P.length).fill(Infinity), prev = new Int32Array(P.length).fill(-1), done = new Uint8Array(P.length);
+    dist[si] = 0;
+    for (;;) {
+      let i = -1; for (let k = 0; k < P.length; k++) if (!done[k] && dist[k] < Infinity && (i < 0 || dist[k] < dist[i])) i = k;
+      if (i < 0 || i === gi) break;
+      done[i] = 1;
+      for (const j of P[i].nb) { const d = dist[i] + Math.hypot(P[j].x - P[i].x, P[j].z - P[i].z); if (d < dist[j]) { dist[j] = d; prev[j] = i; } }
+    }
+    const pts = []; for (let i = gi; i >= 0; i = prev[i]) pts.push([P[i].x, P[i].z]);
+    return { pts: pts.reverse(), length: dist[gi] };
+  };
+  return { way };
+}
+
+// (phase 3b) From the fort's gate down its road to the nearest village by
+// road, along its road or street to its centre, then out onto its jetty by
+// its footpath to the water (a village without one: on to the nearest
+// bridge), and a slow look round to fill the time.
+async function walkVillage(page, seed, secs) {
+  const { generateWorld, DEFAULT_SEED } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const g = generateWorld(seed !== undefined ? Number(seed) : DEFAULT_SEED); let r; while (!(r = g.next()).done);
+  const w = unpackWorld(packWorld(r.value)), f = w.sites.fort, G = roadGraph(w), o = f.gate.out;
+  const x0 = f.front.x + o[0] * 3, z0 = f.front.z + o[1] * 3;
+  const ways = w.sites.villages.map((v) => ({ v, ...G.way(x0, z0, v.plan.centre.x, v.plan.centre.z) })).sort((A, B) => A.length - B.length);
+  const { v, pts: road } = ways[0], p = v.plan;
+  let last;
+  if (p.jetty) {
+    const pa = (p.paths || []).find((q) => q.to === 'water');
+    last = [...(pa ? pa.x.map((x, i) => [x, pa.z[i]]) : []), p.jetty.a, p.jetty.b];
+  } else {
+    const b = (w.sites.bridges || []).map((b) => ({ b, ...G.way(p.centre.x, p.centre.z, b.x, b.z) })).sort((A, B) => A.length - B.length)[0];
+    last = b ? b.pts : [];
+  }
+  console.log(`world-village: village ${p.q + 1} (${p.pattern}), ${Math.round(ways[0].length)} m by road from the gate, then ${p.jetty ? 'its jetty' : 'the nearest bridge'}`);
+  await page.evaluate(({ x, z, yaw }) => window.lab.setCamera({ x, z, yaw }), { x: x0, z: z0, yaw: Math.atan2(o[0], o[1]) * 180 / Math.PI });
+  const t0 = Date.now();
+  await page.keyboard.down('KeyW');
+  await follow(page, road, 4, 200);
+  await follow(page, last, 2, 90);
+  await page.keyboard.up('KeyW');
+  // a slow look round, out over the water, for whatever time is left
+  const left = Math.max(10, secs - (Date.now() - t0) / 1000);
+  await page.evaluate(({ secs }) => new Promise((res) => {
+    const L = window.lab, y0 = L.state().yaw, t0 = performance.now();
+    const step = () => { const t = Math.min(1, (performance.now() - t0) / (secs * 1000)); L.face(y0 + 300 * t * t * (3 - 2 * t)); if (t < 1) requestAnimationFrame(step); else res(); };
+    step();
+  }), { secs: left });
+}
+
 async function follow(page, pts0, ahead, secs) {
   const pts = [pts0[0]];
   for (let i = 1; i < pts0.length; i++) {

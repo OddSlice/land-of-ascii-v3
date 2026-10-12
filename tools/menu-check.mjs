@@ -182,6 +182,42 @@ try {
   await small.check();
   await small.ctx.close();
 
+  // ---- (phase 3b) 1280 x 720: the Controls fit without scrolling; the benchmark ----
+  {
+    const mid = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1280, height: 720, dpr: 1 });
+    const mp = mid.page;
+    await mp.keyboard.press('Enter'); await mp.waitForTimeout(200);
+    await mp.keyboard.press('Escape'); await mp.waitForTimeout(400);
+    const ctl = await mp.evaluate(() => { const b = document.querySelector('#menu .pane'); return { scroll: b.scrollHeight, client: b.clientHeight }; });
+    check('at 1280 x 720 the Controls fit without scrolling', ctl.scroll <= ctl.client + 1, JSON.stringify(ctl));
+    // (the clock runs in real time meanwhile: its hour compared to within 36 s)
+    const snap = () => mp.evaluate(() => { const s = window.lab.state(); return JSON.stringify({ hour: Math.round(s.hour * 100) / 100, weather: s.weather, x: s.x.toFixed(2), z: s.z.toFixed(2), yaw: s.yaw.toFixed(3), running: s.running, frozen: s.frozen }); });
+    const benchButton = (text) => mp.evaluate((text) => { const b = [...document.querySelectorAll('#menu button')].find((x) => x.textContent.trim().includes(text)); if (b) b.click(); return !!b; }, text);
+    await mp.click('#menu [role="tab"]:has-text("Advanced")'); await mp.waitForTimeout(300);
+    const b0 = await snap();
+    check('the benchmark does not run until asked', !(await mp.evaluate(() => window.lab.bench && window.lab.bench.running)));
+    await benchButton('run the benchmark'); await mp.waitForTimeout(3000);
+    const during = await mp.evaluate(() => window.lab.bench && window.lab.bench.running);
+    await benchButton('cancel'); await mp.waitForTimeout(500);
+    const afterCancel = await snap();
+    check('the benchmark, cancelled part way, puts back the clock, the weather and the camera', during && afterCancel === b0, `${b0} -> ${afterCancel}`);
+    await benchButton('run the benchmark'); await mp.waitForTimeout(3000);
+    await mp.keyboard.press('Escape'); await mp.waitForTimeout(600);
+    const afterClose = await snap();
+    check('closing the menu during the benchmark stops it and puts everything back', afterClose === b0 && !(await mp.evaluate(() => window.lab.bench.running)), afterClose);
+    await mp.keyboard.press('Escape'); await mp.waitForTimeout(400);
+    await mp.click('#menu [role="tab"]:has-text("Advanced")'); await mp.waitForTimeout(300);
+    const t0 = Date.now();
+    await benchButton('run the benchmark');
+    await mp.waitForFunction(() => !window.lab.bench.running, null, { timeout: 600000 });
+    const res = await mp.evaluate(() => ({ rows: window.lab.bench.rows.length, cams: window.lab.cameras.length, text: window.lab.bench.text() }));
+    const afterRun = await snap();
+    check('the benchmark runs every camera in fair weather and rain, and puts everything back', res.rows === 2 * res.cams && afterRun === b0 && /slowest/.test(res.text),
+      `${res.rows} rows for ${res.cams} cameras in ${Math.round((Date.now() - t0) / 1000)} s`);
+    await mid.check();
+    await mid.ctx.close();
+  }
+
   // ---- without localStorage ----
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   await ctx.addInitScript(() => {

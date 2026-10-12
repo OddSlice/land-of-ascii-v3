@@ -31,13 +31,21 @@
 //       five look fixes before (the build in DIR, a copy of phase 2b before
 //       them) and after; the menu's sections, the start card, the hint and
 //       the clean screen
-//   node tools/lookbook.mjs --phase 3a [--seeds 3,1,2,4,5] [--built] [--only proto,yard,fort,plans]
+//   node tools/lookbook.mjs --phase 3a [--seeds 3,1,2,4,5] [--built] [--only yard,fort,plans]
 //       docs/phase3a.md (shots/phase3a/): the two prototypes (spans and exact
 //       shapes) near, at middle distance and far; every kit piece in the
 //       building yard by day and at night; the fort on each seed from the
 //       road, inside the gate passage, the courtyard, the wall walk and
 //       across the lake, at day, dusk, night and in rain; and each seed's
 //       fort plan, cut through 1.4 m above the yard
+//   node tools/lookbook.mjs --phase 3b [--seeds 3,1,2,4,5] [--built] [--only yard,villages,plans,bridges,fort]
+//       docs/phase3b.md (shots/phase3b/): the village kit in the building
+//       yard by day and at night; each village of the default seed from its
+//       road, at its centre, inside one of its houses, from across the water
+//       or its fields, and at night; the villages' plans on each seed; a
+//       timber and a stone bridge from the road and from the bank (day,
+//       night, rain); the fort's approach on each seed, from the road and
+//       from above
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -50,6 +58,7 @@ if (String(a.phase) === '1') { await phase1(); process.exit(0); }
 if (String(a.phase) === '2a') { await phase2a(); process.exit(0); }
 if (String(a.phase) === '2b') { await phase2b(); process.exit(0); }
 if (String(a.phase) === '3a') { await phase3a(); process.exit(0); }
+if (String(a.phase) === '3b') { await phase3b(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -271,7 +280,27 @@ async function why(frames, index, saved) {
   for (let q = 0; q < Math.min(rd.n, f.reach + 60); q++) roadPts.push([rd.x[q], rd.z[q]]);
   const { polyDist } = await import('../src/world/gen/fort.js');
   const top = f.base + 26;
+  // (phase 3b) the villages (within their radius and 20 m), their fields and
+  // footpaths, the bridges and the road's 45 m either side of each (lifted,
+  // straightened, its banks), each with the 16 m the coarser terrain levels
+  // carry a change, up to 30 m above their ground
+  const disks = [];
+  for (const v of w.sites.villages) {
+    const p = v.plan; if (!p) continue;
+    disks.push([p.centre.x, p.centre.z, p.radius + 20 + 16, p.centre.y + 30]);
+    for (const fl of p.fields || []) disks.push([fl.x, fl.z, Math.hypot(fl.L, fl.W) / 2 + 16, groundAt(w.terrain, fl.x, fl.z) + 30]);
+    for (const pa of p.paths || []) for (let q = 0; q < pa.n; q += 4) disks.push([pa.x[q], pa.z[q], 18, groundAt(w.terrain, pa.x[q], pa.z[q]) + 30]);
+    if (p.signpost) disks.push([p.signpost.x, p.signpost.z, 18, p.signpost.y + 30]);
+  }
+  for (const b of w.sites.bridges || []) {
+    disks.push([b.x, b.z, b.len / 2 + 16, b.y + 30]);
+    const rb = w.roads[b.road];
+    if (rb) { let qc = 0, bd = Infinity; for (let q = 0; q < rb.n; q++) { const d = Math.hypot(rb.x[q] - b.x, rb.z[q] - b.z); if (d < bd) { bd = d; qc = q; } } for (let q = Math.max(0, qc - Math.ceil(b.len / 2) - 45); q <= Math.min(rb.n - 1, qc + Math.ceil(b.len / 2) + 45); q += 3) disks.push([rb.x[q], rb.z[q], 20, rb.y[q] + 30]); }
+  }
+  const ceiling = Math.max(top, ...disks.map((d) => d[3]));
+  const inVillage = (x, y, z) => { for (const [cx, cz, rr, yt] of disks) if (y < yt && Math.abs(x - cx) < rr && Math.abs(z - cz) < rr && Math.hypot(x - cx, z - cz) < rr) return true; return false; };
   const inZone = (x, y, z) => {
+    if (inVillage(x, y, z)) return true;
     if (y > top) return false;
     if (polyDist(cleared, x, z) < 22) return true;
     if (x > ox0 - 16 && x < ox1 + 16 && z > oz0 - 16 && z < oz1 + 16) return true;
@@ -280,7 +309,7 @@ async function why(frames, index, saved) {
   };
   const be = createCpuBackend(w), player = new Player(w, { rules: 'world' });
   console.log('\nwhy the world frames changed (cells; a cell can have more than one reason)\n');
-  console.log('| frame | changed | the fort or its surroundings in view | in the fort\'s shadow | in water mirroring either | unexplained |');
+  console.log('| frame | changed | the fort, a village, a field, a footpath or a bridge (or their surroundings) in view | in their shadow | in water mirroring them | unexplained |');
   console.log('|---|---|---|---|---|---|');
   let bad = 0;
   for (const fr of frames) {
@@ -302,7 +331,7 @@ async function why(frames, index, saved) {
     const sun = sunDir(hour), L = sun[1] > -0.035 ? sun : moonFor(hour, 0, 'moon');
     const ty = Math.tan(fov / 2), tx = ty * frame.aspect, cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cy0 = Math.cos(cam.yaw), sy0 = Math.sin(cam.yaw);
     let nView = 0, nShadow = 0, nWater = 0, nBad = 0;
-    const shadowed = (x, y, z) => { const l = Math.hypot(L[0], L[2]) || 1, el = Math.max(0.035, L[1]); for (let s = 1; s < 1200; s += 1) { const px = x + L[0] / l * s, pz = z + L[2] / l * s, py = y + el / Math.sqrt(1 - el * el) * s; if (py > top) return false; if (inZone(px, py, pz)) return true; } return false; };
+    const shadowed = (x, y, z) => { const l = Math.hypot(L[0], L[2]) || 1, el = Math.max(0.035, L[1]); for (let s = 1; s < 1200; s += 1) { const px = x + L[0] / l * s, pz = z + L[2] / l * s, py = y + el / Math.sqrt(1 - el * el) * s; if (py > ceiling) return false; if (inZone(px, py, pz)) return true; } return false; };
     for (const c of changed) {
       const col = c % cols, row = (c - col) / cols, o = c * HIT_STRIDE;
       const X = (2 * (col + 0.5) / cols - 1) * tx, Y = (1 - 2 * (row + 0.5) / rows) * ty;
@@ -320,7 +349,7 @@ async function why(frames, index, saved) {
     bad += nBad;
     console.log(`| ${fr.name} | ${changed.length} | ${nView} | ${nShadow} | ${nWater} | ${nBad} |`);
   }
-  console.log(`\n${bad ? `${bad} changed cells unexplained` : 'every changed cell is explained by the fort (in view, its shadow or its reflection)'}`);
+  console.log(`\n${bad ? `${bad} changed cells unexplained` : 'every changed cell is explained by the fort, a village, its fields and footpaths or a bridge (in view, their shadow or their reflection)'}`);
   if (bad) process.exitCode = 1;
 }
 
@@ -716,7 +745,7 @@ async function phase3a() {
   const OUT = path.join(ROOT, 'shots', 'phase3a');
   fs.mkdirSync(OUT, { recursive: true });
   const seeds = String(a.seeds || '3,1,2,4,5').split(',').map(Number);
-  const only = a.only ? String(a.only).split(',') : ['proto', 'yard', 'fort', 'plans'];
+  const only = a.only ? String(a.only).split(',') : ['yard', 'fort', 'plans'];
   const now = await serve();
   const browser = await launch('chromium');
   const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
@@ -753,23 +782,8 @@ async function phase3a() {
       return shot(lab.page);
     };
 
-    // 1. the prototypes: each piece turned and squared to the grid, as spans
-    // and as exact shapes, near, at middle distance and far
-    if (only.includes('proto')) {
-      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'yard', extra: { proto: 1 } });
-      await lab.page.evaluate(() => window.lab.setHud(false));
-      const names = await lab.page.evaluate(() => window.lab.cameras.map((c) => c.name));
-      const at = (rep, piece, dist) => names.indexOf(`prototype, ${rep}: ${piece}, ${dist}`);
-      for (const [piece, file] of [['wall', 'wall'], ['tower', 'tower'], ['house', 'house'], ['wall (square)', 'wall-square'], ['tower (square)', 'tower-square'], ['house (square)', 'house-square']]) {
-        const srcs = [], labels = [];
-        for (const rep of ['spans', 'shapes']) for (const dist of ['near', 'middle', 'far']) {
-          srcs.push(await frame(lab, { cam: at(rep, piece, dist), hour: 14 }));
-          labels.push(`${rep === 'spans' ? 'spans (1 m columns)' : 'exact shapes'}, ${dist}`);
-        }
-        writeDataURL(path.join(OUT, `proto-${file}.jpg`), await compose(srcs, labels, `Prototype: the ${piece}${piece.includes('square') ? '' : ', turned 25 degrees'}, spans above and exact shapes below`, 3, 0.2));
-      }
-      await lab.ctx.close();
-    }
+    // 1. (the prototypes were removed from the build in phase 3b; their
+    // pictures stay in shots/phase3a/)
 
     // 2. the building yard: every kit piece by day, and at night
     if (only.includes('yard')) {
@@ -867,6 +881,217 @@ async function phase3a() {
       writeDataURL(path.join(OUT, 'plans.jpg'), await compose(plans, planLabels, 'The fort plans: walls dark (lighter where higher), floors pale, yard earth, ground shaded by height; road dashed, torches orange', 3, 1));
     }
     console.log(fs.readdirSync(OUT).map((f) => `shots/phase3a/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    now.server.close();
+  }
+}
+
+
+// ---- phase 3b ------------------------------------------------------------------
+// A plan of the world round (cx, cz), span metres across, n pixels: the
+// kit dark (lighter the higher it stands above the ground), water blue,
+// roads and footpaths tan, fields by kind (crop, stubble, fallow), the ground
+// green shaded by height; returns the pixels and the torches in pixels.
+async function topPlan(w, cx, cz, span, n) {
+  const { supportAt } = await import('../src/world/kit.js');
+  const { groundAt } = await import('../src/world/objects.js');
+  const T = w.terrain, K = w.kit, NN = T.NN, m = span / n, x0 = cx - span / 2, z1 = cz + span / 2;
+  const base = groundAt(T, cx, cz), rgb = new Uint8Array(n * n * 3);
+  for (let iy = 0; iy < n; iy++) for (let ix = 0; ix < n; ix++) {
+    const x = x0 + (ix + 0.5) * m, z = z1 - (iy + 0.5) * m, o = (iy * n + ix) * 3;
+    const gy = groundAt(T, x, z), top = supportAt(K, x, z, 1e9), j = Math.round(z) * NN + Math.round(x);
+    let c;
+    if (top > gy + 0.25) { const t = Math.max(0, Math.min(1, (top - gy) / 9)); c = [70 + 90 * t, 62 + 80 * t, 58 + 70 * t]; }
+    else if (T.wWater[j] > 127) c = [64, 104, 150];
+    else if (T.wRoad[j] > 127) c = [176, 150, 108];
+    else if (T.wPath[j] > 127) c = [196, 176, 132];
+    else if (T.wField[j] > 127) c = T.fieldKind[j] === 2 ? [196, 178, 104] : T.fieldKind[j] === 3 ? [128, 98, 70] : [150, 160, 74];
+    else { const t = Math.max(-1, Math.min(1, (gy - base) / 20)); c = [88 + 40 * t, 120 + 40 * t, 76 + 30 * t]; }
+    rgb[o] = c[0]; rgb[o + 1] = c[1]; rgb[o + 2] = c[2];
+  }
+  const torches = K.torches.filter((t) => Math.abs(t.x - cx) < span / 2 && Math.abs(t.z - cz) < span / 2).map((t) => [(t.x - x0) / m, (z1 - t.z) / m]);
+  return { n, rgb: Array.from(rgb), torches };
+}
+
+async function phase3b() {
+  const OUT = path.join(ROOT, 'shots', 'phase3b');
+  fs.mkdirSync(OUT, { recursive: true });
+  const seeds = String(a.seeds || '3,1,2,4,5').split(',').map(Number);
+  const only = a.only ? String(a.only).split(',') : ['yard', 'villages', 'plans', 'bridges', 'fort'];
+  const { generateWorld } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const { VILLAGE_ROWS } = await import('../src/world/yard.js');
+  const worlds = new Map();
+  const worldOf = (seed) => {
+    if (!worlds.has(seed)) { const g = generateWorld(seed); let r; while (!(r = g.next()).done); worlds.set(seed, unpackWorld(packWorld(r.value))); }
+    return worlds.get(seed);
+  };
+  const now = await serve();
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  const hourOf = { day: 14, dusk: 17.85, night: 23, dawn: 6.15 };
+  const deg = (r) => r * 180 / Math.PI;
+  const { groundAt } = await import('../src/world/objects.js');
+  const groundOf = (w, x, z) => groundAt(w.terrain, x, z);
+  const waterOf = (w, x, z) => { const T = w.terrain; return groundAt({ ground: T.levels[0].H, N: T.N, NN: T.NN }, x, z); };
+  try {
+    const bench = await workbench(browser);
+    const compose = (srcs, labels, title, per, scale = 1) => bench.evaluate(async ({ srcs, labels, title, per, scale }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const pad = 12, top = 30, w = Math.round(ims[0].width * scale), h = Math.round(ims[0].height * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, x, y, w, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.86);
+    }, { srcs, labels, title, per, scale });
+    const planImage = (pl) => bench.evaluate(({ n, rgb, torches }) => {
+      const c = document.createElement('canvas'); c.width = n; c.height = n;
+      const g = c.getContext('2d'), img = g.createImageData(n, n);
+      for (let i = 0; i < n * n; i++) { img.data[i * 4] = rgb[i * 3]; img.data[i * 4 + 1] = rgb[i * 3 + 1]; img.data[i * 4 + 2] = rgb[i * 3 + 2]; img.data[i * 4 + 3] = 255; }
+      g.putImageData(img, 0, 0);
+      g.fillStyle = '#ffb347'; for (const [x, y] of torches) { g.beginPath(); g.arc(x, y, 2.4, 0, 2 * Math.PI); g.fill(); }
+      return c.toDataURL('image/png');
+    }, pl);
+    const frame = async (lab, set) => {
+      await lab.page.evaluate(async (set) => {
+        const L = window.lab;
+        L.setWeather(set.weather || 'fair');
+        if (set.free) L.setCamera(set.free); else L.camera(set.cam);
+        L.freeze(set.hour, 12.5, 0);
+        await L.whenIdle();
+      }, set);
+      await lab.check();
+      return shot(lab.page);
+    };
+    // a free camera at (x, z), eye `up` over the ground (or the water), looking at (tx, ty, tz)
+    const aim = (w, x, z, up, tx, ty, tz) => {
+      const T = w.terrain, j = Math.round(z) * T.NN + Math.round(x);
+      const gy = Math.max(groundOf(w, x, z), T.wWater[j] > 127 ? waterOf(w, x, z) : -1e9), y = gy + up;
+      return { x, z, y, yaw: deg(Math.atan2(tx - x, tz - z)), pitch: deg(Math.atan2(ty - y, Math.hypot(tx - x, tz - z))) };
+    };
+
+    // 1. the village kit in the building yard, by day and at night
+    if (only.includes('yard')) {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'yard' });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      const cams = await lab.page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, time: c.time })));
+      const mine = cams.map((c, i) => ({ ...c, i })).filter((c) => VILLAGE_ROWS.some((r) => c.name === `${r}, near` || c.name === r) || c.name === 'the village pieces at night');
+      const srcs = [], labels = [];
+      for (const c of mine) { srcs.push(await frame(lab, { cam: c.i, hour: hourOf[c.time] })); labels.push(`${c.i + 1} ${c.name} (${c.time})`); }
+      writeDataURL(path.join(OUT, 'yard.jpg'), await compose(srcs, labels, 'The village kit in the building yard (?yard=1), each piece turned 25 degrees', 3, 0.2));
+      const nsrcs = [], nlabels = [];
+      for (const c of mine.filter((c) => /^(cottage|hall|chapel|market|jetty|signpost|stone bridge|inside)/.test(c.name))) { nsrcs.push(await frame(lab, { cam: c.i, hour: 23 })); nlabels.push(`${c.i + 1} ${c.name}, night`); }
+      writeDataURL(path.join(OUT, 'yard-night.jpg'), await compose(nsrcs, nlabels, 'The village kit at night (23:00): lanterns, hearths, lit windows', 3, 0.2));
+      await lab.ctx.close();
+    }
+
+    // 2. each village of the default seed: from its road, its centre, inside
+    // a house, from across the water or its fields, and at night
+    if (only.includes('villages')) {
+      const seed = seeds[0], w = worldOf(seed);
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c) => c.name));
+      for (const [q, v] of w.sites.villages.entries()) {
+        const p = v.plan, tag = `village ${q + 1} (${p.pattern})`, c = p.centre;
+        const road = names.indexOf(`${tag}, the road in`), centre = names.indexOf(`${tag}, its centre`);
+        // inside its first enterable house: just in from the door, looking in
+        const e = p.enter[0], ex = e.door[0] - e.x, ez = e.door[1] - e.z, el = Math.hypot(ex, ez);
+        const ix = e.x + ex / el * Math.max(0.6, el - 1.1), iz = e.z + ez / el * Math.max(0.6, el - 1.1);
+        const inside = { x: ix, z: iz, y: e.floor + 1.6, yaw: deg(Math.atan2(-ex, -ez)), pitch: -8 };
+        // across the water (a shore village) or across its farthest field
+        let ax, az;
+        if (p.pattern === 'shore' && p.shoreFace) { ax = c.x + p.shoreFace[0] * 70; az = c.z + p.shoreFace[1] * 70; }
+        else { const f = p.fields.reduce((b, f) => (Math.hypot(f.x - c.x, f.z - c.z) > Math.hypot(b.x - c.x, b.z - c.z) ? f : b), p.fields[0]); const d = Math.hypot(f.x - c.x, f.z - c.z) || 1; ax = c.x + (f.x - c.x) / d * (d + 15); az = c.z + (f.z - c.z) / d * (d + 15); }
+        const across = aim(w, ax, az, 4, c.x, c.y + 3, c.z);
+        const shots = [
+          [{ cam: road, hour: 14 }, 'from its road, day'], [{ cam: centre, hour: 14 }, 'its centre, day'],
+          [{ free: inside, hour: 17.85 }, `inside a ${e.kind}, dusk`], [{ free: across, hour: 14 }, `across the ${p.pattern === 'shore' ? 'water' : 'fields'} (${Math.round(Math.hypot(ax - c.x, az - c.z))} m), day`],
+          [{ cam: road, hour: 17.85 }, 'from its road, dusk'], [{ cam: road, hour: 23 }, 'from its road, night'],
+          [{ cam: centre, hour: 23 }, 'its centre, night'], [{ free: across, hour: 23 }, 'across, night'],
+        ];
+        const srcs = [], labels = [];
+        for (const [set, label] of shots) { srcs.push(await frame(lab, set)); labels.push(label); }
+        writeDataURL(path.join(OUT, `village-${q + 1}.jpg`), await compose(srcs, labels, `Village ${q + 1} of seed ${seed}: ${p.pattern}, ${p.houses.length} houses (${p.enter.length} to go into), ${p.barns.length} ${p.barns.length === 1 ? 'barn' : 'barns'}, ${p.fields.length} fields`, 4, 0.2));
+      }
+      await lab.ctx.close();
+    }
+
+    // 3. the villages' plans on each seed, 150 m across
+    if (only.includes('plans')) {
+      const srcs = [], labels = [];
+      for (const seed of seeds) {
+        const w = worldOf(seed);
+        for (const [q, v] of w.sites.villages.entries()) {
+          const p = v.plan;
+          srcs.push(await planImage(await topPlan(w, p.centre.x, p.centre.z, 150, 375)));
+          labels.push(`seed ${seed}, village ${q + 1}: ${p.pattern}, ${p.houses.length} houses, ${p.fields.length} fields`);
+        }
+      }
+      writeDataURL(path.join(OUT, 'plans.jpg'), await compose(srcs, labels, 'The villages, 150 m across, north up: buildings dark (lighter the taller), fields by kind, roads and footpaths tan, lights orange', 3, 1));
+    }
+
+    // 4. a bridge of each kind (the first found on the seeds) from the road and from the bank
+    if (only.includes('bridges')) {
+      const srcs = [], labels = [];
+      for (const style of ['timber', 'stone']) {
+        let seed = null, b = null;
+        for (const s of seeds) { const w = worldOf(s); b = (w.sites.bridges || []).find((x) => x.style === style); if (b) { seed = s; break; } }
+        if (!b) { console.log(`no ${style} bridge on seeds ${seeds}`); continue; }
+        const w = worldOf(seed), ux = Math.cos(b.a), uz = Math.sin(b.a);
+        const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed });
+        await lab.page.evaluate(() => window.lab.setHud(false));
+        const rx = b.x - ux * (b.len / 2 + 14), rz = b.z - uz * (b.len / 2 + 14);
+        const fromRoad = { ...aim(w, rx, rz, 1.7, b.x, b.y + 0.6, b.z) };
+        // the bank: the first dry spot out to the side, either side
+        let bank = null;
+        for (const d of [14, 18, 22, 26, 10]) for (const sg of [1, -1]) {
+          const x = b.x - uz * d * sg + ux * 4, z = b.z + ux * d * sg + uz * 4, j = Math.round(z) * w.terrain.NN + Math.round(x);
+          if (!bank && w.terrain.wWater[j] < 64) bank = aim(w, x, z, 1.7, b.x, b.y - 1, b.z);
+        }
+        bank = bank || aim(w, b.x - uz * 18, b.z + ux * 18, 3, b.x, b.y, b.z);
+        for (const [set, label] of [[{ free: fromRoad, hour: 14 }, 'from the road, day'], [{ free: bank, hour: 14 }, 'from the bank, day'], [{ free: bank, hour: 23 }, 'from the bank, night'], [{ free: bank, hour: 14, weather: 'rain' }, 'from the bank, rain']]) {
+          srcs.push(await frame(lab, set)); labels.push(`${style} bridge (seed ${seed}, ${Math.round(b.len)} m), ${label}`);
+        }
+        await lab.ctx.close();
+      }
+      writeDataURL(path.join(OUT, 'bridges.jpg'), await compose(srcs, labels, 'The bridges: timber over a narrow crossing, stone with arches over a wide one', 4, 0.2));
+    }
+
+    // 5. the fort's approach on each seed: from the road, and from above (260 m across)
+    if (only.includes('fort')) {
+      const srcs = [], labels = [];
+      for (const seed of seeds) {
+        const w = worldOf(seed), f = w.sites.fort;
+        const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed });
+        await lab.page.evaluate(() => window.lab.setHud(false));
+        const names = await lab.page.evaluate(() => window.lab.cameras.map((c) => c.name));
+        srcs.push(await frame(lab, { cam: names.indexOf('road approaching the fort'), hour: 14 })); labels.push(`seed ${seed}: the road approaching the fort`);
+        srcs.push(await frame(lab, { cam: names.indexOf('the fort from the road'), hour: 14 })); labels.push(`seed ${seed}: the fort from the road`);
+        await lab.ctx.close();
+        const pl = await planImage(await topPlan(w, f.x, f.z, 260, 480));
+        srcs.push(await bench.evaluate(async ({ src, W, H }) => {
+          const im = await loadImage(src), c = document.createElement('canvas'); c.width = W; c.height = H;
+          const g = c.getContext('2d'); g.fillStyle = '#121316'; g.fillRect(0, 0, W, H);
+          const s = Math.min(W / im.width, H / im.height); g.drawImage(im, (W - im.width * s) / 2, (H - im.height * s) / 2, im.width * s, im.height * s);
+          return c.toDataURL('image/png');
+        }, { src: pl, W: 2880, H: 1800 }));
+        labels.push(`seed ${seed}: from above, 260 m across, north up`);
+      }
+      writeDataURL(path.join(OUT, 'fort-approach.jpg'), await compose(srcs, labels, "The fort's new approach on each seed: the winding road", 3, 0.2));
+    }
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase3b/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
   } finally {
     await browser.close();
     now.server.close();

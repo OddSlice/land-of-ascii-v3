@@ -39,7 +39,7 @@ const threadCounts = String(a.threads || '8,4').split(',').map(Number);
 const densities = String(a.density || '3,4').split(',').map(Number);
 const frames = Number(a.frames || 240);
 const scenes = { lab: ['lab'], stress: ['stress'], both: ['lab', 'stress'], world: ['world'], yard: ['yard'] }[a.scene || 'both'];
-// (phase 3a) --scene yard [--proto]: the building yard (with its prototypes);
+// (phase 3a) --scene yard: the building yard;
 // --only a,b: only the cameras whose name holds one of these
 const only = a.only ? String(a.only).split(',') : null;
 
@@ -70,7 +70,7 @@ try {
       for (const scene of scenes) {
         const stress = scene === 'stress';
         const t0 = Date.now();
-        const lab = await openLab(browser, url, { built: !!a.built, threads, scene, look, seed: a.seed, extra: a.proto ? { proto: 1 } : null });
+        const lab = await openLab(browser, url, { built: !!a.built, threads, scene, look, seed: a.seed, extra: null });
         const readyMs = Date.now() - t0;
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));

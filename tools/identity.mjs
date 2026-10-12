@@ -39,7 +39,7 @@ const STRESS = [
   { free: { x: 760, z: 640, yaw: 30, pitch: -25 }, t: 'day' },       // down into the lake from the south shore
   { cam: 0, t: 'night' },
 ];
-// The generated world: its eight cameras (found from its data) at their own
+// The generated world: its first eight cameras (found from its data) at their own
 // time and at night, and views that test the edges: the open sea from above
 // a cliff (it must run to the horizon), the map's edge from outside it, down
 // into a river, up at the fort's gate. Phase 2a adds dawn, the night under a
@@ -55,6 +55,10 @@ const WORLD = [
   // courtyard at night (torches, lit windows), the wall walk at dusk
   ...[8, 9, 10, 11].map((cam) => ({ cam, t: 'day' })),
   { cam: 9, t: 'night' }, { cam: 10, t: 'night' }, { cam: 11, t: 'dusk' }, { cam: 8, t: 'night' },
+  // (phase 3b) the new cameras: each village's road in and centre, inside a
+  // house, a bridge, by day; the centres, the house and the bridge at night
+  ...[12, 13, 14, 15, 16, 17, 18, 19].map((cam) => ({ cam, t: 'day' })),
+  { cam: 13, t: 'night' }, { cam: 15, t: 'night' }, { cam: 17, t: 'night' }, { cam: 18, t: 'night' }, { cam: 19, t: 'night' }, { cam: 12, t: 'dusk' },
 ];
 // (phase 3a) the building yard: every piece near, the yard middle and far,
 // at night, the passage and the wall walk; the gate, the keep, the torches
@@ -62,6 +66,9 @@ const WORLD = [
 const YARD = [
   ...Array.from({ length: 14 }, (_, cam) => ({ cam, t: cam === 11 ? 'night' : cam === 13 ? 'dusk' : 'day' })),
   { cam: 0, t: 'night' }, { cam: 3, t: 'night' }, { cam: 7, t: 'night' }, { cam: 8, t: 'night' }, { cam: 12, t: 'night' },
+  // (phase 3b) the village pieces by day, the cottage inside and the pieces at night
+  ...Array.from({ length: 15 }, (_, k) => ({ cam: 14 + k, t: k === 13 || k === 14 ? 'night' : 'day' })),
+  { cam: 14, t: 'night' }, { cam: 20, t: 'night' }, { cam: 26, t: 'night' },
 ];
 const WEATHERS = a.weather === 'all' ? ['clear', 'fair', 'overcast', 'rain', 'mist'] : a.weather ? String(a.weather).split(',') : ['fair'];
 // (phase 2b) where the mist lies: over the lake and along the river at dawn

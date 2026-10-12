@@ -49,8 +49,7 @@ export function args(argv = process.argv.slice(2)) {
 // Open the game in a page and wait until it is running. Fails on any page
 // error or worker failure. `scene`: 'lab' (the default, for the tools written
 // before the generated world), 'stress' (or stress: true) or 'world' (with
-// `seed`), or (phase 3a) 'yard', the building yard (extra: { proto: 1 } for
-// the prototypes).
+// `seed`), or (phase 3a) 'yard', the building yard.
 // `quiet` (the default): the menu, the hint and the start card (phase 2b) are
 // suppressed from the first frame, so no picture or measurement changes
 // because of them; builds without them ignore it.

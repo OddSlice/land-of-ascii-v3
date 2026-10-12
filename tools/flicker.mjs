@@ -8,7 +8,6 @@
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
 //   node tools/flicker.mjs --set fort      (phase 3a) the fort beside the lab's wall and gate: walking
 //                                          the road to the gate, walking the wall walk, turning inside
-//   node tools/flicker.mjs --set proto     (phase 3a) the two prototypes, spans and exact shapes
 //   node tools/flicker.mjs --set world     a walk through the generated world (default seed, settled
 //                                          look): meadow, forest and along the lake, from its cameras,
 //                                          and (phase 2a) along the coast's foam line and swell
@@ -20,6 +19,9 @@
 //   node tools/flicker.mjs --buildings [--seed N]   (phase 3a; in Node) the fort set, its blinks counted
 //                                          only on the buildings' own cells, so the fort and the lab's
 //                                          wall compare like for like
+//                                          (phase 3b: and the villages: walking into each, walking its
+//                                          street, turning on its green, crossing a bridge; --bymat
+//                                          sorts each run's blinks by material)
 //   --only forest,stand                    only the runs whose label contains one of these
 //   --built [--root DIR]                   the single-file build (in DIR: a copy, so the repository can change meanwhile)
 //   (phase 2b) the world set also counts glyph flips (a glyph that changes and changes back, whatever
@@ -87,15 +89,6 @@ const SETS = {
     { label: 'stress, across the lake: turning across the lake', stress: true, cam: 1, ...TURN },
   ],
 };
-// (phase 3a) the prototypes in the building yard: each piece as spans and as
-// exact shapes, turned 30 degrees, walked past sideways at middle distance,
-// walked toward from near and turned beside
-SETS.proto = [];
-for (const set of ['spans', 'shapes']) for (const piece of ['wall', 'tower', 'house']) {
-  SETS.proto.push({ label: `prototype ${set}, ${piece}: walking sideways, middle distance`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, middle`, ...W });
-  SETS.proto.push({ label: `prototype ${set}, ${piece}: walking toward it, near`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, near`, ...F, step: -0.075 });
-  SETS.proto.push({ label: `prototype ${set}, ${piece}: turning, near`, scene: 'yard', proto: true, camName: `prototype, ${set}: ${piece}, near`, ...TURN });
-}
 // (phase 3a) the fort against the lab's wall and gate (spans, phase 0a):
 // walking the road toward the gate from 14 m off (both start at the same
 // distance, so the masonry is seen at the same size), walking along the
@@ -175,7 +168,8 @@ async function buildings(seed) {
   const lab = buildWorld();
   const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
   const w = PK.unpackWorld(PK.packWorld(r.value)), f = w.sites.fort;
-  const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
+  const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW,
+    CT.MAT.THATCH, CT.MAT.PLASTER2, CT.MAT.PLASTER3, CT.MAT.TIMBER2, CT.MAT.TIMBER3]);
   const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const o = f.gate.out, deg = (x) => x * 180 / Math.PI;
   // the wall walk: the camera's spot, along its wall
@@ -188,7 +182,7 @@ async function buildings(seed) {
   }
   const yc = w.cameras.find((c) => c.name === 'the courtyard');
   const pl = new Player(w, { rules: 'world' });
-  const RUNS = [
+  let RUNS = [
     { label: 'lab wall: walking the road to the gate', world: lab, x: 256, z: 143, yaw: 0, pitch: 2, ...F },
     { label: 'lab wall: walking the wall walk', world: lab, x: 230, z: 158.5, y: 18.7, yaw: 90, pitch: -3, ...F },
     { label: 'lab wall: turning by the gate', world: lab, x: 256, z: 145, yaw: 0, pitch: 2, ...TURN },
@@ -196,28 +190,52 @@ async function buildings(seed) {
     { label: 'fort: walking the wall walk', world: w, x: wc.x, z: wc.z, y: wc.y, yaw: deg(Math.atan2(best.dx, best.dz)), pitch: -3, ...F },
     { label: 'fort: turning in the courtyard', world: w, x: yc.x, z: yc.z, y: pl.standOn(yc.x, yc.z, yc.y - 1.7) + 1.7, yaw: yc.yaw, pitch: yc.pitch, ...TURN },
   ];
+  // (phase 3b) the villages: walking into each along its road, walking a
+  // street, crossing a bridge, turning on the green
+  const deg2 = (a) => a * 180 / Math.PI;
+  w.sites.villages.forEach((v, q) => {
+    const p = v.plan, rd = w.roads.find((r) => r.to === `village ${q + 1}`);
+    let k = 0;
+    for (let i = 0; i < rd.n; i++) { const d = Math.min(...p.houses.map((h) => Math.hypot(h.x - rd.x[i], h.z - rd.z[i]))); k = i; if (d >= 35) break; }
+    const yaw = deg2(Math.atan2(rd.x[Math.max(0, k - 8)] - rd.x[k], rd.z[Math.max(0, k - 8)] - rd.z[k]));
+    RUNS.push({ label: `village ${q + 1} (${p.pattern}): walking in along its road`, world: w, x: rd.x[k], z: rd.z[k], yaw, pitch: 1, stand: true, ...F });
+    if (p.pattern === 'street') {
+      const i0 = Math.min(rd.n - 1, 40), i1 = Math.max(0, i0 - 10);
+      RUNS.push({ label: `village ${q + 1} (street): walking its street`, world: w, x: rd.x[i0], z: rd.z[i0], yaw: deg2(Math.atan2(rd.x[i1] - rd.x[i0], rd.z[i1] - rd.z[i0])), pitch: 0, stand: true, ...F });
+    }
+    if (p.green) RUNS.push({ label: `village ${q + 1} (green): turning on the green`, world: w, x: p.green.x + p.green.r * 0.2, z: p.green.z - p.green.r * 0.3, yaw: 0, pitch: 3, stand: true, ...TURN });
+  });
+  if (w.sites.bridges && w.sites.bridges.length) {
+    const b = w.sites.bridges[0], ux = Math.cos(b.a), uz = Math.sin(b.a);
+    const x = b.x - ux * (b.len / 2 + 4), z = b.z - uz * (b.len / 2 + 4);
+    RUNS.push({ label: `crossing the ${b.style} bridge`, world: w, x, z, yaw: deg2(Math.atan2(ux, uz)), pitch: 0, stand: true, ...F });
+  }
   const out = [];
+  if (a.only) RUNS = RUNS.filter((r) => String(a.only).split(',').some((w2) => r.label.includes(w2)));
   for (const run of RUNS) {
     const be = BE.createCpuBackend(run.world), fr = [];
     const way = (run.yaw + run.dir) * Math.PI / 180;
     for (let i = 0; i < frames + 1; i++) {
       const x = run.x + Math.sin(way) * run.step * i, z = run.z + Math.cos(way) * run.step * i;
-      const y = run.y ?? OB.groundAt(run.world.terrain, x, z) + 1.7;
+      // (`stand`: on whatever is underfoot, a bridge's deck say)
+      const y = run.y ?? (run.stand ? pl.supportAt(x, z, OB.groundAt(run.world.terrain, x, z) + 3) : OB.groundAt(run.world.terrain, x, z)) + 1.7;
       const cam = { x, z, y, yaw: (run.yaw + run.turn * i) * Math.PI / 180, pitch: run.pitch * Math.PI / 180 };
       const fq = { seq: i, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: 14, t: 0, day: 0, look };
       const hits = new Uint8Array(n * CT.HIT_STRIDE);
       for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
-      const mats = new Uint8Array(n);
-      for (let k = 0; k < n; k++) mats[k] = BLD.has(hits[k * CT.HIT_STRIDE]) ? 1 : 0;
+      const mats = new Uint8Array(n), mat = new Uint8Array(n);
+      for (let k = 0; k < n; k++) { mat[k] = hits[k * CT.HIT_STRIDE]; mats[k] = BLD.has(mat[k]) ? 1 : 0; }
       const cells = new Uint8Array(n * 8);
       RS.resolveStripe(RS.makePalette(14, 0, 'moon'), hits, cells, cols, rows, 0, fq);
-      fr.push({ cells, mats });
+      fr.push({ cells, mats, mat });
     }
     let bc = 0, gf = 0, cf = 0, agf = 0, acf = 0;
+    const byMat = {};
     for (let i = 2; i < fr.length; i++) {
       const A = fr[i - 2], B = fr[i - 1], C = fr[i];
       for (let k = 0; k < n; k++) {
         const q = k * 8, bld = A.mats[k] || B.mats[k] || C.mats[k];
+        if (a.bymat && bld) { const m = CT.MAT_NAMES[B.mat[k]]; const fg = A.cells[q + 3] === C.cells[q + 3] && A.cells[q + 3] !== B.cells[q + 3]; byMat[m] = byMat[m] || [0, 0]; byMat[m][0]++; if (fg) byMat[m][1]++; }
         const flipG = A.cells[q + 3] === C.cells[q + 3] && A.cells[q + 3] !== B.cells[q + 3];
         const jump = Math.max(Math.abs(A.cells[q] - B.cells[q]), Math.abs(A.cells[q + 1] - B.cells[q + 1]), Math.abs(A.cells[q + 2] - B.cells[q + 2]));
         const back = Math.max(Math.abs(A.cells[q] - C.cells[q]), Math.abs(A.cells[q + 1] - C.cells[q + 1]), Math.abs(A.cells[q + 2] - C.cells[q + 2]));
@@ -228,6 +246,7 @@ async function buildings(seed) {
       }
     }
     const frN = fr.length - 2;
+    if (a.bymat) console.log('   by material:', Object.entries(byMat).sort((x, y) => y[1][1] - x[1][1]).slice(0, 6).map(([m, [c, f]]) => `${m} ${f} flips in ${c} cells`).join(', '));
     out.push({ label: run.label, share: 100 * bc / frN / n, glyph: 100 * gf / Math.max(1, bc), colour: 100 * cf / Math.max(1, bc), allGlyph: 100 * agf / frN / n, allColour: 100 * acf / frN / n });
     console.log(`${run.label}: building cells ${(100 * bc / frN / n).toFixed(1)}% of the frame; on them glyph flips ${(100 * gf / Math.max(1, bc)).toFixed(3)}%, colour flips ${(100 * cf / Math.max(1, bc)).toFixed(3)}%`);
   }
@@ -282,7 +301,7 @@ async function measure(browser, root, list) {
     for (const scene of ['lab', 'stress', 'world', 'yard']) {
       const mine = list.filter((r) => (r.scene || (r.stress ? 'stress' : 'lab')) === scene);
       if (!mine.length) continue;
-      const lab = await openLab(browser, url, { scene, density: a.density, built: !!a.built, seed: a.seed, extra: mine.some((r) => r.proto) ? { proto: 1 } : null });
+      const lab = await openLab(browser, url, { scene, density: a.density, built: !!a.built, seed: a.seed });
       for (const run of mine) {
         const r = await lab.page.evaluate(async ({ run, frames }) => {
           const L = window.lab;
