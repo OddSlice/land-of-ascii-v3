@@ -56,20 +56,24 @@ export function sampleLine(move, pts, ft0, step = 0.5) {
 export function sampleRoute(move, pts, ft0, step = 0.5) {
   const xs = [pts[0][0]], zs = [pts[0][1]], ys = [ft0];
   let x = pts[0][0], z = pts[0][1], ft = ft0;
+  // (in steps of `step`, or of half that where the steps land badly: on a
+  // door's sill a step's length decides where the feet come down)
   const walk = (tx, tz) => {
     const L = Math.hypot(tx - x, tz - z);
     if (L < 1e-6) return true;
-    const n = Math.max(1, Math.ceil(L / step)), dx = (tx - x) / L, dz = (tz - z) / L, h = L / n;
-    const sx = xs.length;
-    let cx = x, cz = z, cf = ft;
-    for (let k = 0; k < n; k++) {
-      const r = move(cx, cz, cf, dx, dz, h);
-      if (!r) { xs.length = sx; zs.length = sx; ys.length = sx; return false; }
-      [cx, cz, cf] = r;
-      xs.push(cx); zs.push(cz); ys.push(cf);
+    for (const st of [step, step / 2]) {
+      const n = Math.max(1, Math.ceil(L / st)), dx = (tx - x) / L, dz = (tz - z) / L, h = L / n;
+      const sx = xs.length;
+      let cx = x, cz = z, cf = ft, ok = true;
+      for (let k = 0; k < n; k++) {
+        const r = move(cx, cz, cf, dx, dz, h);
+        if (!r) { xs.length = sx; zs.length = sx; ys.length = sx; ok = false; break; }
+        [cx, cz, cf] = r;
+        xs.push(cx); zs.push(cz); ys.push(cf);
+      }
+      if (ok) { x = cx; z = cz; ft = cf; return true; }
     }
-    x = cx; z = cz; ft = cf;
-    return true;
+    return false;
   };
   const mark = [0];                       // the sample each point was reached at
   for (let i = 1; i < pts.length; i++) {

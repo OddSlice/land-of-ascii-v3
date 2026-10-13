@@ -198,7 +198,10 @@ export function buildPeople(world) {
     for (const b of pl.barns || []) {
       const F = frame(b.x, b.z, b.a), [sx, sz] = F.at(0, b.d + 1.4), [ix, iz] = F.at(0, b.d - 1.4);
       const st = place('barndoor', sx, sz, G(sx, sz), Math.atan2(-F.sa, F.ca));
-      V.barns.push(place('barn', ix, iz, b.floor, Math.atan2(F.sa, -F.ca), st));
+      const bn = place('barn', ix, iz, b.floor, Math.atan2(F.sa, -F.ca), st), dp = P.places[st], ip = P.places[bn];
+      // (only a barn one can walk into: on a slope its floor can stand
+      // higher over the ground at its doorway than a step)
+      if (clearLine(move, [dp.ax, dp.az], [ip.ax, ip.az], dp.ft) && clearLine(move, [ip.ax, ip.az], [dp.ax, dp.az], ip.ft)) V.barns.push(bn);
     }
     // the fields: a gate where each field's footpath ends, and strips of
     // work spots into the field from there
