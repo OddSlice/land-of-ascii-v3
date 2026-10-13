@@ -177,7 +177,9 @@ export function plant(terrain, F, thr, seed, clear, wetDist, kind, clumps = []) 
       if (!p || hash2(gx, gz, seed + 723) > p) continue;
       if (terrain.ground[j] > SEA + 170) continue;
       const r = (q) => hash2(gx * 7 + q, gz, seed + 724);
-      bushes.push({ x, z, base: groundAt(terrain, x, z), rx: 1.0 + 0.7 * r(1), ry: 0.75 + 0.5 * r(2), seed: bushes.length });
+      // (phase 4a: its look is fixed to its place on the land, its lattice
+      // square, not to how many bushes came before it)
+      bushes.push({ x, z, base: groundAt(terrain, x, z), rx: 1.0 + 0.7 * r(1), ry: 0.75 + 0.5 * r(2), seed: gz * mb + gx });
     }
   }
   return { trees, bushes };
