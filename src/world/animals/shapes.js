@@ -28,6 +28,8 @@ export function marked(st, o, dist, colAngle) {
   return (sp.span || 0.5) * (st[o + A.SCALE] || 1) < 2 * colAngle * Math.max(dist, 0.5);
 }
 const TAU = Math.PI * 2;
+// (all four legs apart only this near; further, left and right as one)
+const LEGS_APART = 8;
 
 export function animalParts(st, o, dist, colAngle, rowAngle, t, out, at, ex = NaN, ez = NaN) {
   const pose = st[o + A.POSE];
@@ -64,14 +66,16 @@ export function animalParts(st, o, dist, colAngle, rowAngle, t, out, at, ex = Na
     return n;
   }
   const swing = pose === APOSE.WALK ? Math.sin(ph) : pose === APOSE.RUN ? Math.sin(ph) * 1.6 : 0;
-  // four legs at (+-lu, +-lw), hx thick, lh long: near apart, else as one
+  // four legs at (+-lu, +-lw), hx thick, lh long: all four apart within
+  // LEGS_APART; further, each pair (front, back) as one thin part, held at
+  // two columns (left and right legs a column or two apart would open and
+  // close a gap as the view turns)
   const legs = (lu, lw, hx, lh, mat) => {
-    if (near) {
-      for (const [su, sw] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-        const k = su * sw > 0 ? 1 : -1;
-        box(su * lu * s, sw * lw * s + k * swing * lh * 0.22, hx * s, hx * s, 0, lh * s, mat, 1);
-      }
-    } else box(0, 0, (lu + hx) * s, (lw + hx) * s + Math.abs(swing) * lh * 0.15, lh * 0.08, lh * s, mat, 1);
+    const lr = dist < LEGS_APART;
+    for (const su of lr ? [1, -1] : [0]) for (const sw of [1, -1]) {
+      const k = (su || 1) * sw > 0 ? 1 : -1;
+      box(su * lu * s, sw * lw * s + k * swing * lh * (lr ? 0.22 : 0.15), (lr ? hx : lu + hx) * s, hx * s, lr ? 0 : 0.08 * lh, lh * s, mat, 1);
+    }
   };
   switch (kind) {
     case KIND.SHEEP: {

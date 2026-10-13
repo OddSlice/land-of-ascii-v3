@@ -7,7 +7,7 @@
 // two rows tall, and faded by how much of that it really is (`kp.cover`), as
 // a person's far silhouette is; under about 6% it is not drawn. A reed bed's
 // ragged top of stems melts into an even top once the stems' heights differ
-// by less than about two rows.
+// by less than about two rows or a stem is narrower than a few columns.
 //
 // Reeds part round a walker: within about a metre and a half of the eye
 // (horizontally) they bend down, a pure function of where the eye is, so a
@@ -87,7 +87,9 @@ const methods = {
       kp.tA = (-b - sq) / a; kp.tB = (-b + sq) / a; kp.fA = 4;
       kp.ex = R; kp.cy = y0; kp.ery = h;
       // the stems' ragged top, while their difference is a couple of rows
-      kp.jag = W.reed.jag * smooth(1.5, 3, W.reed.jag * h / rowH);
+      // and each stem a few columns across (narrower, each cell would land
+      // on a stem of its own and the top would sparkle as you move)
+      kp.jag = W.reed.jag * smooth(1.5, 3, W.reed.jag * h / rowH) * smooth(2.5, 5, W.reed.stem / minR);
       // a walker near: the bed parts round the eye
       const ox = this.v.ex - S[q + P.CX], oz = this.v.ez - S[q + P.CZ];
       kp.part = ox * ox + oz * oz < (R + W.reed.part[1] + 0.2) * (R + W.reed.part[1] + 0.2);
@@ -159,12 +161,14 @@ const methods = {
       const topAt = (x, z, side) => {
         let k = 1;
         if (kp.jag > 0) {
-          // a stem's height by where it stands (in sectors of the round on
-          // the side, in squares on top)
-          let n;
-          if (side) { const ang = Math.atan2(z - cz, x - cx) * R; n = hashU(Math.floor(ang / W.reed.stem), seed); }
-          else n = hashU(Math.floor(x / W.reed.stem) * 7919 + Math.floor(z / W.reed.stem), seed);
-          k = 1 - kp.jag * n;
+          // the stems' height by where round the bed they stand, the same on
+          // the side and on top (two patterns would disagree at the rim, and
+          // a ray there would take one, then the other)
+          // (eased from one sector's height to the next, so the top's edge
+          // has no steps for a moving eye to catch)
+          const ang = (Math.atan2(z - cz, x - cx) + Math.PI) * R / W.reed.stem, i = Math.floor(ang), f = ang - i, e = f * f * (3 - 2 * f);
+          const nS = Math.max(1, Math.round(2 * Math.PI * R / W.reed.stem)), a0 = hashU(((i % nS) + nS) % nS, seed), a1 = hashU((((i + 1) % nS) + nS) % nS, seed);
+          k = 1 - kp.jag * (a0 + (a1 - a0) * e);
         }
         if (kp.part) { const d = Math.hypot(x - vx, z - vz); k *= P2[2] + (1 - P2[2]) * smooth(P2[0], P2[1], d); }
         return y0 + h * k;
@@ -172,6 +176,19 @@ const methods = {
       let tA = kp.tA, entered = true;
       if (tA < tmin) { tA = tmin; entered = false; }
       if (tA > kp.tB) return false;
+      if (!entered && tmin <= NEAR && ey < y0 + h) {
+        // (the eye in the bed, below its top: the stems round you are parted
+        // away, and what shows is the bed's far side, from inside, past the
+        // parting; the top only from above it)
+        const tE = kp.tB;
+        if (tE <= P2[1]) return false;
+        const xE = this.v.ex + kp.dx * tE, zE = this.v.ez + kp.dz * tE, yE = ey + s * tE;
+        if (yE < y0 || yE > topAt(xE, zE, true)) return false;
+        const l = Math.hypot(xE - cx, zE - cz) || 1;
+        hit.D = tE; hit.nx = -(xE - cx) / l; hit.ny = 0; hit.nz = -(zE - cz) / l; hit.kind = 0; hit.room = S[q + P.ROOM]; hit.rev = 0; hit.revO = 0;
+        hit.mat = mat; hit.cover = kp.cover; hit.prim = q;
+        return true;
+      }
       const xA = this.v.ex + kp.dx * tA, zA = this.v.ez + kp.dz * tA, yA = ey + s * tA;
       if (entered && yA >= y0 && yA <= topAt(xA, zA, true)) {
         D = tA;

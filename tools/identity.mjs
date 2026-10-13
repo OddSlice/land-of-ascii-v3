@@ -65,6 +65,10 @@ const WORLD = [
   // midday, and one in the evening
   ...[20, 21, 22].map((cam) => ({ cam, t: 'own' })), { cam: 20, t: 6.6 }, { cam: 20, t: 19.2 },
   { cam: 13, t: 'noon' }, { cam: 15, t: 'noon' }, { cam: 17, t: 'noon' }, { cam: 17, t: 19.2 },
+  // (phase 4b) views full of animals: a pasture with its flock, deer at a
+  // forest edge at dawn, gulls on the coast, crows on the wall walk at
+  // their own hours; the flock coming in at dusk
+  ...[23, 24, 25, 26].map((cam) => ({ cam, t: 'own' })), { cam: 23, t: 18.3 },
 ];
 // (phase 3a) the building yard: every piece near, the yard middle and far,
 // at night, the passage and the wall walk; the gate, the keep, the torches
@@ -77,6 +81,9 @@ const YARD = [
   { cam: 14, t: 'night' }, { cam: 20, t: 'night' }, { cam: 26, t: 'night' },
   // (phase 4a) the figures: near, middle, far, very far, at night, asleep, on the bench
   ...Array.from({ length: 7 }, (_, k) => ({ cam: 29 + k, t: 'own' })),
+  // (phase 4b) the wild ground detail near and far; every animal in every
+  // pose, all of them from three distances and each kind near
+  ...Array.from({ length: 17 }, (_, k) => ({ cam: 36 + k, t: 'own' })),
 ];
 const WEATHERS = a.weather === 'all' ? ['clear', 'fair', 'overcast', 'rain', 'mist'] : a.weather ? String(a.weather).split(',') : ['fair'];
 // (phase 2b) where the mist lies: over the lake and along the river at dawn

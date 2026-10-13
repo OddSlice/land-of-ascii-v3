@@ -22,6 +22,11 @@
 //                                          (phase 3b: and the villages: walking into each, walking its
 //                                          street, turning on its green, crossing a bridge; --bymat
 //                                          sorts each run's blinks by material)
+//   node tools/flicker.mjs --animals [--seed N]  (phase 4b; in Node) standing beside a grazing flock
+//                                          (turning), walking through a boulder field and through a reed
+//                                          bed, and a flock of small birds crossing the sky: blinks counted
+//                                          on the animals' own cells and on the wild ground detail's, still
+//                                          (clock frozen, camera moving) and moving (camera still, clock running)
 //   node tools/flicker.mjs --people [--seed N]   (phase 4a; in Node) a busy green, a street walk past people
 //                                          and the wall walk from the courtyard at night: blinks on the
 //                                          people's own cells, still (clock frozen) and walking (camera still)
@@ -381,6 +386,164 @@ async function peopleSet(seed) {
     console.log(`${run.label}: still figures ${ps.share.toFixed(2)}% of the frame, glyph flips ${ps.glyph.toFixed(3)}%, colour ${ps.colour.toFixed(3)}%; walkers (frozen) ${pw.share.toFixed(2)}%, glyph ${pw.glyph.toFixed(3)}%, colour ${pw.colour.toFixed(3)}%; buildings glyph ${bs.glyph.toFixed(3)}%, colour ${bs.colour.toFixed(3)}%; walking, camera still: glyph ${pm.glyph.toFixed(3)}%, colour ${pm.colour.toFixed(3)}%`);
   }
   return out;
+}
+// ---- animals and wild ground detail (phase 4b), in Node ---------------------
+async function animalsSet(seed) {
+  const G = await import('../src/world/gen/world.js'), PK = await import('../src/world/pack.js');
+  const BE = await import('../src/scene/cpu/backend.js'), RS = await import('../src/resolve.js'), { LOOK } = await import('../src/look.js');
+  const CT = await import('../src/contract.js'), OB = await import('../src/world/objects.js');
+  const PP = await import('../src/world/people/people.js'), AB = await import('../src/world/animals/build.js'), AST = await import('../src/world/animals/state.js');
+  const AM = await import('../src/world/animals/meet.js'), AK = await import('../src/world/animals/kinds.js'), ASH = await import('../src/world/animals/shapes.js');
+  const AC = await import('../src/world/animals/cameras.js');
+  const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
+  const w = PK.unpackWorld(PK.packWorld(r.value));
+  const P = PP.buildPeople(w), An = AB.buildAnimals(w, P), N0 = An.members.length;
+  // (--noshadow: the animals' shadows off, to tell what flickers)
+  if (a.noshadow) LOOK.animals.shadow.dark = 0;
+  const M = CT.MAT;
+  const ANI = new Set([M.WOOL, M.HIDE, M.FAWN, M.GULL, M.CROW, M.DUCK, M.DUCKHEAD, M.HARE, M.CHARCOAL, M.LINEN, M.RUSSET, M.UMBER, M.OCHRE, M.SLATE]);
+  const WILD = new Set([M.ROCK, M.BARK, M.WOOD, M.REED, M.FLOWERA, M.FLOWERB, M.FLOWERC, M.PASTURE]);
+  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
+  const pl = P.p, deg = (x) => x * 180 / Math.PI;
+  const stAt = (day, hour, cam) => {
+    const st = new Float32Array(N0 * AK.AS), ids = new Int32Array(N0);
+    const near = cam ? [cam.x, cam.z, cam.y - 1.7] : [];
+    const k = a.noanimals ? 0 : AST.animalsAt(An, day, hour, near, st, ids);
+    AM.settle(st, k, near, pl, cam ? { x: cam.x, z: cam.z, r: 160 } : null);
+    return { st: st.slice(0, k * AK.AS), ids, k };
+  };
+  const marksOf = (s, cam) => {
+    const ty = Math.tan(LOOK.fovY * Math.PI / 360), colAngle = 2 * ty * (cols / (2 * rows)) / cols, out = new Float32Array(N0 * 6);
+    const k = ASH.birdMarks(s.st, s.k, (i) => An.members[s.ids[i]].group, cam, colAngle, out);
+    return out.slice(0, k);
+  };
+  const RUNS = [];
+  const cams = AC.animalCameras(w, An);
+  const pc = cams.find((c) => c.name.startsWith('a pasture'));
+  if (pc) RUNS.push({ label: 'beside a grazing flock, turning', x: pc.x, z: pc.z, yaw: pc.yaw - 9, pitch: pc.pitch, hour: pc.time, ...TURN });
+  // the densest boulder field (most boulders within 25 m), walked through
+  const pieces = w.kitDesc.pieces;
+  const bs = pieces.filter((q) => q.kind === 'boulder');
+  let bf = null;
+  for (const b of bs) { const k = bs.filter((q) => Math.hypot(q.at[0] - b.at[0], q.at[1] - b.at[1]) < 25).length; if (!bf || k > bf.k) bf = { k, b }; }
+  if (bf) {
+    // (from 12 m out, walking through its middle: each step clear by the walking rules)
+    const cx = bf.b.at[0], cz = bf.b.at[1];
+    let best = null;
+    for (let t = 0; t < 16; t++) {
+      const a2 = t * Math.PI / 8, x = cx - Math.sin(a2) * 10, z = cz - Math.cos(a2) * 10;
+      let ok = true;
+      for (let i = 0; i <= frames && ok; i++) { const px = x + Math.sin(a2) * F.step * i, pz = z + Math.cos(a2) * F.step * i; if (pl.blocked(px, pz, pl.supportAt(px, pz, OB.groundAt(w.terrain, px, pz) + 3))) ok = false; }
+      if (ok) { best = { x, z, yaw: deg(a2) }; break; }
+    }
+    if (best) RUNS.push({ label: `walking toward a boulder field (${bf.k} boulders within 25 m)`, x: best.x, z: best.z, yaw: best.yaw, pitch: -4, hour: 14, ...F });
+  }
+  // the biggest reed bed, walked into
+  const rb = pieces.filter((q) => q.kind === 'reeds').sort((A, B) => B.r - A.r)[0];
+  if (rb) {
+    let best = null;
+    for (let t = 0; t < 16 && !best; t++) {
+      const a2 = t * Math.PI / 8, x = rb.at[0] - Math.sin(a2) * (rb.r + 3), z = rb.at[1] - Math.cos(a2) * (rb.r + 3);
+      const j = Math.round(z) * w.NN + Math.round(x);
+      if (w.terrain.wWater[j] > 127 && w.terrain.levels[0].H[j] - w.terrain.ground[j] > 0.5) continue;
+      best = { x, z, yaw: deg(a2) };
+    }
+    if (best) {
+      const ux = Math.sin(best.yaw * Math.PI / 180), uz = Math.cos(best.yaw * Math.PI / 180);
+      RUNS.push({ label: 'walking up to a reed bed, from 9 m off its edge', x: best.x - ux * 6, z: best.z - uz * 6, yaw: best.yaw, pitch: -6, hour: 14, ...F, wade: true });
+      RUNS.push({ label: 'walking into a reed bed (it parts round you)', x: best.x, z: best.z, yaw: best.yaw, pitch: -6, hour: 14, ...F, wade: true });
+    }
+  }
+  // a flock of small birds crossing: the camera under its way, looking up
+  const fg = An.groups.find((q) => q.type === 'finches');
+  let fly = null;
+  if (fg) {
+    for (let m = 8 * 60; m < 18 * 60 && !fly; m += 0.25) {
+      const s = stAt(0, m / 60);
+      const o = s.st.findIndex((v, i) => i % AK.AS === AK.A.POSE && v === AK.APOSE.FLY && An.members[s.ids[Math.floor(i / AK.AS)]].group === fg.id);
+      if (o >= 0) fly = { hour: m / 60, x: s.st[o - AK.A.POSE], z: s.st[o - AK.A.POSE + 1], y: s.st[o - AK.A.POSE + 2] };
+    }
+  }
+  if (fly) RUNS.push({ label: 'small birds crossing the sky (camera still, clock running)', x: fly.x + 40, z: fly.z + 40, yaw: deg(Math.atan2(-40, -40)), pitch: 12, hour: fly.hour, step: 0, dir: 0, turn: 0, movingOnly: true });
+  const render = (be, cam, hour, t, s) => {
+    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, look, animals: s.st, marks: marksOf(s, cam) };
+    const hits = new Uint8Array(n * CT.HIT_STRIDE);
+    for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
+    // (the ground detail's materials are counted only within 120 m: past
+    // that the rock is the mountains')
+    const mat = new Uint8Array(n); for (let k = 0; k < n; k++) { const o = k * CT.HIT_STRIDE, m = hits[o], d = (hits[o + 6] | (hits[o + 7] << 8)) / 10; mat[k] = WILD.has(m) && d > 120 ? 255 : m; }
+    const cells = new Uint8Array(n * 8);
+    RS.resolveStripe(RS.makePalette(hour, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+    return { cells, mat, hits: process.env.DUMP ? hits : null };
+  };
+  let dumped = 0;
+  const count = (fr, sets) => {
+    const res = sets.map(() => ({ c: 0, g: 0, k: 0 }));
+    for (let i = 2; i < fr.length; i++) {
+      const A = fr[i - 2], B = fr[i - 1], C = fr[i];
+      if (process.env.DUMP && dumped < 3) {
+        for (let k = 0; k < n && dumped < 3; k++) {
+          const q = k * 8;
+          if (!((process.env.DUMP === 'wild' ? WILD : ANI).has(A.mat[k]) && A.cells[k * 8 + 3] === C.cells[k * 8 + 3] && A.cells[k * 8 + 3] !== B.cells[k * 8 + 3])) continue;
+          dumped++;
+          const cx = k % cols, cy = Math.floor(k / cols);
+          console.log(`flip at col ${cx} row ${cy}, frames ${i - 2}..${i}`);
+          for (const F2 of [A, B, C]) if (F2.hits) { const o = k * CT.HIT_STRIDE; console.log('  rec', Array.from(F2.hits.slice(o, o + 8)), 'cell', Array.from(F2.cells.slice(q, q + 8))); }
+          for (const [nm, F2] of [['A', A], ['B', B], ['C', C]]) {
+            const lines = [];
+            for (let y = Math.max(0, cy - 4); y <= Math.min(rows - 1, cy + 3); y++) { let ln = ''; for (let x = Math.max(0, cx - 12); x <= Math.min(cols - 1, cx + 12); x++) { const m = F2.mat[y * cols + x]; ln += x === cx && y === cy ? '@' : m === M.REED ? 'r' : m === M.WATER ? '~' : m === M.SKY ? ' ' : m === M.WOOL ? 'w' : m === M.CHARCOAL ? 'c' : m === M.LINEN ? 'l' : m === M.PASTURE ? '.' : m === M.GRASS ? ',' : m === M.STONE ? 's' : '?'; } lines.push(ln); }
+            console.log(nm + '\n' + lines.join('\n'));
+          }
+        }
+      }
+      for (let k = 0; k < n; k++) {
+        const q = k * 8;
+        const flipG = A.cells[q + 3] === C.cells[q + 3] && A.cells[q + 3] !== B.cells[q + 3];
+        const jump = Math.max(Math.abs(A.cells[q] - B.cells[q]), Math.abs(A.cells[q + 1] - B.cells[q + 1]), Math.abs(A.cells[q + 2] - B.cells[q + 2]));
+        const back = Math.max(Math.abs(A.cells[q] - C.cells[q]), Math.abs(A.cells[q + 1] - C.cells[q + 1]), Math.abs(A.cells[q + 2] - C.cells[q + 2]));
+        const flipC = jump > 6 && back <= jump / 4;
+        sets.forEach((S2, j) => { const has = S2 === 'all' || S2.has(A.mat[k]) || S2.has(B.mat[k]) || S2.has(C.mat[k]); if (has) { res[j].c++; if (flipG) res[j].g++; if (flipC) res[j].k++; if (a.bymat && j === Number(a.bymatset || 0) && (flipG || flipC)) { const m = `${CT.MAT_NAMES[A.mat[k]]}>${CT.MAT_NAMES[B.mat[k]]}>${CT.MAT_NAMES[C.mat[k]]}`; BYM[m] = (BYM[m] || 0) + 1; } } });
+      }
+    }
+    const frN = fr.length - 2;
+    return res.map((x) => ({ share: 100 * x.c / frN / n, glyph: 100 * x.g / Math.max(1, x.c), colour: 100 * x.k / Math.max(1, x.c) }));
+  };
+  const out = [], BYM = {};
+  for (const run of (a.only ? RUNS.filter((q) => String(a.only).split(',').some((w2) => q.label.includes(w2))) : RUNS)) {
+    const way = (run.yaw + run.dir) * Math.PI / 180;
+    // (the eye where the game's own walking rules put it: on the ground, on
+    // what one stands on, or wading and swimming in water)
+    const eyeAt = (x, z) => run.y ?? (run.wade ? pl.restAt(x, z) : pl.supportAt(x, z, OB.groundAt(w.terrain, x, z) + 3)) + 1.7;
+    let still = null, wild = null, all = null;
+    if (!run.movingOnly) {
+      // the clock frozen, the camera moving (the animals react to where it is)
+      const be2 = BE.createCpuBackend(w), fr = [];
+      for (let i = 0; i < frames + 1; i++) {
+        const x = run.x + Math.sin(way) * run.step * i, z = run.z + Math.cos(way) * run.step * i;
+        const cam = { x, z, y: eyeAt(x, z), yaw: (run.yaw + run.turn * i) * Math.PI / 180, pitch: run.pitch * Math.PI / 180 };
+        fr.push(render(be2, cam, run.hour, 0, stAt(0, run.hour, cam)));
+      }
+      [still, wild, all] = count(fr, [ANI, WILD, 'all']);
+      if (a.bymat) { console.log('   flips on animal cells by material:', Object.entries(BYM).sort((x, y) => y[1] - x[1]).slice(0, 12).map(([m, c]) => `${m} ${c}`).join(', ')); for (const k in BYM) delete BYM[k]; }
+    }
+    // moving: the camera still, the clock running at one game second a second
+    const be = BE.createCpuBackend(w), fm = [];
+    const cam0 = { x: run.x, z: run.z, y: eyeAt(run.x, run.z), yaw: run.yaw * Math.PI / 180, pitch: run.pitch * Math.PI / 180 };
+    for (let i = 0; i < frames + 1; i++) { const hour = run.hour + i / 60 / 3600; fm.push(render(be, cam0, hour, i / 60, stAt(0, hour, cam0))); }
+    const [mv, mall] = count(fm, [ANI, 'all']);
+    out.push({ label: run.label, still, wild, all, mv, mall });
+    const f3 = (x) => (x ? `${x.glyph.toFixed(3)}% / ${x.colour.toFixed(3)}% (${x.share.toFixed(2)}% of the frame)` : '-');
+    console.log(`${run.label}: still animals ${f3(still)}; wild ground detail ${f3(wild)}; whole frame ${f3(all)}; moving animals, camera still ${f3(mv)}; whole frame ${f3(mall)}`);
+  }
+  return out;
+}
+if (a.animals) {
+  const seed = Number(a.seed || 3), list = await animalsSet(seed), f3 = (x) => (x ? `${x.glyph.toFixed(3)}% / ${x.colour.toFixed(3)}%` : '-'), sh = (x) => (x ? `${x.share.toFixed(2)}%` : '-');
+  console.log(`\nanimals' and wild ground detail's own cells (seed ${seed}, Node, 360 x 112, ${frames} frames)\n`);
+  console.log('| run | still animals: share / glyph / colour flips | wild ground detail: share / glyph / colour | whole frame: glyph / colour | moving animals, camera still: share / glyph / colour |');
+  console.log('|---|---|---|---|---|');
+  for (const v of list) console.log(`| ${v.label} | ${sh(v.still)} / ${f3(v.still)} | ${sh(v.wild)} / ${f3(v.wild)} | ${f3(v.all)} | ${sh(v.mv)} / ${f3(v.mv)} |`);
+  process.exit(0);
 }
 if (a.people) {
   const seed = Number(a.seed || 3), list = await peopleSet(seed), f3 = (x) => `${x.toFixed(3)}%`;

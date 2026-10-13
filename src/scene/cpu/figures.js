@@ -15,7 +15,7 @@
 //   leave the fixed lights as they were.
 import { figureParts, lightOf, FS, S, PART, POSE, NEAR_D } from '../../world/people/figure.js';
 import { animalParts } from '../../world/animals/shapes.js';
-import { AS, A as AN, APOSE, ANEAR_D, SPEC } from '../../world/animals/kinds.js';
+import { AS, A as AN, APOSE, ANEAR_D, AMID_D, SPEC } from '../../world/animals/kinds.js';
 import { LOOK } from '../../look.js';
 import { P as KP, P_STRIDE, PT, PF, ZONE_OUT, ZONE_YARD, roomBit } from '../../world/kit.js';
 import { MAT, MAT_FAINT, HIT_STRIDE, REC, H_SHADOW } from '../../contract.js';
@@ -71,13 +71,13 @@ const methods = {
       const fwd = dx * v.syaw + dz * v.cyaw, lat = dx * v.cyaw - dz * v.syaw;
       if (fwd < -3 || Math.abs(lat) > spread * Math.max(fwd, 0) + 3) continue;
       const k = animalParts(sa, o, dist, v.colAngle, v.rowAngle, frame.t, this.figParts, 0, v.ex, v.ez);
-      if (k) np = this.figItem(v, np, k, 100000 + i, x, z, dist, sa[o + AN.ROOM], 50000 + sa[o + AN.ID], ANEAR_D);
+      if (k) np = this.figItem(v, np, k, 100000 + i, x, z, dist, sa[o + AN.ROOM], 50000 + sa[o + AN.ID], ANEAR_D, true);
     }
     this.figKit.np = np;
   },
 
   // One figure's parts (in this.figParts) into the kit's prims, and its item.
-  figItem(v, np, k, pi, x, z, dist, room, id, nearD) {
+  figItem(v, np, k, pi, x, z, dist, room, id, nearD, animal = false) {
     const K = this.figKit, P = K.prims, buf = this.figParts, items = this.figItems;
     const minC = v.colAngle * Math.max(dist, 0.5), minR = v.rowAngle * Math.max(dist, 0.5);
     let reach = 0, y0 = Infinity, y1 = -Infinity, flames = 0;
@@ -104,7 +104,14 @@ const methods = {
         if (hm > h) { const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm; }
         // (faded only past the near detail: close by, the parts are whole
         // and a faded one's blend with what lies behind would jump)
-        if (dist >= nearD) cover = Math.min(cover, (h / hm) * Math.min(1, across / minC));
+        if (animal) {
+          // (phase 4b) an animal's thin parts (legs, ears, wings) are held
+          // and faded out by distance alone, over the last quarter of the
+          // middle step, so turning cannot change them
+          // (and held at two columns across the view: widened as a whole)
+          if (across < minC) { const f = minC / Math.max(across, 1e-4); hx *= f; hz *= f; }
+          cover = Math.min(cover, 1 - smooth(AMID_D * 0.7, AMID_D, dist));
+        } else if (dist >= nearD) cover = Math.min(cover, (h / hm) * Math.min(1, across / minC));
         if (cover < 0.06) continue;
       }
       const ang = buf[b + 2];

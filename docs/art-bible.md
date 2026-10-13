@@ -436,6 +436,70 @@ Cloth darkens in the rain (wetness 0.7, skin 0.3, iron 0.5) and dries as the gro
 
 **Greeting (E):** someone within about 2.3 m, in front of you and facing you (their head turned to you counts), says one line, shown with their name and role in the menu's quiet style for about five seconds, never in the tools' pictures. Lines are data (`lines.js`), 12 or more for each role, chosen by how many of their tags (the hour, the weather, the place, what they are doing) fit, never the same line twice running.
 
+### Animals and wild ground detail (phase 4b)
+
+**Wild ground detail** is scattered from the seed by habitat (`src/world/gen/wild.js`) and built from the kit's exact shapes (`src/world/kit-wild.js`), so what is drawn is what stops a walker, what you stand on and what casts a shadow:
+
+- **Boulders** in three sizes, singly and in loose fields below rocky slopes, along river bends and here and there in meadow: one ellipsoid stone with up to two smaller ones against it, in rock with its own lichen tone (`LOOK.wild.boulder`). The large ones (1 to 1.5 m) can be climbed by jumping.
+- **Outcrops:** three to five flat slabs of bedded rock along the contour of steep meadow, banded (`TX.STRATA`).
+- **Fallen logs** inside and at the edges of forest, a quarter sunk and never over 0.75 m tall, so a walker steps or jumps over them: bark along the round side (grooved), the cut wood's rings at the ends. **Stumps** among the trees, rings on top.
+- **Reed beds** in slow, shallow water and at lake margins, 1.25 to 1.8 m tall (a duck behind them is hidden): pale olive stems with a ragged top. Within 1.5 m of a walker the bed parts (its top dips round them). Nothing is remembered, so the same position gives the same picture.
+- **Flower drifts:** a ground material in three muted tones that follow moisture and aspect (`flowera` yellow-green, `flowerb` grey-lilac, `flowerc` pale), kept off forest, roads and every field. Far off a drift is ground tone only. Close by, sparse heads (one in `LOOK.flowers.share` of a 0.5 m lattice) move toward their bloom colour; they are drawn only while a head is several cells across, so they never crawl. About 2% of the land on the checked seeds.
+- **Pasture:** some field blocks near the villages are grazed. They take a muted pasture tone between grass and stubble, are walled on all sides, and have a fold beside them made from the fence pieces.
+
+All of it is held at two cells and faded by its true share beyond that (`PF.FADE`, under `LOOK.wild.fadeMin` not drawn), and is culled by distance and its 64 m bucket before any ray is cast. None of it is placed on a road, a footpath, a field, a green, a yard, a door's step, a gate, a bridge's or a jetty's end.
+
+**Animals** (`src/world/animals/`) follow the people's rule: nothing is simulated. Where each one is, and what it is doing, is a pure function of the seed, the day and the clock. A flock and a dog also follow their person's plan. The only reaction is a local, stateless response to how near a walker is (you, or a person out of doors):
+
+- An animal lifts its head first (the alert band, half at its alert distance). Further in, it moves away along the clearest of five directions, over a band of distance (`SPEC.flight`), so standing at the band's edge gives a steady picture, never a flip.
+- The band narrows by up to 30% and widens again with the clock (over about four game hours) (`bold`), so a group that fled comes back later if you stay outside its narrower band, and is back where it was as soon as you leave.
+- Meetings (with each other, with people, with you, with any shape) move an animal aside by its overlap. Like people's meetings this is worked out from the moment alone, and done only within 160 m of you.
+
+| Kind | Where and when | Alert / flight (m) |
+|---|---|---|
+| Sheep | 1 or 2 flocks of 8 to 20 a village. In the fold at night. Led out by their shepherd after dawn (about 6.4 h, later after morning rain), grazing round the pasture's slowly drifting middle, brought in at about 18 h (sooner when rain sets in after noon), lying down after 20.8 h. In rain they gather on the pasture's lee side. | none (they follow their shepherd) |
+| Cattle | 3 to 6, in a walled field by water at one or two villages. Grazing slowly, lying through the warm middle of the day and at night. | none |
+| Hens | 4 to 7 a village, scratching before a house's door by day, in to roost before dark and out of the rain. | none |
+| Dog | one a village, its owner's (the shepherd's where there is one). Behind them on their way, through doorways with them. It lies by their door while they are home and waits outside houses one cannot enter. | none |
+| Deer | 4 to 7 groups of 3 to 6. In the forest by day, out to graze its edge at dawn and dusk, bedded at night. | 40 / 22 to 13 |
+| Hares | 12, each sitting in its form, a few hops to another every few minutes. | 16 / 9 to 5 |
+| Ducks | twos and threes on lakes and slow water, paddling slow loops by day, tucked on the bank at night. | 12 / 9 to 5 (they paddle away) |
+| Gulls | 3 to 6 at a few beaches and on a shore village's jetty, circling over the water, then standing on the beach in turn. All stand at night. | 18 / 11 to 7 (they take off) |
+| Crows | on the fort's merlons (placed from the kit's crenel data) and on village ridges. Now and then a turn round and back. | 22 / 12 to 8 (up first, then circling) |
+| Small birds | 4 flocks of 12 to 22, resting in a copse a few minutes, then crossing to the next in a loose cloud | none |
+| Large birds | a pair soaring in wide circles near the mountains, 8 h to 18.5 h | none |
+
+**The figures** are a few exact shapes each (`shapes.js`), boxes in the kit's system like people's: a body, a head and neck (up or down to graze), legs, a tail, ears, a rump patch, a bill, folded or spread wings. Gait comes from distance travelled (`SPEC.stride`); a wingbeat or a dog's tail comes from the clock. Every kind has a resting pose (lying, sitting, perched, tucked on the bank).
+
+| Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | Used for |
+|---|---|---|---|---|---|
+| Pasture (`pasture`) | `,:;"+*` | `#788a48` / `#30392a` | `#41463e` | `#242728` | grazed field blocks |
+| Flowers (`flowera`, `flowerb`, `flowerc`) | `,:;"+*` | `#7f9142`, `#74805a`, `#82985a` / about `#30382a` | `#454a39`, `#3f414d`, `#464d4d` | `#262925`, `#222432`, `#272b32` | drifts; heads toward `#c9bb5c`, `#a28fae`, `#d4d4c0` near |
+| Reed | `.:|!I` | `#7a7c48` / `#343722` | `#665f40` | `#242822` | reed beds |
+| Bark | `:|!I#` | `#5a4c40` / `#28211c` | `#3f3635` | `#212021` | logs, stumps |
+| Wool | `.,:;o%` | `#c4b9a0` / `#5e5951` | `#8c7772` | `#353134` | sheep (some charcoal) |
+| Hide | `.,:;=+` | `#6f4e3f` / `#31231e` | `#4f372e` | `#241b18` | cattle (also linen and charcoal) |
+| Fawn | `.,:;=+` | `#8f765a` / `#41362a` | `#765c4c` | `#2b2624` | deer, with a linen rump |
+| Hare | `.,:;=+` | `#86705a` / `#3a3028` | `#604f46` | `#2b2725` | hares, some small birds |
+| Duck, duck's head | `.,:;=+` | `#7a6448` / `#33291f`, `#3e5040` / `#1a221c` | `#574638`, `#2c332d` | `#27231d`, `#101515` | ducks (the drake's head dark green) |
+| Gull | `.,:;=+` | `#c9c8c2` / `#5f6066` | `#90818a` | `#36353f` | gulls, slate wings |
+| Crow | `.,:;=+` | `#34353c` / `#16171b` | `#25252f` | `#111219` | crows |
+
+Hens, dogs and small birds wear colours the people's cloth already has (russet, linen, umber, charcoal, ochre).
+
+**Distance steps** (horizontal distance from the eye; section 6 holds throughout):
+
+| Distance | What is drawn |
+|---|---|
+| Near, under 14 m | every part; the thin ones (legs, ears, tails, bills, wings) held at two rows and two columns, whole |
+| Middle, 14 to 40 m | the body and head whole, each pair of legs as one thin part (two legs seen from the side), the thin parts held at two cells and faded by their true share |
+| Far, beyond 40 m | the body alone, held at two columns wide and a row tall and faded by its true share, so a far flock is a pale cluster that thins, never sparkle; not drawn under 5% (`LOOK.animals.fadeMin`) or beyond 320 m |
+| A bird in the air narrower than two columns | not shapes but one mark (`LOOK.animals.marks.glyphs`, `v` wings up, `-` level, `^` down) in its shaded colour, drawn over what the cell shows like a rain streak, faded out toward 700 m. A far flock keeps fewer marks with distance, its later birds going first and the last kept fading, so it thins by count, not flicker. |
+
+**Shadows:** each animal on the ground darkens the ground under it. The darkening is its footprint moved away from the light by its height over the light's slope, drawn out that way, soft at its edge, and faded out between 60 and 90 m (`LOOK.animals.shadow`). Animals show in reflections as people do.
+
+**Rain:** sheep gather on their pasture's lee side, cattle on their field's, hens stay in, deer keep to their daytime cover, and gulls stand on the beach in heavy rain.
+
 ### Sky
 
 - the gradient from horizon to high, with a glow round the sun;

@@ -16,6 +16,7 @@ import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
 import { People } from './app/people.js';
 import { Animals } from './app/animals.js';
+import { animalCameras } from './world/animals/cameras.js';
 import { peopleCameras } from './world/people/cameras.js';
 import { packWorld, unpackWorld, worldHash } from './world/pack.js';
 import { shadowStore } from './scene/cpu/light.js';
@@ -176,6 +177,9 @@ if (people && params.get('people') === '0') people.on = false;
 if (people) world.cameras.push(...peopleCameras(world, people.P));
 // (phase 4b) the animals (?animals=0: none, nor their pastures and folds)
 const animals = people && GEN.animals ? new Animals(world, people.P) : null;
+// (and the cameras that look at them: a pasture with its flock, deer at a
+// forest edge at dawn, gulls on the coast, crows on the wall walk)
+if (animals) world.cameras.push(...animalCameras(world, animals.A));
 // (in the building yard: a line of figures standing still, in every pose)
 const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
 // (phase 4b) and every animal in every pose, standing still
@@ -561,6 +565,8 @@ const game = {
   },
   // (phase 4a) everyone, for the menu's list
   get people() { return people ? lab.people : null; },
+  // (phase 4b) the animals, for the menu's counts and its camera buttons
+  get animals() { return animals ? lab.animals : null; },
   workersLine() {
     if (!THREADS) return 'everything on the page, no workers';
     if (!WORLD) return `${THREADS} workers, each building its own copy of the scene`;
@@ -627,8 +633,10 @@ lab.animals = {
   get left() { return animals ? animals.left : 0; },
   // this frame's states (AS numbers each) and how many
   states() { return animals ? Array.from(animals.st.subarray(0, animals.count * 16)) : []; },
+  // where group g is this frame (the middle of its members)
+  where(g) { return animals ? animals.where(g) : null; },
   // the camera `dist` metres off group g, looking at it (from its open side)
-  goTo(g, dist = 12, pitch = -0.1) {
+  goTo(g, dist = 12, pitch = null) {
     if (!animals) return false;
     if (people && people.planned < 0) people.planDay(state.day);
     animals.update(state.day, state.hour, null, null, null, weatherNow());
@@ -642,7 +650,9 @@ lab.animals = {
       if (!player.blocked(x, z, player.restAt ? player.restAt(x, z) : 0)) { best = [x, z]; break; }
     }
     const [x, z] = best || [w.x + Math.sin(a) * dist, w.z + Math.cos(a) * dist];
-    player.place(x, z, Math.atan2(w.x - x, w.z - z), pitch);
+    // (looking at them: up to a perch, down to the water)
+    const eye = player.restAt(x, z) + EYE, d = Math.hypot(w.x - x, w.z - z);
+    player.place(x, z, Math.atan2(w.x - x, w.z - z), pitch !== null ? pitch : w.y !== null ? Math.atan2(w.y + 0.4 - eye, d) : -0.1);
     state.held = false; state.camName = `by the ${info.type}`;
     return true;
   },

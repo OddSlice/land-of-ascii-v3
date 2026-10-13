@@ -4,7 +4,7 @@
 // road (`world-road`, the default seed or --seed). The videos go to
 // shots/walks/, which is kept out of git.
 //
-//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village,world-green-day,world-fort-night] [--threads 8] [--density 4] [--headed]
+//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village,world-green-day,world-fort-night,world-flock-day,world-dawn-deer] [--threads 8] [--density 4] [--headed]
 //                       [--look cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to
@@ -57,6 +57,16 @@ const WALKS = [
   // at the gate past its guard, across the courtyard, up a stair and along
   // the wall walk past the watch with their torches, back, and a look round
   { name: 'world-fort-night', world: true, fort: true, night: true, hour: 23.0, rate: 1 / 3600, secs: 120 },
+  // phase 4b: five minutes following the first flock through its day in
+  // fast time, from 05:30 in its fold, out behind its shepherd, grazing,
+  // and back in at dusk, to 20:30 (the clock running 15 hours in five
+  // minutes), the camera a little above and 14 m off the flock's middle
+  { name: 'world-flock-day', world: true, flock: 0, hour: 5.5, rate: 15 / 300, secs: 300 },
+  // and three minutes on foot at dawn from the village nearest a deer
+  // group's forest edge, across the meadow toward the deer grazing there,
+  // the clock running an hour in the three minutes; they lift their heads,
+  // then run for the trees
+  { name: 'world-dawn-deer', world: true, deer: true, hour: 5.85, rate: 1 / 180, secs: 180 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -97,6 +107,8 @@ try {
     else if (w.fort) await walkFort(page, a.seed, w.night ? w.secs : 0);
     else if (w.hold) await page.waitForTimeout(w.hold * 1000);
     else if (w.village) await walkVillage(page, a.seed, w.secs);
+    else if (w.flock !== undefined) await followFlock(page, w.flock, w.secs);
+    else if (w.deer) await walkToDeer(page, a.seed, w.secs);
     else if (w.pan) {
       // turn at a steady rate, one step each display refresh
       await page.evaluate(({ secs, deg }) => new Promise((res) => {
@@ -367,4 +379,83 @@ async function follow(page, pts0, ahead, secs) {
     };
     step();
   }), { pts, ahead, secs });
+}
+
+// (phase 4b) Follow group g for `secs` seconds: the camera 4 m up and 14 m
+// off the flock's middle, from the side away from its fold's gate at the
+// start, eased toward where it should be each frame and always facing it.
+async function followFlock(page, g, secs) {
+  await page.evaluate(({ g, secs }) => new Promise((res) => {
+    const L = window.lab, t0 = performance.now();
+    let cx = null, cz = null, cy = null, last = t0, side = null;
+    const step = () => {
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const w = L.animals.where(g);
+      if (w && w.y !== null) {
+        if (side === null) side = Math.atan2(w.x, w.z) + 2.4;
+        const tx = w.x + Math.sin(side) * 14, tz = w.z + Math.cos(side) * 14, ty = w.y + 1.7 + 4;
+        if (cx === null) { cx = tx; cz = tz; cy = ty; }
+        const k = 1 - Math.exp(-dt * 0.8);
+        cx += (tx - cx) * k; cz += (tz - cz) * k; cy += (ty - cy) * k;
+        const d = Math.hypot(w.x - cx, w.z - cz);
+        L.setCamera({ x: cx, z: cz, y: cy, yaw: Math.atan2(w.x - cx, w.z - cz) * 180 / Math.PI, pitch: Math.atan2(w.y + 0.5 - cy, d) * 180 / Math.PI });
+      }
+      if ((now - t0) / 1000 > secs) res(); else requestAnimationFrame(step);
+    };
+    step();
+  }), { g, secs });
+}
+
+// (phase 4b) From the village nearest a deer group's forest edge, on foot
+// across the meadow toward it (a way round what is in the way on a
+// half-metre grid, by the game's own collision), stopping 8 m short of the
+// edge, then a slow look along it.
+async function walkToDeer(page, seed, secs) {
+  const { generateWorld, DEFAULT_SEED } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const { buildPeople } = await import('../src/world/people/people.js');
+  const { buildAnimals } = await import('../src/world/animals/build.js');
+  const { groundAt } = await import('../src/world/objects.js');
+  const gen = generateWorld(seed !== undefined ? Number(seed) : DEFAULT_SEED); let r; while (!(r = gen.next()).done);
+  const w = unpackWorld(packWorld(r.value)), P = buildPeople(w), An = buildAnimals(w, P), pl = P.p;
+  // (the pair whose straight distance is within what three minutes' walk allows)
+  let best = null;
+  for (const g of An.groups.filter((q) => q.type === 'deer')) for (const v of w.sites.villages) {
+    const d = Math.hypot(g.edge[0] - v.plan.centre.x, g.edge[1] - v.plan.centre.z);
+    if (d < 520 && (!best || d < best.d)) best = { g, v, d };
+  }
+  if (!best) throw new Error('world-dawn-deer: no deer group near a village');
+  const { g, v } = best, A = [v.plan.centre.x, v.plan.centre.z];
+  const ux = g.edge[0] - A[0], uz = g.edge[1] - A[1], L0 = Math.hypot(ux, uz), B = [g.edge[0] - ux / L0 * 8, g.edge[1] - uz / L0 * 8];
+  const s2 = 1, x0 = Math.min(A[0], B[0]) - 40, z0 = Math.min(A[1], B[1]) - 40, nx = Math.ceil((Math.abs(A[0] - B[0]) + 80) / s2), nz = Math.ceil((Math.abs(A[1] - B[1]) + 80) / s2);
+  const free = (i, k) => { const x = x0 + i * s2, z = z0 + k * s2; return !pl.blocked(x, z, pl.supportAt(x, z, groundAt(w.terrain, x, z) + 0.3)) && w.terrain.wWater[Math.round(z) * w.NN + Math.round(x)] < 128; };
+  const key = (i, k) => k * nx + i, start = [Math.round((A[0] - x0) / s2), Math.round((A[1] - z0) / s2)], goal = [Math.round((B[0] - x0) / s2), Math.round((B[1] - z0) / s2)];
+  const dist = new Float64Array(nx * nz).fill(Infinity), prev = new Int32Array(nx * nz).fill(-1), seen = new Uint8Array(nx * nz), ok = new Int8Array(nx * nz).fill(-1);
+  const open = [[0, key(...start)]]; dist[key(...start)] = 0;
+  while (open.length) {
+    let bi = 0; for (let q = 1; q < open.length; q++) if (open[q][0] < open[bi][0]) bi = q;
+    const [, c] = open.splice(bi, 1)[0]; if (seen[c]) continue; seen[c] = 1;
+    if (c === key(...goal)) break;
+    const ci = c % nx, ck = (c - ci) / nx;
+    for (const [di, dk] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const i = ci + di, k = ck + dk; if (i < 0 || k < 0 || i >= nx || k >= nz) continue;
+      const q = key(i, k); if (ok[q] < 0) ok[q] = free(i, k) ? 1 : 0; if (!ok[q]) continue;
+      const nd = dist[c] + Math.hypot(di, dk) * s2;
+      if (nd < dist[q]) { dist[q] = nd; prev[q] = c; open.push([nd + Math.hypot(i - goal[0], k - goal[1]) * s2, q]); }
+    }
+  }
+  const way = []; for (let c = key(...goal); c >= 0; c = prev[c]) way.push([x0 + (c % nx) * s2, z0 + Math.floor(c / nx) * s2]);
+  way.reverse();
+  console.log(`world-dawn-deer: from village ${v.q + 1}'s centre to deer group ${g.id}'s forest edge, ${Math.round(best.d)} m straight, ${way.length} m of way`);
+  await page.evaluate(({ x, z, yaw }) => window.lab.setCamera({ x, z, yaw }), { x: A[0], z: A[1], yaw: Math.atan2(ux, uz) * 180 / Math.PI });
+  const t0 = Date.now();
+  await page.keyboard.down('KeyW');
+  await follow(page, way.filter((q, i, arr) => i % 3 === 0 || i === arr.length - 1), 4, secs - 25);
+  await page.keyboard.up('KeyW');
+  const left = Math.max(10, secs - (Date.now() - t0) / 1000);
+  await page.evaluate(({ secs }) => new Promise((res) => {
+    const L = window.lab, y0 = L.state().yaw, t0 = performance.now();
+    const step = () => { const t = Math.min(1, (performance.now() - t0) / (secs * 1000)); L.face(y0 - 50 + 100 * t * t * (3 - 2 * t)); if (t < 1) requestAnimationFrame(step); else res(); };
+    step();
+  }), { secs: left });
 }

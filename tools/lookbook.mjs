@@ -8,7 +8,7 @@
 //   node tools/lookbook.mjs --phase 0c --ref DIR [--built]   docs/phase0c.md: each look candidate at near, middle
 //       and far distance, and the three fixes before (the build in DIR, e.g. a copy of phase 0b) and after
 //       (shots/phase0c/)
-//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look cloud=A,...] [--why] [--people off]
+//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look cloud=A,...] [--why] [--people off] [--gen off]
 //       the regression lookbook: the fixed cameras (nine in the lab, three in
 //       the stress scene, the generated world's twelve for the default seed,
 //       phase 3a's building yard's fourteen) at day, dusk and night with every clock frozen and the
@@ -195,7 +195,8 @@ async function regress() {
   const weather = String(a.weather || 'fair');
   try {
     for (const scene of scenes) {
-      const lab = await openLab(browser, url, { built: !!a.built, scene, density, threads: 8 });
+      // (phase 4b: --gen off: no wild ground detail and no animals, phase 4a's world)
+      const lab = await openLab(browser, url, { built: !!a.built, scene, density, threads: 8, extra: a.gen === 'off' ? { wild: 0, animals: 0 } : null });
       const { page } = lab;
       const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
       for (let i = 0; i < cams.length; i++) {

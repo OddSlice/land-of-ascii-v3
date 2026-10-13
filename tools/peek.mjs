@@ -19,7 +19,7 @@ try {
   const hour = a.hour !== undefined ? +a.hour : 14;
   for (let i = 0; i < names.length; i++) {
     if (!re.test(names[i])) continue;
-    await page.evaluate(async ({ i, hour }) => { window.lab.setWeather('fair'); window.lab.camera(i); window.lab.freeze(hour, 0, 0); await window.lab.whenIdle(); }, { i, hour });
+    await page.evaluate(async ({ i, hour }) => { window.lab.setWeather('fair'); window.lab.camera(i); window.lab.freeze(hour >= 0 ? hour : undefined, 0, 0); await window.lab.whenIdle(); }, { i, hour });
     await lab.check();
     const f = path.join(out, `${String(i).padStart(2, '0')}-${names[i].toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`);
     await (await page.$('#view')).screenshot({ path: f });

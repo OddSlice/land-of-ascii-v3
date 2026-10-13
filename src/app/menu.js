@@ -195,6 +195,7 @@ export class Menu {
       h('div', { class: 'opts' }, [['world', 'the generated world'], ['lab', 'the Look Lab'], ['stress', 'the stress scene'], ['yard', 'the building yard']].map(([s, t]) =>
         h('button', { type: 'button', 'aria-pressed': String(g.scene === s), onclick: () => g.goScene(s) }, t))),
       this.peoplePart(),
+      this.animalsPart(),
       h('h3', { class: 'part' }, 'workers'),
       h('p', { class: 'line' }, workers),
       this.benchPart());
@@ -218,6 +219,28 @@ export class Menu {
     };
     this.refresh.push(fill);
     return [h('h3', { class: 'part' }, 'people'), h('p', { class: 'words' }, `${g.people.count} people. Choose one to stand beside them.`), list];
+  }
+
+  // (phase 4b) The animals: how many of each kind, and the camera to a
+  // flock, a herd, a deer group or a crow's perch (each press the next one,
+  // from far enough off that they stay as they are).
+  animalsPart() {
+    const g = this.game;
+    if (!g.animals) return [];
+    const counts = h('p', { class: 'words' });
+    const fill = () => { counts.textContent = g.animals.counts().filter((c) => c.n).map((c) => `${c.n} ${c.name}`).join(', ') + '.'; };
+    this.refresh.push(fill);
+    const next = {};
+    const go = (type, dist) => {
+      const gs = g.animals.groups().filter((x) => x.type === type);
+      if (!gs.length) return;
+      const k = next[type] = ((next[type] ?? -1) + 1) % gs.length;
+      g.animals.goTo(gs[k].id, dist);
+      this.update();
+    };
+    const kinds = [['flock', 'a flock', 14], ['herd', 'a herd', 18], ['deer', 'a deer group', 32], ['crow', 'a perch', 28], ['ducks', 'ducks', 16], ['gulls', 'gulls', 24]];
+    return [h('h3', { class: 'part' }, 'animals'), counts,
+      h('div', { class: 'opts' }, kinds.filter(([t]) => g.animals.groups().some((x) => x.type === t)).map(([t, label, d]) => h('button', { type: 'button', onclick: () => go(t, d) }, `to ${label}`)))];
   }
 
   // (phase 3b) The benchmark: run, cancel, the table, copy it as text. It

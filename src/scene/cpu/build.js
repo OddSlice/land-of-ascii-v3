@@ -483,7 +483,7 @@ const methods = {
 
   // (phase 4b) The wild detail's tone: each kind of detail drawn only while
   // it is several cells across (art bible, never-do 28), else its average.
-  wildTone(tex, S, q, x, y, z, fp, tu) {
+  wildTone(tex, S, q, x, y, z, fp, tu, graze = 1) {
     const WT = LOOK.wild, seed = S[q + P.SEED], own = ((Math.imul(seed | 0, 2654435761) >>> 0) / 4294967296 - 0.5);
     if (tex === TX.BOULDER) {
       // the stone's own shade, patches of lichen, a fine grain
@@ -513,10 +513,15 @@ const methods = {
       const ring = Math.cos(r * S[q + P.HZ] / WT.rings * Math.PI * 2);
       return 0.3 * ring * (1 - smooth(WT.rings * 0.25, WT.rings * 0.6, fp)) - 0.35 * (1 - Math.min(1, r)) * (1 - smooth(0.05, 0.2, fp)) + 0.15;
     }
-    // reeds: the stems, paler at their tips and darker toward the water
+    // reeds: paler at their tips and darker toward the water, and clumps of
+    // stems each with a tone of its own (no dark gaps between them, which a
+    // walk would sweep across the cells faster than they are wide, as the
+    // boards' were), shown while a clump is five columns across, counting
+    // how much a glancing view stretches it
     const R = WT.reed, h = Math.max(0.1, S[q + P.Y1] - S[q + P.Y0]), up = Math.min(1, Math.max(0, (y - S[q + P.Y0]) / h));
-    const st = jointCover(tu, R.stem, R.stem * 0.45, Math.max(1e-4, fp));
-    return R.tip * (up - 0.5) - 0.45 * (st - 0.45) * (1 - smooth(R.stem * 0.25, R.stem * 0.6, fp)) + 0.15 * own;
+    const clump = Math.floor(tu / R.stem), t2 = ((Math.imul(clump * 73856093 ^ (seed | 0), 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
+    const fpu = Math.max(1e-4, fp) / Math.max(0.15, graze);
+    return R.tip * (up - 0.5) + 0.22 * t2 * smooth(4, 6, R.stem / fpu) + 0.15 * own;
   },
 
   // Shade a building's hit into cell ci (slot 0 direct, 1 mirrored).
@@ -682,7 +687,7 @@ const methods = {
       const plank = ((Math.imul(row * 73856093 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
       tone = -0.12 + 0.3 * plank * smooth(4, 6, 0.22 / Math.max(1e-4, fp));
     } else if (tex >= TX.BOULDER) {
-      tone = this.wildTone(tex, S, q, x, y, z, fp, tu);
+      tone = this.wildTone(tex, S, q, x, y, z, fp, tu, Math.abs(dx * nx + dz * nz));
     } else if (K === this.figKit) {
       // (phase 4a) a person's clothes and skin: even, one tone to a part (a
       // grain fixed to the world would cut across a body narrower than its

@@ -160,3 +160,44 @@ A person's sizes are in `FIG` (`src/world/people/figure.js`), before each person
 | Guards | 9, three watches of three changing at 6 h, 14 h and 22 h; the watch asleep has a bunk each in the keep, the watches taking turns | The gate and the wall walk always have one; the relief goes up a quarter of an hour early. |
 | Travellers | 3 or 4, each walking a main road over a day or two | Rest by a well by day, on a bench only after about 19.8 h. |
 
+
+## Animals and wild ground detail (phase 4b)
+
+Sizes are before each animal's own scale (0.9 to 1.1). They are in `SPEC` (`src/world/animals/kinds.js`); numbers and spacings are in `SCALE.animals` and `SCALE.wild` (`src/world/scale.js`).
+
+| Kind | Length, height to the back | Walk, run (m/s) | Stride (m a cycle) | Body for meeting (radius) |
+|---|---|---|---|---|
+| Sheep | 0.95 m, 0.86 m | 1.0, 2.2 | 0.9 | 0.35 m |
+| Cattle | 2.0 m, 1.35 m | 0.9, 1.8 | 1.4 | 0.55 m |
+| Hen | 0.35 m, 0.32 m | 0.5, 1.6 | 0.25 | 0.16 m |
+| Dog | 0.85 m, 0.58 m | 1.3, 3.5 | 0.8 | 0.3 m |
+| Deer | 1.25 m, 1.2 m (head to 1.56 m) | 1.1, 7.0 | 1.6 | 0.45 m |
+| Hare | 0.45 m, 0.3 m (ears to 0.5 m) | 0.6, 9.0 | 0.9 | 0.2 m |
+| Duck | 0.42 m, 0.18 m above the water | 0.35, 1.0 | 0.35 | 0.22 m |
+| Gull, crow | 0.42 m; wingspan 1.2 m, 0.95 m | flying 9 to 10 | | |
+| Small bird | 0.14 m; wingspan 0.24 m | flying 11 | | |
+| Large bird | 0.6 m; wingspan 1.8 m | soaring, 110 m up, circles of about 140 m | | |
+
+| | | |
+|---|---|---|
+| A sheepfold | 9 by 7 m inside, of fence pieces, with a 2.6 m gate, beside a barn where there is room | On ground falling no more than 1 m across it. Sheep stand 1.35 m apart in it, 0.9 m off the fence. |
+| A flock grazing | 1.25 m apart (spread by a sunflower pattern), each drifting about 0.45 m by its own clock; kept 3.5 m off the pasture's wall | On the way, 2.6 m behind the shepherd and 0.7 m one behind another. |
+| A herd | 3.2 m apart | |
+| A dog | 1.6 m behind its person, 0.45 m to the side | |
+| Deer | 4 to 7 groups of 3 to 6, at least 300 m apart | Bed, forest edge and daytime spot within a few tens of metres. |
+| Hares | 12, at least 140 m apart | |
+| Ducks | up to 6 groups of 2 or 3, at least 180 m apart, paddling loops of 3 m | Their bank is reached by water all the way. |
+| Gulls | 3 beaches, 3 to 6 each, at least 220 m apart, circling 16 m out and 14 m up; 3 on a jetty | |
+| Crows | 4 on the fort's merlons, 5 on village ridges | Circle 9 m round their perch when up. |
+| Reactions | alert and flight bands as in the art bible; a deer runs up to 45 m, a hare 32 m, a duck 8 m | The band narrows by up to 30% and widens again over about 4 game hours. |
+| Meetings | worked out within 160 m of you (as \|dx\| + \|dz\|) | A sheep, cow, deer or dog near you is a body you cannot walk through. |
+
+| Wild ground detail | Size | Where |
+|---|---|---|
+| Boulders | small 0.25 to 0.45 m across and 0.2 to 0.4 m tall; medium 0.55 to 0.95 m and 0.45 to 0.85 m; large 1.05 to 1.6 m and 0.95 to 1.5 m | Fields below rocky slopes, river bends, now and then meadow. A large one is climbed by jumping (the jump clears 1.1 m, then a 0.6 m step). |
+| Outcrops | slabs 1 to 1.8 m long, 0.5 to 1.1 m high | Meadow steeper than 42%. |
+| Logs | 2.5 to 6 m long, 0.15 to 0.36 m thick, at most 0.75 m tall | Inside and at the edge of forest. |
+| Stumps | 0.2 to 0.42 m across, 0.25 to 0.6 m tall | Forest. |
+| Reed beds | 1.1 to 2.6 m across, 1.25 to 1.8 m tall | Water 0.03 to 0.55 m deep, slow, within 3 m of the edge. |
+| Flower drifts | patterns about 46 m across | About 2% of the land. |
+| Kept clear | 1.2 m off paths, fields, villages and yards; 3 m off roads; 1.5 m from a door, gate, bridge or jetty end | |
