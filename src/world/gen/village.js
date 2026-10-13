@@ -544,12 +544,16 @@ function nearestIndex(rd, x, z) { let b = 0, bd = Infinity; for (let q = 0; q < 
 // stubble and fallow; on gentle open ground, off the ways, the water, the
 // stands and every building. Returns the blocks; `bounds` puts a fence or a
 // wall along one or two of each block's sides, with a gate gap.
-export function planFields(q, rec, env) {
+// (phase 4b) `more`: { have, want, tries, size, slopeK } asks for further
+// blocks beside those already laid (`have`), for a village with too few to
+// graze one: more candidates, smaller, on a little steeper ground.
+export function planFields(q, rec, env, more = null) {
   const { H, N, kind, wetDist, F, thr, seed } = env, NN = N + 1;
   const r = (k) => hash2(q * 613 + k, 77, seed + 9301);
   const gAt = (x, z) => heightAt(H, N, x, z);
-  const want = V.fields[0] + Math.floor((V.fields[1] - V.fields[0] + 1) * r(1));
-  const blocks = [];
+  const want = more ? more.want : V.fields[0] + Math.floor((V.fields[1] - V.fields[0] + 1) * r(1));
+  const blocks = more ? more.have.slice() : [];
+  const size = more ? more.size : 1, slope = V.fieldSlope * (more ? more.slopeK : 1), tries = more ? more.tries : 160;
   const C = [rec.centre.x, rec.centre.z];
   // just past the houses (the barns may stand further out)
   const ds = rec.houses.map((h) => Math.hypot(h.x - C[0], h.z - C[1])).sort((a, b) => a - b);
@@ -557,11 +561,13 @@ export function planFields(q, rec, env) {
   // candidates: round the village first, then beside a block already laid
   // (fields lie side by side along the contour)
   const cands = [];
-  for (let t = 0; t < 160; t++) cands.push({ t, beside: null });
+  // (asking for more: beside the blocks already laid first)
+  if (more) for (const b of more.have) for (const side of [1, -1]) cands.push({ t: 5000 + b.id * 2 + (side > 0 ? 0 : 1), beside: { ...b, side } });
+  for (let t = 0; t < tries; t++) cands.push({ t: more ? 1000 + t : t, beside: null });
   for (let ci = 0; ci < cands.length && blocks.length < want; ci++) {
     const { t, beside } = cands[ci];
-    const L = V.fieldL[0] + (V.fieldL[1] - V.fieldL[0]) * hash2(t, 4, seed + q * 41);
-    const W = V.fieldW[0] + (V.fieldW[1] - V.fieldW[0]) * hash2(t, 5, seed + q * 41);
+    const L = (V.fieldL[0] + (V.fieldL[1] - V.fieldL[0]) * hash2(t, 4, seed + q * 41)) * size;
+    const W = (V.fieldW[0] + (V.fieldW[1] - V.fieldW[0]) * hash2(t, 5, seed + q * 41)) * size;
     let cx, cz, ang;
     if (beside) {
       ang = beside.a;
@@ -586,7 +592,7 @@ export function planFields(q, rec, env) {
       if (f === f && f > thr - 0.06) { ok = false; break; }
       // gentle ground only
       const sx = (gAt(px + 2, pz) - gAt(px - 2, pz)) / 4, sz = (gAt(px, pz + 2) - gAt(px, pz - 2)) / 4;
-      if (Math.hypot(sx, sz) > V.fieldSlope) { ok = false; break; }
+      if (Math.hypot(sx, sz) > slope) { ok = false; break; }
       if (env.ways.clear(px, pz, 12) < 3) { ok = false; break; }
       if (env.cleared.some((p) => inPoly(p, px, pz))) { ok = false; break; }
     }
@@ -658,9 +664,15 @@ export function boundField(blk, rec, env, style, all = false) {
       return pts;
     };
     const ang = Math.atan2(sd.b[1] - sd.a[1], sd.b[0] - sd.a[0]) + blk.a;
-    // (a pasture's other sides: whole, no gate)
-    if (all && si > 0) { pieces.push({ kind: style, pts: run(0, len), angle: ang, seed: 3600 + blk.id * 8 + si * 2 }); return; }
+    // (a pasture's other sides have a gap at the middle too, so two
+    // pastures side by side never close each other's gate; only the first
+    // is its gate for people)
     const g0 = len / 2 - gap / 2, g1 = len / 2 + gap / 2;
+    if (all && si > 0) {
+      pieces.push({ kind: style, pts: run(0, g0), angle: ang, seed: 3600 + blk.id * 8 + si * 2 });
+      pieces.push({ kind: style, pts: run(g1, len), angle: ang, seed: 3601 + blk.id * 8 + si * 2 });
+      return;
+    }
     const A = run(0, g0), B = run(g1, len);
     pieces.push({ kind: style, pts: A, angle: ang, seed: 3600 + blk.id * 8 + si * 2 });
     pieces.push({ kind: style, pts: B, angle: ang, seed: 3601 + blk.id * 8 + si * 2 });

@@ -242,7 +242,9 @@ export function buildAnimals(world, P) {
         for (let k = Math.ceil((-hx + ph) / per); (k + mw / 2) * per - ph < hx; k++) {
           const u = (k + mw / 2) * per - ph;
           if (u < -hx + 0.2 || u > hx - 0.2) continue;
-          perches.push({ x: S[q + KP.CX] + u * S[q + KP.CA], z: S[q + KP.CZ] + u * S[q + KP.SA], y: S[q + KP.Y1], yaw: Math.atan2(-S[q + KP.SA], S[q + KP.CA]) + Math.PI / 2, at: 'fort' });
+          // (on the merlon's own top, as the shapes have it there)
+          const px = S[q + KP.CX] + u * S[q + KP.CA], pz = S[q + KP.CZ] + u * S[q + KP.SA];
+          perches.push({ x: px, z: pz, y: kitSupport(K, px, pz, 1e9), yaw: Math.atan2(-S[q + KP.SA], S[q + KP.CA]) + Math.PI / 2, at: 'fort' });
         }
       }
       // roof ridges: the highest of the kit along a house's middle line
@@ -259,7 +261,16 @@ export function buildAnimals(world, P) {
     const clear = (q) => !bodyBlocked(K, q.x, q.z, q.y + 0.04, q.y + 0.45, 0.12);
     const fortP = perches.filter((q) => q.at === 'fort' && clear(q)), roofP = perches.filter((q) => q.at === 'roof' && clear(q));
     const chosen = [...spread2(pick(fortP, 40, 1), 6).slice(0, C.crowsFort), ...spread2(pick(roofP, 60, 2), 18).slice(0, C.crowsRoofs)];
-    for (const pc of chosen) add({ type: 'crow', perch: pc, home: [pc.x, pc.z] }, KIND.CROW, 1, () => [MAT.CROW, MAT.CROW]);
+    // (each circles 9 m up, or 2 m over the highest shape under its circle)
+    const flyY = (pc) => {
+      let top = pc.y + 9;
+      for (let k = 0; k < 48; k++) for (const rr of [C.crowCircle * 0.35, C.crowCircle * 0.7, C.crowCircle, C.crowCircle + 1]) {
+        const x = pc.x + Math.cos(k * TAU / 48) * rr, z = pc.z + Math.sin(k * TAU / 48) * rr;
+        top = Math.max(top, kitSupport(K, x, z, 1e9) + 2, G(x, z) + 4);
+      }
+      return top;
+    };
+    for (const pc of chosen) add({ type: 'crow', perch: pc, fly: flyY(pc), home: [pc.x, pc.z] }, KIND.CROW, 1, () => [MAT.CROW, MAT.CROW]);
   }
   // small birds: flocks that fly copse to copse
   {

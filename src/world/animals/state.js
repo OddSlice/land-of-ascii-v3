@@ -241,7 +241,7 @@ export function animalsAt(A, day, hour, near, out, ids, groups = null, weather =
         if (up <= 0.01) { put(m, pc.x, pc.z, pc.y, pc.yaw, APOSE.PERCH, 0, 1, 0, alertOf(spec, d)); break; }
         // (up off its perch first, then out to its circle)
         const a = minutes * 6 / C.crowCircle + g.id, R = C.crowCircle * up * up;
-        const x = pc.x + Math.cos(a) * R, z = pc.z + Math.sin(a) * R, y = pc.y + 9 * Math.min(1, up * 2.5);
+        const x = pc.x + Math.cos(a) * R, z = pc.z + Math.sin(a) * R, y = pc.y + 0.15 + (g.fly - pc.y - 0.15) * Math.min(1, up * 2.5);
         put(m, x, z, y, Math.atan2(-Math.sin(a), Math.cos(a)), APOSE.FLY, (minutes * 30 + g.id) % 1, 1, 1);
         break;
       }

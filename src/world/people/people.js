@@ -233,13 +233,22 @@ export function buildPeople(world) {
     for (const f of pl.fields || []) {
       if (!f.pasture) continue;
       const ca = Math.cos(f.a), sa = Math.sin(f.a), toW = (u, w) => [f.x + u * ca - w * sa, f.z + u * sa + w * ca];
-      let gp = pasGate.get(f);
-      if (!gp) {
-        // (no footpath reached it: the middle of its side nearest the village)
-        let best = null;
-        for (const [u, w] of [[f.L + 2.5, 0], [-f.L - 2.5, 0], [0, f.W + 2.5], [0, -f.W - 2.5]]) { const q2 = toW(u, w), d = Math.hypot(q2[0] - pl.centre.x, q2[1] - pl.centre.z); if (!best || d < best[0]) best = [d, q2]; }
-        gp = best[1];
-      }
+      // (the footpath's end, else the middles of its sides outside the
+      // wall's gaps, nearest the village first: the first from which the
+      // road network can be reached; a pasture between other walled fields
+      // can have its footpath's end shut in)
+      const reaches = ([x, z]) => {
+        const ft = p.supportAt(x, z, G(x, z) + 0.3);
+        if (p.blocked(x, z, ft)) return false;
+        const near = net.nearby(x, z, 90).slice(0, 8);
+        for (const k of near) if (clearLine(move, [x, z], [net.x[k], net.z[k]], ft)) return true;
+        for (const k of near.slice(0, 4)) if (latticeWay(move, [x, z], [net.x[k], net.z[k]], ft, 16, 20000)) return true;
+        return false;
+      };
+      const sidesOut = [[f.L + 2.5, 0], [-f.L - 2.5, 0], [0, f.W + 2.5], [0, -f.W - 2.5]].map((uw) => toW(...uw))
+        .sort((A2, B2) => Math.hypot(A2[0] - pl.centre.x, A2[1] - pl.centre.z) - Math.hypot(B2[0] - pl.centre.x, B2[1] - pl.centre.z));
+      const tries = [...(pasGate.get(f) ? [pasGate.get(f)] : []), ...sidesOut];
+      const gp = tries.find(reaches) || tries[0];
       const gate = place('pastgate', gp[0], gp[1], G(gp[0], gp[1]), 0);
       const gpl = P.places[gate], spots = [];
       const S2 = SCALE.animals.pastureSpot;

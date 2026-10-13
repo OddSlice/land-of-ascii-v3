@@ -335,7 +335,10 @@ export function* generateWorld(seed, opts = {}) {
   // (phase 4b) cattle at the one or two villages nearest water
   const byWater = water.map((w, q) => [w ? w.d : Infinity, q]).filter((e) => e[0] < 240).sort((a, b) => a[0] - b[0]).slice(0, 2).map((e) => e[1]);
   vplans.forEach((pl, q) => {
-    const bl = planFields(q, pl.rec, venv);
+    let bl = planFields(q, pl.rec, venv);
+    // (phase 4b) a village with too few fields to graze one looks harder
+    // for one more, smaller, on a little steeper ground
+    if (ANIMALS && bl.length < 2) bl = planFields(q, pl.rec, venv, { have: bl, want: 2, tries: 800, size: 0.65, slopeK: 1.4 });
     // (phase 4b) pastures for the flocks (and a field for cattle)
     const pas = ANIMALS ? choosePastures(q, pl.rec, bl, water[q], byWater.includes(q)) : null;
     pl.rec.fields = bl.map((b) => ({ x: b.x, z: b.z, a: b.a, L: b.L, W: b.W, main: b.main, ...(b.pasture ? { pasture: b.pasture } : {}) }));
