@@ -510,16 +510,30 @@ const methods = {
       // along the wall; its joints are blurred by that, which kept them
       // blinking as you walk along a wall, a bridge's parapet say)
       const fy = D * len * len * v.rowAngle + (ashlar ? Math.abs(s) * fp : 0);
+      // (ashlar's courses as tall as its big blocks, 1.1 m, drawn no
+      // further off than the fine courses: further, at mid distance, their
+      // lines blinked as you turned)
+      const CH = ashlar ? 1.1 : 0.55;
       const by = y - S[q + P.BASE], row = Math.floor(by / 0.55);
       const kv = smooth(1.5, 2.5, 0.55 / fy);
-      const jy = kv > 0 ? kv * jointCover(by, 0.55, Math.min(0.21, Math.max(0.05, 0.9 * fy)), fy) : 0;
+      const jy = kv > 0 ? kv * jointCover(by, CH, Math.min(0.21, Math.max(0.05, 0.9 * fy)), fy) : 0;
       const cu = (tu + (row & 1) * 0.55) / 1.1, fu = cu - Math.floor(cu);
-      // (ashlar, the villages' and bridges' stone, has no heads: walking
-      // sweeps them sideways across the cells faster than a joint is wide,
-      // so they blink however they are drawn; its blocks differ in tone
-      // instead, near, which a block is far too wide to blink)
-      const head = ashlar ? 0 : Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
-      const block = ashlar ? 0.22 * (((Math.imul(row * 73856093 ^ Math.floor(cu) * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.05, 0.14, fp)) : 0;
+      // (ashlar, the villages' and bridges' stone: walking sweeps a block's
+      // head joints sideways across the cells faster than a fine joint is
+      // wide, so they blinked however they were drawn. Phase 4a: big blocks
+      // instead, 2.2 m long and two courses high, their heads at least 0.14 m
+      // wide and drawn by how much of the cell they cover, near only, and the
+      // blocks differing in tone; the village flicker stays at or under the
+      // fort courtyard's)
+      let head, block;
+      if (ashlar) {
+        const row2 = Math.floor(by / 1.1), cu2 = (tu + (row2 & 1) * 1.1) / 2.2;
+        head = jointCover(tu + (row2 & 1) * 1.1, 2.2, Math.max(0.14, 1.2 * fp), fp) * (1 - smooth(0.018, 0.04, fp));
+        block = 0.26 * (((Math.imul(row2 * 73856093 ^ Math.floor(cu2) * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.06, 0.16, fp));
+      } else {
+        head = Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
+        block = 0;
+      }
       tone = -jy - (1 - jy) * 0.85 * head - 0.3 * (1 - kv) + (1 - jy) * block;
     } else if (tex === TX.PAVING || (ashlar && hit.kind !== 0)) {
       // (phase 3b) paving as FLAGS without the joints, which walking sweeps
