@@ -427,9 +427,14 @@ async function walkToDeer(page, seed, secs) {
   if (!best) throw new Error('world-dawn-deer: no deer group near a village');
   const { g, v } = best, A = [v.plan.centre.x, v.plan.centre.z];
   const ux = g.edge[0] - A[0], uz = g.edge[1] - A[1], L0 = Math.hypot(ux, uz), B = [g.edge[0] - ux / L0 * 8, g.edge[1] - uz / L0 * 8];
-  const s2 = 1, x0 = Math.min(A[0], B[0]) - 40, z0 = Math.min(A[1], B[1]) - 40, nx = Math.ceil((Math.abs(A[0] - B[0]) + 80) / s2), nz = Math.ceil((Math.abs(A[1] - B[1]) + 80) / s2);
-  const free = (i, k) => { const x = x0 + i * s2, z = z0 + k * s2; return !pl.blocked(x, z, pl.supportAt(x, z, groundAt(w.terrain, x, z) + 0.3)) && w.terrain.wWater[Math.round(z) * w.NN + Math.round(x)] < 128; };
-  const key = (i, k) => k * nx + i, start = [Math.round((A[0] - x0) / s2), Math.round((A[1] - z0) / s2)], goal = [Math.round((B[0] - x0) / s2), Math.round((B[1] - z0) / s2)];
+  const s2 = 1, M = 120, x0 = Math.min(A[0], B[0]) - M, z0 = Math.min(A[1], B[1]) - M, nx = Math.ceil((Math.abs(A[0] - B[0]) + 2 * M) / s2), nz = Math.ceil((Math.abs(A[1] - B[1]) + 2 * M) / s2);
+  // (on foot: round what is in the way, through water no deeper than the knee)
+  const T = w.terrain, surfH = T.levels[0].H;
+  const free = (i, k) => { const x = x0 + i * s2, z = z0 + k * s2; if (x < 2 || z < 2 || x > w.N - 2 || z > w.N - 2) return false; const j = Math.round(z) * w.NN + Math.round(x); return !pl.blocked(x, z, pl.supportAt(x, z, groundAt(T, x, z) + 0.3)) && (T.wWater[j] < 128 || surfH[j] - T.ground[j] < 0.5); };
+  const key = (i, k) => k * nx + i;
+  // (the nearest open cells to the village's middle (its well stands there) and to the edge)
+  const nearestFree = (P0) => { const i0 = Math.round((P0[0] - x0) / s2), k0 = Math.round((P0[1] - z0) / s2); for (let rr = 0; rr < 20; rr++) for (let dk = -rr; dk <= rr; dk++) for (let di = -rr; di <= rr; di++) { if (Math.max(Math.abs(di), Math.abs(dk)) !== rr) continue; if (free(i0 + di, k0 + dk)) return [i0 + di, k0 + dk]; } return [i0, k0]; };
+  const start = nearestFree(A), goal = nearestFree(B);
   const dist = new Float64Array(nx * nz).fill(Infinity), prev = new Int32Array(nx * nz).fill(-1), seen = new Uint8Array(nx * nz), ok = new Int8Array(nx * nz).fill(-1);
   const open = [[0, key(...start)]]; dist[key(...start)] = 0;
   while (open.length) {
@@ -444,14 +449,30 @@ async function walkToDeer(page, seed, secs) {
       if (nd < dist[q]) { dist[q] = nd; prev[q] = c; open.push([nd + Math.hypot(i - goal[0], k - goal[1]) * s2, q]); }
     }
   }
-  const way = []; for (let c = key(...goal); c >= 0; c = prev[c]) way.push([x0 + (c % nx) * s2, z0 + Math.floor(c / nx) * s2]);
-  way.reverse();
-  console.log(`world-dawn-deer: from village ${v.q + 1}'s centre to deer group ${g.id}'s forest edge, ${Math.round(best.d)} m straight, ${way.length} m of way`);
-  await page.evaluate(({ x, z, yaw }) => window.lab.setCamera({ x, z, yaw }), { x: A[0], z: A[1], yaw: Math.atan2(ux, uz) * 180 / Math.PI });
+  const coarse = []; for (let c = key(...goal); c >= 0; c = prev[c]) coarse.push([x0 + (c % nx) * s2, z0 + Math.floor(c / nx) * s2]);
+  coarse.reverse();
+  // (each 25 m of it walked again by the people's own lattice and the
+  // walking rules, so no corner of a wall is cut)
+  const { latticeWay } = await import('../src/world/people/walk.js');
+  const way = [coarse[0]];
+  for (let i = 25; i < coarse.length + 24; i += 25) {
+    const a = way[way.length - 1], b = coarse[Math.min(i, coarse.length - 1)];
+    const seg = latticeWay(P.move, a, b, pl.supportAt(a[0], a[1], groundAt(w.terrain, a[0], a[1]) + 0.3), 14, 40000);
+    if (!seg) console.log(`  no way by the walking rules from ${a.map((v) => v.toFixed(0))} to ${b.map((v) => v.toFixed(0))}`);
+    way.push(...(seg ? seg.slice(1) : [b]));
+    if (b === coarse[coarse.length - 1]) break;
+  }
+  console.log(`world-dawn-deer: from village ${w.sites.villages.indexOf(v) + 1}'s centre to deer group ${g.id}'s forest edge, ${Math.round(best.d)} m straight, ${Math.round(way.slice(1).reduce((t, q, i) => t + Math.hypot(q[0] - way[i][0], q[1] - way[i][1]), 0))} m of way, from ${way[0].map((v) => v.toFixed(0))}`);
+  await page.evaluate(({ x, z, yaw }) => window.lab.setCamera({ x, z, yaw }), { x: way[0][0], z: way[0][1], yaw: Math.atan2(ux, uz) * 180 / Math.PI });
   const t0 = Date.now();
+  // (walking all the way, the last 60 m on a tighter line)
+  const pts = way, cut = (() => { let d = 0; for (let i = pts.length - 1; i > 0; i--) { d += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); if (d > 60) return i; } return 1; })();
   await page.keyboard.down('KeyW');
-  await follow(page, way.filter((q, i, arr) => i % 3 === 0 || i === arr.length - 1), 4, secs - 25);
+  await follow(page, pts.slice(0, cut + 1), 4, secs - 50);
+  await follow(page, pts.slice(cut), 3, 40);
   await page.keyboard.up('KeyW');
+  const st = await page.evaluate(() => window.lab.state());
+  console.log(`  at the end of the way: ${Math.hypot(st.x - B[0], st.z - B[1]).toFixed(1)} m from it, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   const left = Math.max(10, secs - (Date.now() - t0) / 1000);
   await page.evaluate(({ secs }) => new Promise((res) => {
     const L = window.lab, y0 = L.state().yaw, t0 = performance.now();

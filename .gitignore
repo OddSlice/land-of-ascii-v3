@@ -14,3 +14,4 @@ shots/*
 !shots/phase3b/
 !shots/phase4a/
 .scratch/
+!shots/phase4b/
