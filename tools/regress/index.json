@@ -1,5 +1,5 @@
 {
- "saved": "2026-10-13T10:22:31.181Z",
+ "saved": "2026-10-13T15:38:26.868Z",
  "density": 3,
  "frames": [
   {
@@ -738,759 +738,1200 @@
    "length": 322560
   },
   {
-   "name": "yard 1 gate, near (day)",
+   "name": "world 24 a pasture with its flock (day)",
    "cols": 360,
    "rows": 112,
    "offset": 33868800,
    "length": 322560
   },
   {
-   "name": "yard 1 gate, near (dusk)",
+   "name": "world 24 a pasture with its flock (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 34191360,
    "length": 322560
   },
   {
-   "name": "yard 1 gate, near (night)",
+   "name": "world 24 a pasture with its flock (night)",
    "cols": 360,
    "rows": 112,
    "offset": 34513920,
    "length": 322560
   },
   {
-   "name": "yard 2 square tower, near (day)",
+   "name": "world 25 deer at a forest edge, at dawn (day)",
    "cols": 360,
    "rows": 112,
    "offset": 34836480,
    "length": 322560
   },
   {
-   "name": "yard 2 square tower, near (dusk)",
+   "name": "world 25 deer at a forest edge, at dawn (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 35159040,
    "length": 322560
   },
   {
-   "name": "yard 2 square tower, near (night)",
+   "name": "world 25 deer at a forest edge, at dawn (night)",
    "cols": 360,
    "rows": 112,
    "offset": 35481600,
    "length": 322560
   },
   {
-   "name": "yard 3 round tower, near (day)",
+   "name": "world 26 gulls on the coast (day)",
    "cols": 360,
    "rows": 112,
    "offset": 35804160,
    "length": 322560
   },
   {
-   "name": "yard 3 round tower, near (dusk)",
+   "name": "world 26 gulls on the coast (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 36126720,
    "length": 322560
   },
   {
-   "name": "yard 3 round tower, near (night)",
+   "name": "world 26 gulls on the coast (night)",
    "cols": 360,
    "rows": 112,
    "offset": 36449280,
    "length": 322560
   },
   {
-   "name": "yard 4 keep, near (day)",
+   "name": "world 27 crows on the wall walk (day)",
    "cols": 360,
    "rows": 112,
    "offset": 36771840,
    "length": 322560
   },
   {
-   "name": "yard 4 keep, near (dusk)",
+   "name": "world 27 crows on the wall walk (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 37094400,
    "length": 322560
   },
   {
-   "name": "yard 4 keep, near (night)",
+   "name": "world 27 crows on the wall walk (night)",
    "cols": 360,
    "rows": 112,
    "offset": 37416960,
    "length": 322560
   },
   {
-   "name": "yard 5 stair, near (day)",
+   "name": "yard 1 gate, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 37739520,
    "length": 322560
   },
   {
-   "name": "yard 5 stair, near (dusk)",
+   "name": "yard 1 gate, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 38062080,
    "length": 322560
   },
   {
-   "name": "yard 5 stair, near (night)",
+   "name": "yard 1 gate, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 38384640,
    "length": 322560
   },
   {
-   "name": "yard 6 house, near (day)",
+   "name": "yard 2 square tower, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 38707200,
    "length": 322560
   },
   {
-   "name": "yard 6 house, near (dusk)",
+   "name": "yard 2 square tower, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 39029760,
    "length": 322560
   },
   {
-   "name": "yard 6 house, near (night)",
+   "name": "yard 2 square tower, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 39352320,
    "length": 322560
   },
   {
-   "name": "yard 7 well, near (day)",
+   "name": "yard 3 round tower, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 39674880,
    "length": 322560
   },
   {
-   "name": "yard 7 well, near (dusk)",
+   "name": "yard 3 round tower, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 39997440,
    "length": 322560
   },
   {
-   "name": "yard 7 well, near (night)",
+   "name": "yard 3 round tower, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 40320000,
    "length": 322560
   },
   {
-   "name": "yard 8 torches, near (day)",
+   "name": "yard 4 keep, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 40642560,
    "length": 322560
   },
   {
-   "name": "yard 8 torches, near (dusk)",
+   "name": "yard 4 keep, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 40965120,
    "length": 322560
   },
   {
-   "name": "yard 8 torches, near (night)",
+   "name": "yard 4 keep, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 41287680,
    "length": 322560
   },
   {
-   "name": "yard 9 window, near (day)",
+   "name": "yard 5 stair, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 41610240,
    "length": 322560
   },
   {
-   "name": "yard 9 window, near (dusk)",
+   "name": "yard 5 stair, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 41932800,
    "length": 322560
   },
   {
-   "name": "yard 9 window, near (night)",
+   "name": "yard 5 stair, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 42255360,
    "length": 322560
   },
   {
-   "name": "yard 10 the yard, middle distance (day)",
+   "name": "yard 6 house, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 42577920,
    "length": 322560
   },
   {
-   "name": "yard 10 the yard, middle distance (dusk)",
+   "name": "yard 6 house, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 42900480,
    "length": 322560
   },
   {
-   "name": "yard 10 the yard, middle distance (night)",
+   "name": "yard 6 house, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 43223040,
    "length": 322560
   },
   {
-   "name": "yard 11 the yard, far (day)",
+   "name": "yard 7 well, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 43545600,
    "length": 322560
   },
   {
-   "name": "yard 11 the yard, far (dusk)",
+   "name": "yard 7 well, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 43868160,
    "length": 322560
   },
   {
-   "name": "yard 11 the yard, far (night)",
+   "name": "yard 7 well, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 44190720,
    "length": 322560
   },
   {
-   "name": "yard 12 the yard at night (day)",
+   "name": "yard 8 torches, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 44513280,
    "length": 322560
   },
   {
-   "name": "yard 12 the yard at night (dusk)",
+   "name": "yard 8 torches, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 44835840,
    "length": 322560
   },
   {
-   "name": "yard 12 the yard at night (night)",
+   "name": "yard 8 torches, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 45158400,
    "length": 322560
   },
   {
-   "name": "yard 13 inside the gate passage (day)",
+   "name": "yard 9 window, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 45480960,
    "length": 322560
   },
   {
-   "name": "yard 13 inside the gate passage (dusk)",
+   "name": "yard 9 window, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 45803520,
    "length": 322560
   },
   {
-   "name": "yard 13 inside the gate passage (night)",
+   "name": "yard 9 window, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 46126080,
    "length": 322560
   },
   {
-   "name": "yard 14 on the wall walk (day)",
+   "name": "yard 10 the yard, middle distance (day)",
    "cols": 360,
    "rows": 112,
    "offset": 46448640,
    "length": 322560
   },
   {
-   "name": "yard 14 on the wall walk (dusk)",
+   "name": "yard 10 the yard, middle distance (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 46771200,
    "length": 322560
   },
   {
-   "name": "yard 14 on the wall walk (night)",
+   "name": "yard 10 the yard, middle distance (night)",
    "cols": 360,
    "rows": 112,
    "offset": 47093760,
    "length": 322560
   },
   {
-   "name": "yard 15 cottage, near (day)",
+   "name": "yard 11 the yard, far (day)",
    "cols": 360,
    "rows": 112,
    "offset": 47416320,
    "length": 322560
   },
   {
-   "name": "yard 15 cottage, near (dusk)",
+   "name": "yard 11 the yard, far (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 47738880,
    "length": 322560
   },
   {
-   "name": "yard 15 cottage, near (night)",
+   "name": "yard 11 the yard, far (night)",
    "cols": 360,
    "rows": 112,
    "offset": 48061440,
    "length": 322560
   },
   {
-   "name": "yard 16 hall, near (day)",
+   "name": "yard 12 the yard at night (day)",
    "cols": 360,
    "rows": 112,
    "offset": 48384000,
    "length": 322560
   },
   {
-   "name": "yard 16 hall, near (dusk)",
+   "name": "yard 12 the yard at night (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 48706560,
    "length": 322560
   },
   {
-   "name": "yard 16 hall, near (night)",
+   "name": "yard 12 the yard at night (night)",
    "cols": 360,
    "rows": 112,
    "offset": 49029120,
    "length": 322560
   },
   {
-   "name": "yard 17 barn, near (day)",
+   "name": "yard 13 inside the gate passage (day)",
    "cols": 360,
    "rows": 112,
    "offset": 49351680,
    "length": 322560
   },
   {
-   "name": "yard 17 barn, near (dusk)",
+   "name": "yard 13 inside the gate passage (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 49674240,
    "length": 322560
   },
   {
-   "name": "yard 17 barn, near (night)",
+   "name": "yard 13 inside the gate passage (night)",
    "cols": 360,
    "rows": 112,
    "offset": 49996800,
    "length": 322560
   },
   {
-   "name": "yard 18 chapel, near (day)",
+   "name": "yard 14 on the wall walk (day)",
    "cols": 360,
    "rows": 112,
    "offset": 50319360,
    "length": 322560
   },
   {
-   "name": "yard 18 chapel, near (dusk)",
+   "name": "yard 14 on the wall walk (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 50641920,
    "length": 322560
   },
   {
-   "name": "yard 18 chapel, near (night)",
+   "name": "yard 14 on the wall walk (night)",
    "cols": 360,
    "rows": 112,
    "offset": 50964480,
    "length": 322560
   },
   {
-   "name": "yard 19 chapel with a tower, near (day)",
+   "name": "yard 15 cottage, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 51287040,
    "length": 322560
   },
   {
-   "name": "yard 19 chapel with a tower, near (dusk)",
+   "name": "yard 15 cottage, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 51609600,
    "length": 322560
   },
   {
-   "name": "yard 19 chapel with a tower, near (night)",
+   "name": "yard 15 cottage, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 51932160,
    "length": 322560
   },
   {
-   "name": "yard 20 market shelter, near (day)",
+   "name": "yard 16 hall, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 52254720,
    "length": 322560
   },
   {
-   "name": "yard 20 market shelter, near (dusk)",
+   "name": "yard 16 hall, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 52577280,
    "length": 322560
   },
   {
-   "name": "yard 20 market shelter, near (night)",
+   "name": "yard 16 hall, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 52899840,
    "length": 322560
   },
   {
-   "name": "yard 21 jetty, near (day)",
+   "name": "yard 17 barn, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 53222400,
    "length": 322560
   },
   {
-   "name": "yard 21 jetty, near (dusk)",
+   "name": "yard 17 barn, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 53544960,
    "length": 322560
   },
   {
-   "name": "yard 21 jetty, near (night)",
+   "name": "yard 17 barn, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 53867520,
    "length": 322560
   },
   {
-   "name": "yard 22 fence and gate, near (day)",
+   "name": "yard 18 chapel, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 54190080,
    "length": 322560
   },
   {
-   "name": "yard 22 fence and gate, near (dusk)",
+   "name": "yard 18 chapel, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 54512640,
    "length": 322560
   },
   {
-   "name": "yard 22 fence and gate, near (night)",
+   "name": "yard 18 chapel, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 54835200,
    "length": 322560
   },
   {
-   "name": "yard 23 dry-stone wall, near (day)",
+   "name": "yard 19 chapel with a tower, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 55157760,
    "length": 322560
   },
   {
-   "name": "yard 23 dry-stone wall, near (dusk)",
+   "name": "yard 19 chapel with a tower, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 55480320,
    "length": 322560
   },
   {
-   "name": "yard 23 dry-stone wall, near (night)",
+   "name": "yard 19 chapel with a tower, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 55802880,
    "length": 322560
   },
   {
-   "name": "yard 24 haystack and bench, near (day)",
+   "name": "yard 20 market shelter, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 56125440,
    "length": 322560
   },
   {
-   "name": "yard 24 haystack and bench, near (dusk)",
+   "name": "yard 20 market shelter, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 56448000,
    "length": 322560
   },
   {
-   "name": "yard 24 haystack and bench, near (night)",
+   "name": "yard 20 market shelter, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 56770560,
    "length": 322560
   },
   {
-   "name": "yard 25 signpost and lantern, near (day)",
+   "name": "yard 21 jetty, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 57093120,
    "length": 322560
   },
   {
-   "name": "yard 25 signpost and lantern, near (dusk)",
+   "name": "yard 21 jetty, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 57415680,
    "length": 322560
   },
   {
-   "name": "yard 25 signpost and lantern, near (night)",
+   "name": "yard 21 jetty, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 57738240,
    "length": 322560
   },
   {
-   "name": "yard 26 timber bridge, near (day)",
+   "name": "yard 22 fence and gate, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 58060800,
    "length": 322560
   },
   {
-   "name": "yard 26 timber bridge, near (dusk)",
+   "name": "yard 22 fence and gate, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 58383360,
    "length": 322560
   },
   {
-   "name": "yard 26 timber bridge, near (night)",
+   "name": "yard 22 fence and gate, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 58705920,
    "length": 322560
   },
   {
-   "name": "yard 27 stone bridge, near (day)",
+   "name": "yard 23 dry-stone wall, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 59028480,
    "length": 322560
   },
   {
-   "name": "yard 27 stone bridge, near (dusk)",
+   "name": "yard 23 dry-stone wall, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 59351040,
    "length": 322560
   },
   {
-   "name": "yard 27 stone bridge, near (night)",
+   "name": "yard 23 dry-stone wall, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 59673600,
    "length": 322560
   },
   {
-   "name": "yard 28 inside a cottage (day)",
+   "name": "yard 24 haystack and bench, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 59996160,
    "length": 322560
   },
   {
-   "name": "yard 28 inside a cottage (dusk)",
+   "name": "yard 24 haystack and bench, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 60318720,
    "length": 322560
   },
   {
-   "name": "yard 28 inside a cottage (night)",
+   "name": "yard 24 haystack and bench, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 60641280,
    "length": 322560
   },
   {
-   "name": "yard 29 the village pieces at night (day)",
+   "name": "yard 25 signpost and lantern, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 60963840,
    "length": 322560
   },
   {
-   "name": "yard 29 the village pieces at night (dusk)",
+   "name": "yard 25 signpost and lantern, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 61286400,
    "length": 322560
   },
   {
-   "name": "yard 29 the village pieces at night (night)",
+   "name": "yard 25 signpost and lantern, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 61608960,
    "length": 322560
   },
   {
-   "name": "yard 30 people, near (day)",
+   "name": "yard 26 timber bridge, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 61931520,
    "length": 322560
   },
   {
-   "name": "yard 30 people, near (dusk)",
+   "name": "yard 26 timber bridge, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 62254080,
    "length": 322560
   },
   {
-   "name": "yard 30 people, near (night)",
+   "name": "yard 26 timber bridge, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 62576640,
    "length": 322560
   },
   {
-   "name": "yard 31 people, middle distance (day)",
+   "name": "yard 27 stone bridge, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 62899200,
    "length": 322560
   },
   {
-   "name": "yard 31 people, middle distance (dusk)",
+   "name": "yard 27 stone bridge, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 63221760,
    "length": 322560
   },
   {
-   "name": "yard 31 people, middle distance (night)",
+   "name": "yard 27 stone bridge, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 63544320,
    "length": 322560
   },
   {
-   "name": "yard 32 people, far (day)",
+   "name": "yard 28 inside a cottage (day)",
    "cols": 360,
    "rows": 112,
    "offset": 63866880,
    "length": 322560
   },
   {
-   "name": "yard 32 people, far (dusk)",
+   "name": "yard 28 inside a cottage (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 64189440,
    "length": 322560
   },
   {
-   "name": "yard 32 people, far (night)",
+   "name": "yard 28 inside a cottage (night)",
    "cols": 360,
    "rows": 112,
    "offset": 64512000,
    "length": 322560
   },
   {
-   "name": "yard 33 people, very far (day)",
+   "name": "yard 29 the village pieces at night (day)",
    "cols": 360,
    "rows": 112,
    "offset": 64834560,
    "length": 322560
   },
   {
-   "name": "yard 33 people, very far (dusk)",
+   "name": "yard 29 the village pieces at night (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 65157120,
    "length": 322560
   },
   {
-   "name": "yard 33 people, very far (night)",
+   "name": "yard 29 the village pieces at night (night)",
    "cols": 360,
    "rows": 112,
    "offset": 65479680,
    "length": 322560
   },
   {
-   "name": "yard 34 people at night, with a lantern and a torch (day)",
+   "name": "yard 30 people, near (day)",
    "cols": 360,
    "rows": 112,
    "offset": 65802240,
    "length": 322560
   },
   {
-   "name": "yard 34 people at night, with a lantern and a torch (dusk)",
+   "name": "yard 30 people, near (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 66124800,
    "length": 322560
   },
   {
-   "name": "yard 34 people at night, with a lantern and a torch (night)",
+   "name": "yard 30 people, near (night)",
    "cols": 360,
    "rows": 112,
    "offset": 66447360,
    "length": 322560
   },
   {
-   "name": "yard 35 someone asleep (day)",
+   "name": "yard 31 people, middle distance (day)",
    "cols": 360,
    "rows": 112,
    "offset": 66769920,
    "length": 322560
   },
   {
-   "name": "yard 35 someone asleep (dusk)",
+   "name": "yard 31 people, middle distance (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 67092480,
    "length": 322560
   },
   {
-   "name": "yard 35 someone asleep (night)",
+   "name": "yard 31 people, middle distance (night)",
    "cols": 360,
    "rows": 112,
    "offset": 67415040,
    "length": 322560
   },
   {
-   "name": "yard 36 someone on the bench (day)",
+   "name": "yard 32 people, far (day)",
    "cols": 360,
    "rows": 112,
    "offset": 67737600,
    "length": 322560
   },
   {
-   "name": "yard 36 someone on the bench (dusk)",
+   "name": "yard 32 people, far (dusk)",
    "cols": 360,
    "rows": 112,
    "offset": 68060160,
    "length": 322560
   },
   {
-   "name": "yard 36 someone on the bench (night)",
+   "name": "yard 32 people, far (night)",
    "cols": 360,
    "rows": 112,
    "offset": 68382720,
+   "length": 322560
+  },
+  {
+   "name": "yard 33 people, very far (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 68705280,
+   "length": 322560
+  },
+  {
+   "name": "yard 33 people, very far (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 69027840,
+   "length": 322560
+  },
+  {
+   "name": "yard 33 people, very far (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 69350400,
+   "length": 322560
+  },
+  {
+   "name": "yard 34 people at night, with a lantern and a torch (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 69672960,
+   "length": 322560
+  },
+  {
+   "name": "yard 34 people at night, with a lantern and a torch (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 69995520,
+   "length": 322560
+  },
+  {
+   "name": "yard 34 people at night, with a lantern and a torch (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 70318080,
+   "length": 322560
+  },
+  {
+   "name": "yard 35 someone asleep (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 70640640,
+   "length": 322560
+  },
+  {
+   "name": "yard 35 someone asleep (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 70963200,
+   "length": 322560
+  },
+  {
+   "name": "yard 35 someone asleep (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 71285760,
+   "length": 322560
+  },
+  {
+   "name": "yard 36 someone on the bench (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 71608320,
+   "length": 322560
+  },
+  {
+   "name": "yard 36 someone on the bench (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 71930880,
+   "length": 322560
+  },
+  {
+   "name": "yard 36 someone on the bench (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 72253440,
+   "length": 322560
+  },
+  {
+   "name": "yard 37 wild ground detail, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 72576000,
+   "length": 322560
+  },
+  {
+   "name": "yard 37 wild ground detail, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 72898560,
+   "length": 322560
+  },
+  {
+   "name": "yard 37 wild ground detail, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 73221120,
+   "length": 322560
+  },
+  {
+   "name": "yard 38 a log, a stump and reeds, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 73543680,
+   "length": 322560
+  },
+  {
+   "name": "yard 38 a log, a stump and reeds, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 73866240,
+   "length": 322560
+  },
+  {
+   "name": "yard 38 a log, a stump and reeds, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 74188800,
+   "length": 322560
+  },
+  {
+   "name": "yard 39 wild ground detail, far (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 74511360,
+   "length": 322560
+  },
+  {
+   "name": "yard 39 wild ground detail, far (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 74833920,
+   "length": 322560
+  },
+  {
+   "name": "yard 39 wild ground detail, far (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 75156480,
+   "length": 322560
+  },
+  {
+   "name": "yard 40 animals, middle distance (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 75479040,
+   "length": 322560
+  },
+  {
+   "name": "yard 40 animals, middle distance (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 75801600,
+   "length": 322560
+  },
+  {
+   "name": "yard 40 animals, middle distance (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 76124160,
+   "length": 322560
+  },
+  {
+   "name": "yard 41 animals, far (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 76446720,
+   "length": 322560
+  },
+  {
+   "name": "yard 41 animals, far (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 76769280,
+   "length": 322560
+  },
+  {
+   "name": "yard 41 animals, far (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 77091840,
+   "length": 322560
+  },
+  {
+   "name": "yard 42 animals, very far (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 77414400,
+   "length": 322560
+  },
+  {
+   "name": "yard 42 animals, very far (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 77736960,
+   "length": 322560
+  },
+  {
+   "name": "yard 42 animals, very far (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 78059520,
+   "length": 322560
+  },
+  {
+   "name": "yard 43 animals: sheep, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 78382080,
+   "length": 322560
+  },
+  {
+   "name": "yard 43 animals: sheep, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 78704640,
+   "length": 322560
+  },
+  {
+   "name": "yard 43 animals: sheep, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 79027200,
+   "length": 322560
+  },
+  {
+   "name": "yard 44 animals: cattle, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 79349760,
+   "length": 322560
+  },
+  {
+   "name": "yard 44 animals: cattle, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 79672320,
+   "length": 322560
+  },
+  {
+   "name": "yard 44 animals: cattle, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 79994880,
+   "length": 322560
+  },
+  {
+   "name": "yard 45 animals: hens, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 80317440,
+   "length": 322560
+  },
+  {
+   "name": "yard 45 animals: hens, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 80640000,
+   "length": 322560
+  },
+  {
+   "name": "yard 45 animals: hens, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 80962560,
+   "length": 322560
+  },
+  {
+   "name": "yard 46 animals: dog, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 81285120,
+   "length": 322560
+  },
+  {
+   "name": "yard 46 animals: dog, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 81607680,
+   "length": 322560
+  },
+  {
+   "name": "yard 46 animals: dog, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 81930240,
+   "length": 322560
+  },
+  {
+   "name": "yard 47 animals: deer, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 82252800,
+   "length": 322560
+  },
+  {
+   "name": "yard 47 animals: deer, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 82575360,
+   "length": 322560
+  },
+  {
+   "name": "yard 47 animals: deer, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 82897920,
+   "length": 322560
+  },
+  {
+   "name": "yard 48 animals: hare, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 83220480,
+   "length": 322560
+  },
+  {
+   "name": "yard 48 animals: hare, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 83543040,
+   "length": 322560
+  },
+  {
+   "name": "yard 48 animals: hare, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 83865600,
+   "length": 322560
+  },
+  {
+   "name": "yard 49 animals: ducks, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 84188160,
+   "length": 322560
+  },
+  {
+   "name": "yard 49 animals: ducks, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 84510720,
+   "length": 322560
+  },
+  {
+   "name": "yard 49 animals: ducks, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 84833280,
+   "length": 322560
+  },
+  {
+   "name": "yard 50 animals: gulls, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 85155840,
+   "length": 322560
+  },
+  {
+   "name": "yard 50 animals: gulls, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 85478400,
+   "length": 322560
+  },
+  {
+   "name": "yard 50 animals: gulls, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 85800960,
+   "length": 322560
+  },
+  {
+   "name": "yard 51 animals: crows, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 86123520,
+   "length": 322560
+  },
+  {
+   "name": "yard 51 animals: crows, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 86446080,
+   "length": 322560
+  },
+  {
+   "name": "yard 51 animals: crows, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 86768640,
+   "length": 322560
+  },
+  {
+   "name": "yard 52 animals: small birds, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 87091200,
+   "length": 322560
+  },
+  {
+   "name": "yard 52 animals: small birds, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 87413760,
+   "length": 322560
+  },
+  {
+   "name": "yard 52 animals: small birds, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 87736320,
+   "length": 322560
+  },
+  {
+   "name": "yard 53 animals: large birds, near (day)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 88058880,
+   "length": 322560
+  },
+  {
+   "name": "yard 53 animals: large birds, near (dusk)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 88381440,
+   "length": 322560
+  },
+  {
+   "name": "yard 53 animals: large birds, near (night)",
+   "cols": 360,
+   "rows": 112,
+   "offset": 88704000,
    "length": 322560
   }
  ]

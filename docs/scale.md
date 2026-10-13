@@ -181,7 +181,7 @@ Sizes are before each animal's own scale (0.9 to 1.1). They are in `SPEC` (`src/
 | | | |
 |---|---|---|
 | A sheepfold | 9 by 7 m inside, of fence pieces, with a 2.6 m gate, beside a barn where there is room | On ground falling no more than 1 m across it. Sheep stand 1.35 m apart in it, 0.9 m off the fence. |
-| A flock grazing | 1.25 m apart (spread by a sunflower pattern), each drifting about 0.45 m by its own clock; kept 3.5 m off the pasture's wall | On the way, 2.6 m behind the shepherd and 0.7 m one behind another. |
+| A flock grazing | 1.25 m apart (spread by a sunflower pattern), each drifting about 0.45 m by its own clock; kept 3.5 m off the pasture's wall | On the way, 2.6 m behind the shepherd and 1.1 m one behind another (a sheep is 0.95 m long). |
 | A herd | 3.2 m apart | |
 | A dog | 1.6 m behind its person, 0.45 m to the side | |
 | Deer | 4 to 7 groups of 3 to 6, at least 300 m apart | Bed, forest edge and daytime spot within a few tens of metres. |

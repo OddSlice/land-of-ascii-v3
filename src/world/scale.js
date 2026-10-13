@@ -79,7 +79,7 @@ export const SCALE = {
     gullGrid: 12, gullApart: 220, gullGroups: 3, gulls: [3, 6],
     crowsFort: 4, crowsRoofs: 5,
     finchFlocks: 4, finches: [12, 22],
-    flockSpace: 1.25, flockLead: 2.6, flockFile: 0.7,   // sheep grazing apart; behind their shepherd on the way, and one behind another
+    flockSpace: 1.25, flockLead: 2.6, flockFile: 1.1,   // sheep grazing apart; behind their shepherd on the way, and one behind another
     herdSpace: 3.2, dogLag: 1.6,
     crowCircle: 9, gullCircle: 16, gullAlt: 14, kiteCircle: 140, kiteAlt: 110,
   },

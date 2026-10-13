@@ -1367,8 +1367,10 @@ async function phase4b() {
       const y = ft + 1.7 + up;
       // (a clear line to what it looks at: no wall, roof or hill between)
       let clear = true;
+      // (up to a metre and a half short of it: it may be solid itself)
+      const stop = Math.max(0, 1 - 1.5 / d);
       for (let q = 1; q < 48 && clear; q++) {
-        const f = q / 48, px = x + (c.x - x) * f, pz = z + (c.z - z) * f, py = y + (c.y + aim - y) * f;
+        const f = q / 48 * stop, px = x + (c.x - x) * f, pz = z + (c.z - z) * f, py = y + (c.y + aim - y) * f;
         if ((w.kit && solidAt(w.kit, px, py, pz)) || py < groundAt(T, px, pz)) clear = false;
       }
       if (!clear) continue;
@@ -1560,7 +1562,7 @@ async function phase4b() {
       if (fl) { const c = { x: fl.x, z: fl.z, y: groundAt(T, fl.x, fl.z) }; const v = view(c, 12, 0.4, 0.3, 0); if (v) { srcs.push(await frame(lab, { hour: 14, free: v })); labels.push('a drift of flowers in the meadow, 12 m'); } }
       // from the viewpoints: the vista and the spawn
       const names = await lab.page.evaluate(() => window.lab.cameras.map((c2) => c2.name));
-      for (const nm of ['the ridge-top vista', 'spawn']) { const ci = names.findIndex((n) => n.includes(nm)); if (ci >= 0) { srcs.push(await frame(lab, { cam: ci, hour: 14 })); labels.push(`${names[ci]}, 14:00`); } }
+      for (const nm of ['vista', 'spawn']) { const ci = names.findIndex((n) => n.includes(nm)); if (ci >= 0) { srcs.push(await frame(lab, { cam: ci, hour: 14 })); labels.push(`${names[ci]}, 14:00`); } }
       writeDataURL(path.join(OUT, 'ground.jpg'), await compose(srcs, labels, `Wild ground detail in place (seed ${seed}, 14:00): boulders, an outcrop, a log, stumps, reeds, flowers, and from the viewpoints`, 3, 0.25));
       await lab.ctx.close();
     }

@@ -113,11 +113,11 @@ export function animalsAt(A, day, hour, near, out, ids, groups = null, weather =
   // how bold the group is now (its flight band narrows by up to a quarter)
   const bold = (g) => 0.85 + 0.15 * Math.sin(minutes / 37 + g.id * 1.7);
   // a flight away from (wx, wz): how far along `away`, stopping at water or anything in the way
-  // the longest way off among straight away and up to 60 degrees either
+  // the longest way off among straight away and up to 125 degrees either
   // side (round what is in the way): [ax, az, length]
   const fleeWay = (x, z, ax, az, L, onWater = false) => {
     let best = [ax, az, fleeTo(x, z, ax, az, L, onWater)];
-    for (const t of [0.5, -0.5, 1.05, -1.05]) {
+    for (const t of [0.5, -0.5, 1.05, -1.05, 1.6, -1.6, 2.2, -2.2]) {
       if (best[2] >= L) break;
       const c = Math.cos(t), sn = Math.sin(t), bx = ax * c - az * sn, bz = az * c + ax * sn, d = fleeTo(x, z, bx, bz, L, onWater);
       if (d > best[2] + 2) best = [bx, bz, d];

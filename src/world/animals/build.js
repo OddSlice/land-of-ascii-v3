@@ -137,6 +137,8 @@ export function buildAnimals(world, P) {
       if (!free(...edge) || !free(...day) || !free(...bed) || roadNear(...edge) || trunks(...edge, 6) > 0 || forest(...day) < 0.3 || forest(...bed) < 0.3 || !dry(edge) || !dry(day) || !dry(bed)) continue;
       const ways = { bedEdge: way(bed, edge), edgeDay: way(edge, day), dayEdge: way(day, edge), edgeBed: way(edge, bed) };
       if (!ways.bedEdge || !ways.edgeDay || !ways.dayEdge || !ways.edgeBed) continue;
+      // (and dry along their ways too, as wide as the group walks)
+      if (Object.values(ways).some((R) => { for (let i = 0; i < R.n; i++) if (!dry([R.x[i], R.z[i]])) return true; return false; })) continue;
       const n = C.deerN[0] + Math.floor(r(Math.round(x), Math.round(z), 24) * (C.deerN[1] - C.deerN[0] + 1));
       add({ type: 'deer', edge, day, bed, ways, home: [x, z], into: [ix, iz] }, KIND.DEER, n, () => [MAT.FAWN, MAT.LINEN]);
     }
