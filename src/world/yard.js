@@ -13,9 +13,11 @@ import { makeLevels, materialCode } from './terrain.js';
 import { floorField } from './objects.js';
 import { buildClouds } from './sky.js';
 import { KitBuilder, compileKit } from './kit.js';
-import { buildStructure } from './kit-pieces.js';
+import { buildStructure, frame } from './kit-pieces.js';
 import { emptySpans } from './spans.js';
 import { SCALE } from './scale.js';
+import { FS, S, POSE, HATK, TOOL, LIGHT } from './people/figure.js';
+import { furnitureSpots } from './kit-village.js';
 import { MAT } from '../contract.js';
 
 export const YARD_N = 512;
@@ -222,11 +224,63 @@ export function buildYard() {
   buildStructure(b, yardLayout());
   const kit = compileKit(b);
   const torches = kit.torches.map((t) => ({ ...t }));
-  const cams = yardCameras();
+  const cams = [...yardCameras(), ...yardPeopleCameras()];
   return {
     kind: 'yard', N, NN, center: [N / 2, N / 2], viewDist: 1e9,
     terrain, spans, kit, objects: { trees: [], bushes: [], torches, water: POND },
     clouds: buildClouds(), cameras: cams, start: { x: cams[0].x, z: cams[0].z, yaw: cams[0].yaw, pitch: 0 },
     buildMs: performance.now() - t0,
   };
+}
+
+// (phase 4a) People in the yard: a line of figures in every pose and with
+// every tool and light, west of the village pieces' bench row, one sitting
+// on that bench and one asleep in the cottage one can go into. Static: the
+// yard has no plans. For the cameras below.
+const PEOPLE_Z = VROW0 + 9 * VROWS + 3, PEOPLE_X0 = 292;
+export function yardFigures() {
+  const out = [];
+  const put = (x, z, yaw, pose, o) => {
+    const st = new Array(FS).fill(0);
+    st[S.X] = x; st[S.Z] = z; st[S.FEET] = o.feet ?? G0; st[S.YAW] = yaw; st[S.POSE] = pose; st[S.PHASE] = o.phase ?? 0;
+    st[S.LIGHT] = o.light ?? 0; st[S.ROOM] = o.room ?? -1; st[S.TOP] = o.top; st[S.BOTTOM] = o.bottom; st[S.HAT] = o.hat ?? MAT.OCHRE;
+    st[S.SKIN] = o.skin ?? MAT.SKIN; st[S.HATK] = o.hatK ?? HATK.BARE; st[S.TOOL] = o.tool ?? TOOL.NONE; st[S.SCALE] = o.scale ?? 1; st[S.AUX] = o.aux ?? 0; st[S.ID] = out.length / FS;
+    out.push(...st);
+  };
+  const f = 0;          // facing +z, toward the cameras
+  put(PEOPLE_X0, PEOPLE_Z, f, POSE.STAND, { top: MAT.RUSSET, bottom: MAT.UMBER, hatK: HATK.HAT, tool: TOOL.HOE });
+  put(PEOPLE_X0 + 2, PEOPLE_Z, f, POSE.WALK, { top: MAT.LINEN, bottom: MAT.CHARCOAL, hat: MAT.MOSS, hatK: HATK.HOOD, light: LIGHT.LANTERN, phase: 0.25 });
+  put(PEOPLE_X0 + 4, PEOPLE_Z, f + 0.4, POSE.WORK, { top: MAT.OCHRE, bottom: MAT.UMBER, hat: MAT.LINEN, hatK: HATK.CAP, tool: TOOL.HOE, skin: MAT.SKIN2 });
+  put(PEOPLE_X0 + 6, PEOPLE_Z, f - 0.5, POSE.FISH, { top: MAT.SLATE, bottom: MAT.LEATHER, hat: MAT.UMBER, hatK: HATK.CAP, tool: TOOL.ROD });
+  put(PEOPLE_X0 + 8, PEOPLE_Z, f, POSE.SWEEP, { top: MAT.CHARCOAL, bottom: MAT.UMBER, hat: MAT.CHARCOAL, hatK: HATK.HOOD, tool: TOOL.BROOM });
+  put(PEOPLE_X0 + 10, PEOPLE_Z, f, POSE.STAND, { top: MAT.SLATE, bottom: MAT.LEATHER, hatK: HATK.HELMET, tool: TOOL.SPEAR, light: LIGHT.TORCH });
+  put(PEOPLE_X0 + 12, PEOPLE_Z, f + 0.3, POSE.WALK, { top: MAT.UMBER, bottom: MAT.MOSS, hat: MAT.UMBER, hatK: HATK.HAT, tool: TOOL.PACK, phase: 0.6, skin: MAT.SKIN2, scale: 1.04 });
+  put(PEOPLE_X0 + 14, PEOPLE_Z, f, POSE.STAND, { top: MAT.MOSS, bottom: MAT.CHARCOAL, hat: MAT.RUSSET, hatK: HATK.BARE, scale: 0.94 });
+  // on the bench of the 'haystack and bench' row (square to the grid)
+  const bz = VROW0 + 9 * VROWS;
+  put(VCOL0 + 3.5 - 0.4, bz + 1 - 0.04, 0, POSE.SIT, { top: MAT.RUSSET, bottom: MAT.SLATE, hatK: HATK.CAP, hat: MAT.LINEN, aux: SCALE.kit.bench.seat });
+  // asleep in the cottage one can go into (square to the grid)
+  const cz = VROW0 + 13 * VROWS, F = frame(VCOL0, cz, 0), wt = SCALE.kit.cottage.wallT;
+  const fs = furnitureSpots(F, 3.2 - wt, 2.5 - wt, G0 + 0.3 + 0.02, 1);
+  put(fs.bed.x, fs.bed.z, fs.bed.yaw, POSE.SLEEP, { top: MAT.LINEN, bottom: MAT.RUSSET, hatK: HATK.BARE, feet: fs.floor, aux: fs.bed.top - fs.floor, room: 0 });
+  return Float32Array.from(out);
+}
+
+// and the cameras that look at them: near, at middle distance, far and very
+// far, and near at night, the bench and the sleeper
+export function yardPeopleCameras() {
+  const cx = PEOPLE_X0 + 7, z = PEOPLE_Z;
+  const look = (x, zz, tx, tz) => Math.atan2(tx - x, tz - zz) / D;
+  const cams = [];
+  for (const [name, d, pitch, time] of [['people, near', 9, -3, 'day'], ['people, middle distance', 24, -1, 'day'], ['people, far', 70, 0, 'day'], ['people, very far', 160, 0, 'day'], ['people at night, with a lantern and a torch', 9, -3, 'night']]) {
+    const x = cx, zz = z + d;
+    cams.push({ name, x, z: zz, yaw: look(x, zz, cx, z), pitch, time });
+  }
+  const bx = VCOL0 + 3.1, bz = VROW0 + 9 * VROWS + 1;
+  // in through the door of the cottage one can go into, to the sleeper
+  const cz = VROW0 + 13 * VROWS, F = frame(VCOL0, cz, 0), wt = SCALE.kit.cottage.wallT;
+  const bed = furnitureSpots(F, 3.2 - wt, 2.5 - wt, G0 + 0.32, 1).bed, [ix, iz] = F.at(-0.2, 0.1);
+  cams.push({ name: 'someone asleep', x: ix, z: iz, yaw: look(ix, iz, bed.x, bed.z), pitch: -30, time: 'night', y: G0 + 0.32 + 1.43 });
+  cams.push({ name: 'someone on the bench', x: bx + 1.5, z: bz + 3.5, yaw: look(bx + 1.5, bz + 3.5, bx, bz), pitch: -6, time: 'day' });
+  return cams;
 }

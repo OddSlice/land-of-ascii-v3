@@ -44,6 +44,10 @@
     font: 13px/1.5 var(--mono); color: var(--ink); background: rgba(13, 14, 18, .78); border: 1px solid var(--line); border-radius: 6px;
     pointer-events: none; opacity: 0; transition: opacity 260ms ease; text-align: center; }
   #say.on { opacity: 1; }
+  .menu .people { display: grid; gap: 2px; max-height: 280px; overflow: auto; margin-top: 6px; padding-right: 4px; }
+  .menu .person { display: grid; grid-template-columns: 11em 10em 1fr; gap: 8px; text-align: left; padding: 4px 8px; font: 12px/1.4 var(--mono); }
+  .menu .person b { color: var(--head); font-weight: 600; }
+  .menu .person .role, .menu .person .act { color: var(--quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #say .who { font-size: 11px; color: var(--quiet); letter-spacing: .02em; margin-bottom: 3px; }
   #say .who b { color: var(--head); font-weight: 600; }
   #hint kbd, #card kbd, .menu kbd { display: inline-block; min-width: 1.9em; padding: 0 5px; margin-right: 3px; font: 600 11px/1.6 var(--mono);

@@ -624,9 +624,9 @@ function villagerPlan(P, per, day, fc) {
   } else if (role === 'minder' || role === 'wellkeeper') {
     const place1 = role === 'minder' ? spot(V.greens, 5) : spot(V.wells, 5);
     const seat = h(6) < 0.5 ? seatOf() : -1;
-    out(place1, t + 0.2, 10.5, POSE.STAND, role === 'minder' ? 'minding the green' : 'keeping the well');
-    if (seat >= 0) out(seat, 10.6, 12.0, POSE.SIT, 'resting'); else out(place1, 10.6, 12.0, POSE.STAND, role === 'minder' ? 'minding the green' : 'keeping the well');
-    homeAgain(12.3, 13.2, 'at the midday meal');
+    out(place1, t + 0.2, 10.8, POSE.STAND, role === 'minder' ? 'minding the green' : 'keeping the well');
+    if (seat >= 0) out(seat, 10.9, 12.8, POSE.SIT, 'resting'); else out(place1, 10.9, 12.8, POSE.STAND, role === 'minder' ? 'minding the green' : 'keeping the well');
+    homeAgain(13.0, 13.7, 'at the midday meal');
     out(role === 'minder' ? spot(V.greens, 7) : spot(V.wells, 7), 13.5, 18.0 + 0.4 * h(8), POSE.STAND, role === 'minder' ? 'minding the green' : 'keeping the well');
   } else {
     // keeping house: the doorstep, the well, a neighbour, the green
@@ -636,10 +636,14 @@ function villagerPlan(P, per, day, fc) {
       const nb = V.houses[(per.home + 1 + Math.floor(h(9) * (V.houses.length - 1))) % V.houses.length];
       out(nb.step, 10.0, 10.9 + 0.4 * h(10), POSE.STAND, 'visiting a neighbour');
     }
-    homeAgain(11.5, 14.0 + h(11));
+    // midday on the green (or by the well, or under the market shelter):
+    // where the village meets
+    const meet = V.shelter.length && per.rank % 3 === 2 ? V.shelter[per.rank % V.shelter.length] : spot(V.greens.length ? V.greens : V.wells, 13);
+    if (h(15) < 0.75) out(meet, 11.1 + 0.3 * h(16), 12.7 + 0.3 * h(17), POSE.STAND, 'talking');
+    homeAgain(12.9 + 0.3 * h(18), 14.4 + h(11));
     const seat = seatOf();
     if (seat >= 0 && h(12) < 0.6) out(seat, 15.0, 16.4, POSE.SIT, 'resting');
-    else out(spot(V.greens.length ? V.greens : V.wells, 13), 15.0, 16.4, POSE.STAND, 'talking');
+    else out(spot(V.greens.length ? V.greens : V.wells, 19), 15.0, 16.4, POSE.STAND, 'talking');
     out(H.step, 16.8, 18.0 + 0.5 * h(14), POSE.STAND, 'at the door');
   }
   // rain: out-of-doors work is left for shelter (a barn, the market shelter,

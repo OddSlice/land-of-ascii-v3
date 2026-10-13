@@ -9,10 +9,11 @@ import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
-import { buildYard } from './world/yard.js';
+import { buildYard, yardFigures } from './world/yard.js';
 import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
 import { People } from './app/people.js';
+import { peopleCameras } from './world/people/cameras.js';
 import { packWorld, unpackWorld, worldHash } from './world/pack.js';
 import { shadowStore } from './scene/cpu/light.js';
 import { buildInWorker, SharedShadows } from './app/worldboot.js';
@@ -164,6 +165,11 @@ const player = new Player(world, { rules: WORLD || YARD ? 'world' : 'lab' });
 // (phase 4a) the people of the generated world (?people=0: none)
 const people = WORLD ? new People(world) : null;
 if (people && params.get('people') === '0') people.on = false;
+// (and the cameras that look at them: a green at midday, the wall walk at
+// night, a traveller on the road)
+if (people) world.cameras.push(...peopleCameras(world, people.P));
+// (in the building yard: a line of figures standing still, in every pose)
+const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
 const canvas = $('view');
 const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
@@ -197,7 +203,8 @@ function standAt(x, z, yawDeg, pitchDeg, eyeY) {
 }
 // (the clock goes on running from there, if it was)
 function setTime(name) {
-  state.hour = LOOK.hours[name];
+  // (phase 4a: a camera's time can be an hour, a traveller's say)
+  state.hour = typeof name === 'number' ? name : LOOK.hours[name];
 }
 function useCamera(i) {
   const c = CAMS[i];
@@ -270,6 +277,7 @@ function makeFrame() {
     f.people = people.update(state.day, state.hour, { x: player.x, z: player.z, feet: player.feet }, player);
     f.lit = people.lit.slice();
   }
+  if (yardFolk && yardFolk.on) f.people = yardFolk.st;
   return f;
 }
 
@@ -530,6 +538,8 @@ const game = {
     if (typeof state.weather === 'object') return `set by a tool: ${weatherName()}${state.weather.wet ? ', wet ground' : ''}`;
     return state.weather === 'auto' ? `now ${weatherName()}, from the forecast for seed ${SEED}, day ${state.day}` : `held: ${state.weather}`;
   },
+  // (phase 4a) everyone, for the menu's list
+  get people() { return people ? lab.people : null; },
   workersLine() {
     if (!THREADS) return 'everything on the page, no workers';
     if (!WORLD) return `${THREADS} workers, each building its own copy of the scene`;
@@ -641,8 +651,8 @@ function hideHint() { clearTimeout(hintTimer); $('hint').classList.remove('on');
 // (phase 4a) people, for the tools and the menu
 lab.people = {
   get count() { return people ? people.n : 0; },
-  get on() { return !!(people && people.on); },
-  set(on) { if (people) people.setOn(on, player); },
+  get on() { return !!(people ? people.on : yardFolk && yardFolk.on); },
+  set(on) { if (people) people.setOn(on, player); if (yardFolk) yardFolk.on = !!on; },
   list() { return people ? people.list() : []; },
   get updateMs() { return people ? people.updateMs : 0; },
   get buildMs() { return people ? people.buildMs : 0; },

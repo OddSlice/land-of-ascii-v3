@@ -44,7 +44,7 @@ export const LOOK = {
   },
 
   // Hours the 1, 2, 3, 4 keys jump to (dawn: the sun as low as at dusk).
-  hours: { day: 14.0, dusk: 17.85, night: 23.0, dawn: 6.15 },
+  hours: { day: 14.0, dusk: 17.85, night: 23.0, dawn: 6.15, noon: 12.2 },
 
   // The day the page opens on (?day= for another): the moon's phase follows
   // the day count, a month of 29.53 days. Day 0 has a bright moon, high in

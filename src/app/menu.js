@@ -193,6 +193,7 @@ export class Menu {
       h('h3', { class: 'part' }, 'scenes'),
       h('div', { class: 'opts' }, [['world', 'the generated world'], ['lab', 'the Look Lab'], ['stress', 'the stress scene'], ['yard', 'the building yard']].map(([s, t]) =>
         h('button', { type: 'button', 'aria-pressed': String(g.scene === s), onclick: () => g.goScene(s) }, t))),
+      this.peoplePart(),
       h('h3', { class: 'part' }, 'workers'),
       h('p', { class: 'line' }, workers),
       this.benchPart());
@@ -200,6 +201,22 @@ export class Menu {
     this.pane.append(...TABS.map(([id]) => sections[id]));
     this.sections = sections;
     this.select(this.tab, false);
+  }
+
+  // (phase 4a) Everyone in the world: name, role and what they are doing
+  // now, brought up to date when the menu opens; choosing one stands you
+  // beside them, looking at them.
+  peoplePart() {
+    const g = this.game;
+    if (!g.people) return [];
+    const list = h('div', { class: 'people' });
+    const fill = () => {
+      const ps = g.people.list();
+      list.replaceChildren(...ps.map((p) => h('button', { type: 'button', class: 'person', onclick: () => { g.people.goTo(p.i); this.update(); } },
+        h('b', {}, p.name), h('span', { class: 'role' }, p.role), h('span', { class: 'act' }, p.act))));
+    };
+    this.refresh.push(fill);
+    return [h('h3', { class: 'part' }, 'people'), h('p', { class: 'words' }, `${g.people.count} people. Choose one to stand beside them.`), list];
   }
 
   // (phase 3b) The benchmark: run, cancel, the table, copy it as text. It
