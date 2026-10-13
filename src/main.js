@@ -48,6 +48,9 @@ const CLOCK_RATE = 1 / 3600;    // real time: one game hour per real hour (after
 const STRESS = params.get('stress') === '1';
 const YARD = !STRESS && params.get('yard') === '1';
 const LAB = !STRESS && !YARD && params.get('lab') === '1';
+// (phase 4b) ?wild=0: no wild ground detail; ?animals=0: no animals, nor
+// their pastures and folds (both off: phase 4a's world, byte for byte)
+const GEN = { wild: params.get('wild') !== '0', animals: params.get('animals') !== '0' };
 const WORLD = !STRESS && !LAB && !YARD;
 const SEED = WORLD ? (params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED) : 0;
 // Shared memory needs the page to be cross-origin isolated (the Vercel copy
@@ -130,12 +133,12 @@ async function makeWorld() {
     const t0 = performance.now();
     if (THREADS === 0) {
       // all on the page, in steps, so the progress line still paints
-      const gen = generateWorld(SEED);
+      const gen = generateWorld(SEED, GEN);
       let r;
       while (!(r = gen.next()).done) { worldProgress(r.value.stage, r.value.p); await nextTask(); }
       packed = packWorld(r.value, null);
     } else {
-      packed = await buildInWorker(SEED, SHARED, worldProgress);
+      packed = await buildInWorker(SEED, SHARED, worldProgress, GEN);
     }
     worldBuild.total = performance.now() - t0;
     const w = unpackWorld(packed);

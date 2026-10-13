@@ -35,8 +35,10 @@ export function packWorld(world, Shared = null) {
   if (T.farCode) put('farCode', T.farCode);
   if (T.shoreSq) put('shoreSq', T.shoreSq);
   for (let L = 0; L < LEVELS; L++) put(`level${L}`, T.levels[L].H);
-  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard', 'wField', 'fieldKind', 'fieldId', 'fieldTable', 'wPath', 'wWear', 'roof']) if (T[k]) put(k, T[k]);
+  for (const k of ['wWater', 'wRoad', 'wSand', 'wRock', 'wSnow', 'wFloor', 'tone', 'fine', 'code', 'wYard', 'wField', 'fieldKind', 'fieldId', 'fieldTable', 'wPath', 'wWear', 'roof', 'wFlower', 'flowerKind']) if (T[k]) put(k, T[k]);
   for (const k of FILTERED) for (let L = 1; L < LEVELS; L++) put(`${k}${L}`, T[`${k}L`][L]);
+  // (phase 4b) the flower drifts, when there are any
+  if (T.wFlower) for (let L = 1; L < LEVELS; L++) put(`wFlower${L}`, T.wFlowerL[L]);
   // trees: a table of numbers, and their tiers in one pool
   const trees = world.objects.trees;
   const tab = new Float64Array(trees.length * TREE_F);
@@ -88,7 +90,9 @@ export function unpackWorld(packed) {
     wFloor: a.wFloor, tone: a.tone, fine: a.fine, code: a.code, toneK: m.toneK, maxH: m.maxH, wYard: a.wYard,
     wField: a.wField || null, fieldKind: a.fieldKind || null, fieldId: a.fieldId || null, fieldTable: a.fieldTable || null, wPath: a.wPath || null, wWear: a.wWear || null, roof: a.roof || null,
     form: a.form || null, shore: a.shore || null, farCode: a.farCode || null, shoreSq: a.shoreSq || null,
+    wFlower: a.wFlower || null, flowerKind: a.flowerKind || null,
   };
+  if (a.wFlower) { terrain.wFlowerL = [null]; for (let L = 1; L < LEVELS; L++) terrain.wFlowerL.push(a[`wFlower${L}`]); }
   for (const k of FILTERED) { terrain[`${k}L`] = [null]; for (let L = 1; L < LEVELS; L++) terrain[`${k}L`].push(a[`${k}${L}`]); }
   const trees = [], tab = a.trees, tiers = a.tiers;
   for (let q = 0; q < tab.length / TREE_F; q++) {

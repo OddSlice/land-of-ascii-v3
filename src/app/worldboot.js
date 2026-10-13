@@ -7,7 +7,7 @@ import { lightKey } from '../scene/cpu/light.js';
 
 // Build the world for `seed` in a worker. Resolves with the packed world
 // (in shared memory if `shared`); `onProgress(stage, p)` as it goes.
-export function buildInWorker(seed, shared, onProgress) {
+export function buildInWorker(seed, shared, onProgress, opts = {}) {
   return new Promise((resolve, reject) => {
     const w = new Worker(workerURL(), { type: 'module', name: 'builder' });
     w.onmessage = (e) => {
@@ -17,7 +17,7 @@ export function buildInWorker(seed, shared, onProgress) {
       else if (d.type === 'error') { w.terminate(); reject(new Error(`builder worker: ${d.message}\n${d.stack}`)); }
     };
     w.onerror = (e) => { e.preventDefault(); w.terminate(); reject(new Error(`builder worker: ${e.message || 'failed to load or crashed'}`)); };
-    w.postMessage({ type: 'build', seed, shared });
+    w.postMessage({ type: 'build', seed, shared, opts });
   });
 }
 

@@ -21,6 +21,7 @@ import { PT, HT, PF, TX, ZONE_OUT, ZONE_YARD } from './kit.js';
 import { MAT } from '../contract.js';
 import { SCALE } from './scale.js';
 import { buildVillagePiece, furnish } from './kit-village.js';
+import { WILD_KINDS, buildWildPiece } from './kit-wild.js';
 
 const K = SCALE.kit;
 const PASSAGE_LIGHT = 0.45;
@@ -526,6 +527,8 @@ export function buildStructure(b, desc) {
         else postTorch(b, pc.at[0], pc.at[1], pc.base, pc.mask === undefined ? ZONE_OUT | ZONE_YARD : pc.mask, pc.phase || 0);
         out.push(null); break;
       default:
+        // (phase 4b) the wild ground detail's pieces
+        if (WILD_KINDS.has(pc.kind)) { out.push(buildWildPiece(b, pc) || null); break; }
         // (phase 3b) the villages' pieces
         if (!VILLAGE_KINDS.has(pc.kind)) throw new Error(`no such piece: ${pc.kind}`);
         out.push(buildVillagePiece(b, pc) || null);

@@ -208,7 +208,8 @@ export function buildPeople(world) {
     for (const pa of pl.paths || []) {
       if (pa.to !== 'field') continue;
       const ex = pa.x[0], ez = pa.z[0];
-      const f = (pl.fields || []).reduce((b, f) => (!b || Math.hypot(f.x - ex, f.z - ez) < Math.hypot(b.x - ex, b.z - ez) ? f : b), null);
+      // (phase 4b: a pasture is the flock's, not worked)
+      const f = (pl.fields || []).filter((f) => !f.pasture).reduce((b, f) => (!b || Math.hypot(f.x - ex, f.z - ez) < Math.hypot(b.x - ex, b.z - ez) ? f : b), null);
       if (!f) continue;
       const gate = place('fieldgate', ex, ez, G(ex, ez), 0);
       const dl = Math.hypot(f.x - ex, f.z - ez) || 1, ux = (f.x - ex) / dl, uz = (f.z - ez) / dl;

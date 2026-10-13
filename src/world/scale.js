@@ -54,6 +54,23 @@ export const SCALE = {
   // cut into strips `strip` wide
   village: { lane: 3, path: 1.4, green: [12, 17], shoreBack: 14, setback: [2.5, 6], gap: 3.2, turn: 0.13, doorDrop: 0.5, lit: 0.8,
     jetty: [8, 16], fields: [3, 5], fieldL: [22, 40], fieldW: [16, 28], fieldSlope: 0.1, strip: [6, 11] },
+  // (phase 4b) the wild ground detail (docs/scale.md): metres, placing in
+  // jittered grids of `grid` metres with a chance each, by habitat
+  wild: {
+    clear: 1.2, roadClear: 3,            // kept off paths, fields, villages; and the roads
+    boulder: { grid: 6, steep: 0.6, cluster: 38, fieldAt: 0.56, lone: 0.004, belowRock: 0.3, river: 0.18, gap: 0.9,
+      small: [0.25, 0.45], smallH: [0.2, 0.4], medium: [0.55, 0.95], mediumH: [0.45, 0.85], large: [1.05, 1.6], largeH: [0.95, 1.5] },
+    outcrop: { grid: 22, slope: [0.42, 0.62], chance: 0.3, r: [1.0, 1.8], h: [0.5, 1.1] },
+    log: { grid: 7, edge: -0.03, chance: 0.022, len: [2.5, 6], r: [0.15, 0.36], level: 0.3 },
+    stump: { chance: 0.026, r: [0.2, 0.42], h: [0.25, 0.6] },
+    reeds: { grid: 5, depth: [0.03, 0.55], edge: 3, slow: 0.25, cluster: 45, at: 0.5, chance: 0.55, r: [1.1, 2.6], h: [1.25, 1.8] },
+    flowers: { drift: 46, at: 0.52, soft: 0.12, wet: 30, hollow: 0.6, aspect: [0.35, -0.94], sunny: 0.04 },
+  },
+  // (phase 4b) the animals (docs/scale.md)
+  animals: {
+    // a sheepfold: half sizes, the ground's most fall across it, its gate's width
+    fold: { hw: 4.5, hd: 3.5, fall: 1.0, gate: 2.6 },
+  },
   wall: { length: 120, thick: 3, height: 6, gate: 4 },
 
   // the building kit (phase 3a; docs/scale.md): metres, heights above the

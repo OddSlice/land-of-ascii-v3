@@ -209,6 +209,9 @@ const methods = {
     else if ((thin ? this.thinW(T.wSandL, lv, L, beta, x, z) : bilU8(T.wSand, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = MAT.SAND;
     else if (this.weight(T.wSnow, T.wSnowL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.SNOW;
     else if (this.weight(T.wRock, T.wRockL, lv, L, beta, x, z, D) > 0.5 + 0.3 * jitter) mat = MAT.ROCK;
+    // (phase 4b) the meadow's drifts of flowers (in meadow only, so before
+    // the forest floor; far off by their filtered weight, as ground tone)
+    else if (T.wFlower && code !== 3 && (thin ? this.thinW(T.wFlowerL, lv, L, beta, x, z) : bilU8(T.wFlower, x, z, N, NN)) > 0.5 + 0.25 * jitter) mat = this.flowerMat(T, x, z);
     else if (T.wFloor && bilU8(T.wFloor, x, z, N, NN) > 0.5 + 0.3 * jitter) mat = MAT.FLOOR;
     else mat = MAT.GRASS;
     // the coast (phase 2a): where sand meets the sea or a lake, a darker wet
@@ -249,7 +252,9 @@ const methods = {
         if (mat === MAT.ROCK) tone += FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(x / 210, z / 210, SEED + 131)) * fadeOf(FAR.strata / 2, fp) * (1 - smooth(FAR.strata * 0.15, FAR.strata * 0.55, D * v.rowAngle));
       }
       // (judged by the cell's footprint along the view, where rows are tall)
-      if (mat === MAT.GRASS && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
+      if ((mat === MAT.GRASS || mat === MAT.PASTURE || mat === MAT.FLOWERA || mat === MAT.FLOWERB || mat === MAT.FLOWERC) && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
+      // (phase 4b) up close, a drift's flower heads
+      if (mat === MAT.FLOWERA || mat === MAT.FLOWERB || mat === MAT.FLOWERC) tone += this.blooms(x, z, fp);
       // (phase 3b) a field's furrows, along its strips, by how much of the
       // cell each covers; gone once they are under about three cells apart
       if (mat === MAT.CROP || mat === MAT.STUBBLE || mat === MAT.FALLOW) tone = 0.4 * tone + this.furrows(T, x, z, fp, mat);
@@ -296,7 +301,33 @@ const methods = {
     if (!id) return MAT.CROP;
     const b = (id - 1) * 4;
     if (fp * 3 > T.fieldTable[b + 3]) kd = T.fieldTable[b + 2];
-    return kd === 2 ? MAT.STUBBLE : kd === 3 ? MAT.FALLOW : MAT.CROP;
+    return kd === 2 ? MAT.STUBBLE : kd === 3 ? MAT.FALLOW : kd === 4 ? MAT.PASTURE : MAT.CROP;
+  },
+
+  // (phase 4b) Which flower drift is here (1 yellow, 2 lilac, 3 pale).
+  flowerMat(T, x, z) {
+    const i = Math.round(x), k = Math.round(z);
+    const kd = T.flowerKind[(k < 0 ? 0 : k > this.N ? this.N : k) * this.NN + (i < 0 ? 0 : i > this.N ? this.N : i)];
+    return kd === 1 ? MAT.FLOWERA : kd === 2 ? MAT.FLOWERB : MAT.FLOWERC;
+  },
+
+  // (phase 4b) Flower heads: one in some of the squares of a lattice, a
+  // small round brighter patch fixed to the land, drawn only while it is
+  // several cells across (a speck would crawl), so far off the drift is its
+  // colour alone.
+  blooms(x, z, fp) {
+    const B = LOOK.flowers, f = 1 - smooth(B.head * 0.5, B.head * 1.4, fp);
+    if (f <= 0) return 0;
+    const g = B.lattice, gx = Math.floor(x / g), gz = Math.floor(z / g);
+    let t = 0;
+    for (let dz = 0; dz <= 1; dz++) for (let dx = 0; dx <= 1; dx++) {
+      const a = gx + dx - (x / g - gx < 0.5 ? 1 : 0), b = gz + dz - (z / g - gz < 0.5 ? 1 : 0);
+      if (hash2(a, b, SEED + 141) > B.share) continue;
+      const hx = (a + 0.2 + 0.6 * hash2(a, b, SEED + 142)) * g, hz = (b + 0.2 + 0.6 * hash2(a, b, SEED + 143)) * g;
+      const d = Math.hypot(x - hx, z - hz);
+      t = Math.max(t, 1 - smooth(B.head * 0.6, B.head, d));
+    }
+    return B.bright * t * f;
   },
 
   // The furrows' tone at (x, z): lines along the block's length every 0.9 m.

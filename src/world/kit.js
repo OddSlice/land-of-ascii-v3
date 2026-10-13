@@ -24,7 +24,15 @@
 // length, w the depth.
 
 // shape types
-export const PT = { BOX: 1, CYL: 2, PRISM: 3, STAIR: 4, PANE: 5 };
+export const PT = { BOX: 1, CYL: 2, PRISM: 3, STAIR: 4, PANE: 5, ELL: 6, LOG: 7, REED: 8 };
+// (phase 4b, the wild ground detail)
+// - ELL: an ellipsoid (a boulder, a stone of an outcrop): half sizes hx along
+//   u, hz along w, ry up and down from its middle at BASE (ry = Y1 - BASE);
+//   cut flat at Y0 (below the ground it is sunk in)
+// - LOG: a cylinder lying along u (a fallen trunk): half length hx, radius
+//   hz, its axis at BASE; its round side is MAT, its cut ends MAT2
+// - REED: a bed of reeds, a round of radius hx from Y0 up to about Y1, its
+//   top ragged; it can be walked through (PASS), and it parts round a walker
 // hole types
 export const HT = { BOX: 1, CYL: 2, ARCH: 3 };
 // shape flags
@@ -38,6 +46,12 @@ export const PF = {
   // away, as GROW, but only while it really is at least HOLD_MIN of that;
   // smaller still, it is not drawn at all
   HOLD: 16,
+  // (phase 4b) small wild detail far off: held at two cells across and two
+  // rows tall, and faded by how much of that it really is (a person's far
+  // silhouette's rule); under about 6% it is not drawn
+  FADE: 32,
+  // (phase 4b) not solid: nothing stands on it or is stopped by it (reeds)
+  PASS: 64,
 };
 export const HOLD_MIN = 0.35;
 // what a surface's texture is
@@ -46,7 +60,10 @@ export const HOLD_MIN = 0.35;
 // FRAME and SHINGLE but without
 // the detail that blinks as you walk right past or turn (see primShade); the
 // fort keeps its own)
-export const TX = { PLAIN: 0, MASONRY: 1, FRAME: 2, SHINGLE: 3, BOARDS: 4, FLAGS: 5, THATCH: 6, RUBBLE: 7, ASHLAR: 8, PAVING: 9, TIMBERED: 10, TILES: 11 };
+export const TX = { PLAIN: 0, MASONRY: 1, FRAME: 2, SHINGLE: 3, BOARDS: 4, FLAGS: 5, THATCH: 6, RUBBLE: 7, ASHLAR: 8, PAVING: 9, TIMBERED: 10, TILES: 11,
+  // (phase 4b) the wild detail: a boulder's lichen and grain, an outcrop's
+  // bedding, bark, a cut end's rings, reed stems
+  BOULDER: 12, STRATA: 13, BARK: 14, RINGS: 15, REEDS: 16 };
 
 // shape table: P_STRIDE numbers per shape
 export const P_STRIDE = 28;
@@ -137,7 +154,7 @@ export function compileKit(b) {
     const q = i * P_STRIDE, a = o.a || 0;
     prims[q + P.TYPE] = o.type; prims[q + P.CX] = o.x; prims[q + P.CZ] = o.z;
     prims[q + P.CA] = Math.cos(a); prims[q + P.SA] = Math.sin(a);
-    prims[q + P.HX] = o.hx; prims[q + P.HZ] = o.type === PT.CYL ? o.hx : o.hz;
+    prims[q + P.HX] = o.hx; prims[q + P.HZ] = o.type === PT.CYL || o.type === PT.REED ? o.hx : o.hz;
     prims[q + P.Y0] = o.y0; prims[q + P.Y1] = o.y1;
     prims[q + P.MAT] = o.mat; prims[q + P.FLAGS] = o.flags || 0;
     prims[q + P.MH] = o.mh || 0; prims[q + P.PER] = o.per || 0; prims[q + P.MW] = o.mw || 0; prims[q + P.PH] = o.ph || 0;
@@ -207,7 +224,7 @@ export function kitFromData(d) {
 // How far a shape reaches from its centre, horizontally.
 export function reachOf(prims, q) {
   const t = prims[q + P.TYPE], hx = prims[q + P.HX], hz = prims[q + P.HZ];
-  return t === PT.CYL ? hx : Math.sqrt(hx * hx + hz * hz);
+  return t === PT.CYL || t === PT.REED ? hx : t === PT.ELL ? Math.max(hx, hz) : Math.sqrt(hx * hx + hz * hz);
 }
 
 // A lookup of the shapes over GRID-metre squares, for walking and the tools.
@@ -249,6 +266,10 @@ function near(kit, x, z, out, pad = 0) {
 // -Infinity if (u, w) is outside its footprint.
 function topAt(kit, q, u, w) {
   const S = kit.prims, t = S[q + P.TYPE], hx = S[q + P.HX], hz = S[q + P.HZ];
+  // (phase 4b) the wild shapes: their own tops; reeds have none
+  if (t === PT.ELL) { const e = 1 - (u / hx) * (u / hx) - (w / hz) * (w / hz); return e < 0 ? -Infinity : S[q + P.BASE] + (S[q + P.Y1] - S[q + P.BASE]) * Math.sqrt(e); }
+  if (t === PT.LOG) { if (u < -hx || u > hx || w < -hz || w > hz) return -Infinity; return S[q + P.BASE] + Math.sqrt(hz * hz - w * w); }
+  if (t === PT.REED) return -Infinity;
   if (t === PT.CYL) { if (u * u + w * w > hx * hx) return -Infinity; }
   else if (u < -hx || u > hx || w < -hz || w > hz) return -Infinity;
   const y1 = S[q + P.Y1];
@@ -289,11 +310,14 @@ function inHole(kit, h, x, y, z) {
 // Is world point (x, y, z) inside the solid of shape i (not in its openings)?
 export function inPrim(kit, i, x, y, z) {
   const S = kit.prims, q = i * P_STRIDE, t = S[q + P.TYPE];
-  if (t === PT.PANE) return false;
+  if (t === PT.PANE || t === PT.REED) return false;
   if (y < S[q + P.Y0]) return false;
   const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
   const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
-  if (y > topAt(kit, q, u, w)) return false;
+  const top = topAt(kit, q, u, w);
+  if (y > top) return false;
+  // (phase 4b) round shapes have a round underside, as their top
+  if ((t === PT.ELL || t === PT.LOG) && y < 2 * S[q + P.BASE] - top) return false;
   for (let h = S[q + P.H0], e = h + S[q + P.HN]; h < e; h++) if (inHole(kit, h, x, y, z)) return false;
   return true;
 }
@@ -338,7 +362,7 @@ export function supportAt(kit, x, z, maxY) {
   const S = kit.prims, Hs = kit.holes;
   for (let a = 0; a < n; a++) {
     const q = LS[a] * P_STRIDE, t = S[q + P.TYPE];
-    if (t === PT.PANE) continue;
+    if (t === PT.PANE || t === PT.REED) continue;
     const dx = x - S[q + P.CX], dz = z - S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
     const u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
     const top = topAt(kit, q, u, w);
@@ -396,6 +420,8 @@ export function bodyBlocked(kit, x, z, lo, hi, r) {
     const q = LB[a] * P_STRIDE;
     const y0 = S[q + P.Y0], y1 = S[q + P.Y1], yc = y1 - S[q + P.MH];
     add(y0 + 0.01, lo, hi); add(y0 - 0.01, lo, hi); add(y1 + 0.01, lo, hi); add(y1 - 0.01, lo, hi); add(yc + 0.01, lo, hi); add(yc - 0.01, lo, hi);
+    // (phase 4b) a round shape is widest at its middle
+    if (S[q + P.TYPE] === PT.ELL || S[q + P.TYPE] === PT.LOG) add(S[q + P.BASE], lo, hi);
     if (S[q + P.TYPE] === PT.STAIR) {
       const k = Math.round(2 * S[q + P.HX] / S[q + P.RUN]), base = S[q + P.BASE], rise = S[q + P.RISE];
       // (only the steps between lo and hi)

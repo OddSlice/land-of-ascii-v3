@@ -24,7 +24,7 @@ import { CG, KIND, coarsen, flood, accumulate, findLakes, pickRivers, wetFine, d
 import { forestField, chooseThreshold, plant, copses, fieldAt } from './plants.js';
 import { chooseFort, chooseVillages, chooseViewpoints, chooseSpawn, shoreOf, heightAt, brow } from './sites.js';
 import { roadGrid, cheapest, roadLine, layRoads, joinRoads, bridgeRoads, rejoinRoads, meetRoads, STEEP } from './roads.js';
-import { Ways, villagePatterns, planVillage, planFields, boundField, layFields, planPaths, nearestWater } from './village.js';
+import { Ways, villagePatterns, planVillage, planFields, boundField, layFields, planPaths, nearestWater, choosePastures, planFold } from './village.js';
 import { materials, detail, gullies, shoreLine, shoreSquares } from './ground.js';
 import { worldCameras, fortCameras, villageCameras } from './cameras.js';
 import { makeLevels, materialCode, weightLevels, farCode } from '../terrain.js';
@@ -34,6 +34,7 @@ import { planFort, levelFort, levelApproach, routeIntoFort, windToFort, detourFo
 import { KitBuilder, compileKit, raiseOccluders } from '../kit.js';
 import { buildStructure } from '../kit-pieces.js';
 import { buildClouds, worldCloudList } from '../sky.js';
+import { placeWild } from './wild.js';
 
 const SEA = SCALE.sea;
 // the weights kept filtered for the coarser levels (see pack.js)
@@ -45,8 +46,12 @@ export const DEFAULT_SEED = 3;
 
 export const STAGES = ['shaping the land', 'running the rain', 'carving rivers', 'growing forests', 'choosing sites', 'finding roads', 'planting trees', 'laying the ground', 'finishing'];
 
-export function* generateWorld(seed) {
+// `opts` (phase 4b): { wild, animals } (both on by default): the wild
+// ground detail, and what the animals need on the land (pastures, folds).
+// With both off the world is phase 4a's, byte for byte.
+export function* generateWorld(seed, opts = {}) {
   seed = seed >>> 0;
+  const WILD = opts.wild !== false, ANIMALS = opts.animals !== false;
   const t0 = performance.now();
   const N = SCALE.N, NN = N + 1, cells = NN * NN;
   const times = {};
@@ -327,16 +332,33 @@ export function* generateWorld(seed) {
   const vpieces = vplans.flatMap((pl) => pl.pieces);
   // the fields and their bounds, then the paths
   const blocks = [];
+  // (phase 4b) cattle at the one or two villages nearest water
+  const byWater = water.map((w, q) => [w ? w.d : Infinity, q]).filter((e) => e[0] < 240).sort((a, b) => a[0] - b[0]).slice(0, 2).map((e) => e[1]);
   vplans.forEach((pl, q) => {
     const bl = planFields(q, pl.rec, venv);
-    pl.rec.fields = bl.map((b) => ({ x: b.x, z: b.z, a: b.a, L: b.L, W: b.W, main: b.main }));
+    // (phase 4b) pastures for the flocks (and a field for cattle)
+    const pas = ANIMALS ? choosePastures(q, pl.rec, bl, water[q], byWater.includes(q)) : null;
+    pl.rec.fields = bl.map((b) => ({ x: b.x, z: b.z, a: b.a, L: b.L, W: b.W, main: b.main, ...(b.pasture ? { pasture: b.pasture } : {}) }));
     pl.gates = [];
     bl.forEach((b, i) => {
       const style = pl.rec.bounds === 'fence' ? (i % 3 === 2 ? 'drystone' : 'fence') : (i % 3 === 2 ? 'fence' : 'drystone');
-      const bd = boundField(b, pl.rec, venv, style);
+      const bd = boundField(b, pl.rec, venv, style, !!b.pasture);
       vpieces.push(...bd.pieces);
       pl.gates.push(...bd.gates);
+      if (b.pasture) b.gate = bd.gates[0];
     });
+    // (phase 4b) a fold for each flock, by a barn, before the paths are laid
+    if (pas) {
+      pl.rec.folds = [];
+      pas.sheep.forEach((id, k) => {
+        const b = bl.find((x) => x.id === id), fd = planFold(q, k, pl.rec, b, b.gate, venv);
+        if (!fd) return;
+        vpieces.push(...fd.pieces);
+        if (!fd.inside) { venv.built.push(fd.rect); venv.fields.push(fd.rect); }
+        pl.rec.folds.push({ x: fd.rect.x, z: fd.rect.z, a: fd.rect.a, hw: fd.rect.hw, hd: fd.rect.hd, gate: fd.gate, gateIn: fd.gateIn, inside: fd.inside, pasture: bl.indexOf(b) });
+      });
+      pl.rec.cattleField = pas.cattle !== null ? bl.findIndex((x) => x.id === pas.cattle) : -1;
+    }
     blocks.push(...bl);
   });
   // (the fences and walls, as segments, for the paths to keep off)
@@ -481,11 +503,25 @@ export function* generateWorld(seed) {
   const flds = layFields(N, blocks);
   Object.assign(terrain, { wField: flds.wField, fieldKind: flds.fieldKind, fieldId: flds.fieldId, fieldTable: flds.fieldTable, wPath, wWear });
   terrain.wFloor = floorField(terrain, trees);
+  // (phase 4b) the wild ground detail: boulders, outcrops, logs, stumps and
+  // reeds as kit pieces; flower drifts as ground
+  let wildPieces = [];
+  if (WILD) {
+    const avoid = [[spawn.x, spawn.z, 16], ...viewpoints.map((p) => [p.x, p.z, 6]), ...(venv.posts || []).map((p) => [p[0], p[1], 3])];
+    for (const bg of bridges) for (const pt of bg.pts) avoid.push([pt[0], pt[1], 12]);
+    for (const pl of vplans) if (pl.rec.jetty) { const j = pl.rec.jetty; for (let t = 0; t <= 1; t += 0.25) avoid.push([j.a[0] + (j.b[0] - j.a[0]) * t, j.a[1] + (j.b[1] - j.a[1]) * t, 6]); }
+    for (const p of fpaths) if (p.to === 'water' && p.n) avoid.push([p.x[p.n - 1], p.z[p.n - 1], 7]);
+    const wd = placeWild({ N, H, kind, level, freshDist, F, thr, trees, roadDist: roadDist.dist, wPath, wField: flds.wField, bare, cleared: plan.cleared, wYard: terrain.wYard, wRock, wSand, seed, avoid });
+    wildPieces = wd.pieces;
+    terrain.wFlower = wd.wFlower; terrain.flowerKind = wd.flowerKind;
+    times.wildCounts = wildPieces.reduce((o, p) => { o[p.kind] = (o[p.kind] || 0) + 1; return o; }, { flowerCells: wd.flowerCells });
+  }
   terrain.code = materialCode(terrain);
   // (filtered copies for the coarser levels: thin water, roads and sand fade
   // with distance; snow and rock end at a clean line far away)
-  for (const k of FILTERED) terrain[`${k}L`] = weightLevels(terrain[k], N);
-  terrain.farCode = farCode(terrain, FILTERED);
+  const filtered = terrain.wFlower ? [...FILTERED, 'wFlower'] : FILTERED;
+  for (const k of filtered) terrain[`${k}L`] = weightLevels(terrain[k], N);
+  terrain.farCode = farCode(terrain, filtered);
   // the range's gullies, on the 4 m grid (the far rule)
   terrain.form = gullies(co, acc, gOf);
   // the waterline of the sea and the lakes (the coast's wet band and foam)
@@ -497,7 +533,7 @@ export function* generateWorld(seed) {
   // (phase 3a) no spans: the fort is the kit's shapes
   const spans = emptySpans();
   // (phase 3b) the fort, the villages and the bridges, one description
-  const kitDesc = { pieces: [...plan.desc.pieces, ...vpieces], yards: plan.desc.yards, cleared: plan.desc.cleared };
+  const kitDesc = { pieces: [...plan.desc.pieces, ...vpieces, ...wildPieces], yards: plan.desc.yards, cleared: plan.desc.cleared };
   const kb = new KitBuilder();
   buildStructure(kb, kitDesc);
   const kit = compileKit(kb);

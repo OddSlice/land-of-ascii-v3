@@ -304,6 +304,10 @@ for (const m of [MAT.THATCH, MAT.PLASTER2, MAT.PLASTER3, MAT.TIMBER2, MAT.TIMBER
 for (const m of [MAT.HAIR, MAT.LINEN, MAT.RUSSET, MAT.OCHRE, MAT.MOSS, MAT.SLATE, MAT.UMBER, MAT.CHARCOAL, MAT.LEATHER]) WETM[m] = 0.7;
 WETM[MAT.SKIN] = 0.3; WETM[MAT.SKIN2] = 0.3; WETM[MAT.IRON] = 0.5;
 WETM[MAT.CONIFER] = 0.5; WETM[MAT.BUSH] = 0.5;
+// (phase 4b) the wild ground and its detail wet as the ground does; reeds as foliage; coats as cloth
+for (const m of [MAT.PASTURE, MAT.FLOWERA, MAT.FLOWERB, MAT.FLOWERC, MAT.BARK]) WETM[m] = 1;
+WETM[MAT.REED] = 0.5;
+for (const m of [MAT.WOOL, MAT.HIDE, MAT.FAWN, MAT.GULL, MAT.CROW, MAT.DUCK, MAT.DUCKHEAD, MAT.HARE]) WETM[m] = 0.6;
 let wetDark = 0, wetSheen = 0;
 // the rules of the stripe being resolved: air (aerial perspective and the
 // far-land rules) and the air a record's ray passed through (-1: phase 1's haze)
@@ -315,6 +319,14 @@ let airOn = false;
 // behind it in `rec.sky*`, so each caller can draw the edge its own way.
 const rec = { r: 0, g: 0, b: 0, bright: 0, h: 0, cover: 1, skyR: 0, skyG: 0, skyB: 0 };
 // the look candidates of the stripe being resolved (set by resolveStripe)
+// (phase 4b) the flower drifts' blooms: each a share of its drift's lit colour
+const FLOWERS = LOOK.flowers;
+const BLOOM = FLOWERS.bloom.map((c, i) => {
+  const d = LOOK.keys.day[['flowera', 'flowerb', 'flowerc'][i]].lit;
+  const v = (h) => [1, 3, 5].map((q) => parseInt(h.slice(q, q + 2), 16));
+  const a = v(c), b = v(d);
+  return a.map((x, q) => x / Math.max(1, b[q]));
+});
 let grassHue = 0, blueShallows = false;
 // `mu`: for a direct view, the sine of the ray's elevation (wet ground
 // mirrors the sky at low angles); 2 for any other record. `y`: the height of
@@ -389,7 +401,12 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN, amb = 1) {
       const tn = (toneB - 128) / 127;
       const tk = 1 + pal.toneAmp[m] * tn;
       r *= tk; g *= tk; b *= tk;
-      if (m === MAT.GRASS && grassHue > 0) {
+      if (m >= MAT.FLOWERA && m <= MAT.FLOWERC && tn > 0) {
+        // (phase 4b) a flower head: toward its bloom's colour (the drift's own
+        // lit colour scaled by the bloom's share of it, so it keeps the hour)
+        const j0 = m * 3, br = BLOOM[m - MAT.FLOWERA], f = tn * FLOWERS.hue * t;
+        r += (lit[j0] * br[0] - r) * f; g += (lit[j0 + 1] * br[1] - g) * f; b += (lit[j0 + 2] * br[2] - b) * f;
+      } else if (m === MAT.GRASS && grassHue > 0) {
         // meadow mottling: tone also turns the green drier or lusher, more so in the light
         const to = tn > 0 ? k.grassDry : k.grassLush, f = (tn > 0 ? tn : -tn) * grassHue * t, j0 = m * 3;
         r += (to[0] - lit[j0]) * f; g += (to[1] - lit[j0 + 1]) * f; b += (to[2] - lit[j0 + 2]) * f;

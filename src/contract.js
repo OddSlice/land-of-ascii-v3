@@ -39,6 +39,10 @@ export const MAT = {
   SKIN: 35, SKIN2: 36, HAIR: 37,
   LINEN: 38, RUSSET: 39, OCHRE: 40, MOSS: 41, SLATE: 42, UMBER: 43, CHARCOAL: 44, // cloth
   LEATHER: 45, IRON: 46,
+  // phase 4b: the wild ground detail (pasture and flower drifts are ground)
+  PASTURE: 47, FLOWERA: 48, FLOWERB: 49, FLOWERC: 50, REED: 51, BARK: 52,
+  // and the animals' coats (with the people's cloth, leather and charcoal)
+  WOOL: 53, HIDE: 54, FAWN: 55, GULL: 56, CROW: 57, DUCK: 58, DUCKHEAD: 59, HARE: 60,
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;

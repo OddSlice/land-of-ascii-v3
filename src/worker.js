@@ -44,7 +44,7 @@ self.onmessage = (e) => {
       self.postMessage({ type: 'done', id: msg.id, seq: frame.seq, c0, c1, cells: r.cells, march: r.march, resolve: r.resolve,
         settled: r.settled, sweepMs: r.sweepMs }, [r.cells.buffer]);
     } else if (msg.type === 'build') {
-      const gen = generateWorld(msg.seed);
+      const gen = generateWorld(msg.seed, msg.opts || {});
       let r;
       while (!(r = gen.next()).done) self.postMessage({ type: 'progress', stage: r.value.stage, p: r.value.p });
       const t0 = performance.now();

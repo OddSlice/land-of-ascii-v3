@@ -26,7 +26,8 @@
 //   cell's footprint before they can blink (in primShade);
 // - a reveal (an opening's or a merlon's side) under about two and a half
 //   cells wide takes the light of the face it is cut into.
-import { MAT, MAT_SHELTER, HIT_STRIDE, REC } from '../../contract.js';
+import { MAT, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC } from '../../contract.js';
+import { vnoise } from '../../world/noise.js';
 import { LOOK } from '../../look.js';
 import { PT, HT, PF, TX, P, H, P_STRIDE, H_STRIDE, HOLD_MIN, zoneAt, roomBit, shelterOf, inMerlon } from '../../world/kit.js';
 
@@ -82,6 +83,8 @@ const methods = {
     const u0 = ox * ca + oz * sa, w0 = -ox * sa + oz * ca, du = dx * ca + dz * sa, dw = -dx * sa + dz * ca;
     kp.u0 = u0; kp.w0 = w0; kp.du = du; kp.dw = dw; kp.ca = ca; kp.sa = sa; kp.dx = dx; kp.dz = dz;
     kp.type = t;
+    // (phase 4b) the wild detail's shapes (wild.js)
+    if (t >= PT.ELL) { this.wildPlane(kp, q, S, minR, rowH); return; }
     const fl = S[q + P.FLAGS], grow = (fl & (PF.GROW | PF.HOLD)) !== 0;
     let hx = S[q + P.HX], hz = S[q + P.HZ];
     kp.y0 = S[q + P.Y0]; kp.y1 = S[q + P.Y1];
@@ -93,6 +96,16 @@ const methods = {
       if (ht < 2 * rowH) { const yc = (kp.y0 + kp.y1) / 2; kp.y0 = yc - rowH; kp.y1 = yc + rowH; }
     }
     if (grow) { if (hx < minR) hx = minR; if (hz < minR) hz = minR; }
+    // (phase 4b) small wild detail (a stump): held at two cells across and
+    // two rows tall, faded by its true share of that
+    kp.cover = 1;
+    if (fl & PF.FADE) {
+      const ht = kp.y1 - kp.y0, hm = Math.max(hx, minR), hh = Math.max(ht, 2 * rowH);
+      kp.cover = (hx / hm) * (ht / hh);
+      if (kp.cover < LOOK.wild.fadeMin) { kp.miss = true; return; }
+      if (hh > ht) kp.y1 = kp.y0 + hh;
+      hz = hz * hm / hx; hx = hm;
+    }
     if (t === PT.PANE) {
       // a window's light: at least two cells wide and two rows tall, faded
       // by how much of that it really is
@@ -192,6 +205,7 @@ const methods = {
     if (kp.miss) return false;
     const K = this.kit, S = K.prims, Hs = K.holes, q = kp.q, hit = this.hit;
     const tmin = after > NEAR ? after : NEAR;
+    if (kp.type >= PT.ELL) return this.wildRay(s, ey, tmin);
     // the vertical extent
     const y0 = kp.y0, yTop = kp.yTop;
     let va, vb, vf;
@@ -312,7 +326,7 @@ const methods = {
     }
     hit.D = t; hit.nx = nx; hit.ny = ny; hit.nz = nz; hit.kind = kind; hit.room = room; hit.rev = rev; hit.revO = revO;
     hit.mat = type === PT.PANE ? MAT.WINDOW : S[q + P.MAT];
-    hit.cover = type === PT.PANE ? kp.cover : 1;
+    hit.cover = type === PT.PANE || (S[q + P.FLAGS] & PF.FADE) ? kp.cover : 1;
     hit.prim = q;
     return true;
   },
@@ -467,6 +481,44 @@ const methods = {
     return false;
   },
 
+  // (phase 4b) The wild detail's tone: each kind of detail drawn only while
+  // it is several cells across (art bible, never-do 28), else its average.
+  wildTone(tex, S, q, x, y, z, fp, tu) {
+    const WT = LOOK.wild, seed = S[q + P.SEED], own = ((Math.imul(seed | 0, 2654435761) >>> 0) / 4294967296 - 0.5);
+    if (tex === TX.BOULDER) {
+      // the stone's own shade, patches of lichen, a fine grain
+      const lich = vnoise((x + y * 0.7) / WT.boulder.lichen[0], (z - y * 0.5) / WT.boulder.lichen[0], 4211 + (seed & 255)) * 2 - 1;
+      const grain = vnoise(x / 0.09 + y * 3.1, z / 0.09 - y * 2.3, 4212) * 2 - 1;
+      return WT.boulder.own * own + WT.boulder.lichen[1] * lich * (1 - smooth(WT.boulder.lichen[0] * 0.25, WT.boulder.lichen[0] * 0.7, fp)) + 0.12 * grain * (1 - smooth(0.03, 0.08, fp));
+    }
+    if (tex === TX.STRATA) {
+      // bedding planes: darker bands along the height, drawn while a band is
+      // a few rows tall
+      const B = WT.outcrop.band, cov = jointCover(y + own * B, B, B * 0.3, Math.max(1e-4, fp));
+      return WT.boulder.own * own - 0.55 * (cov - 0.3) * (1 - smooth(B * 0.18, B * 0.45, fp)) + 0.1 * (vnoise(x / 0.4, z / 0.4, 4213) * 2 - 1) * (1 - smooth(0.1, 0.3, fp));
+    }
+    if (tex === TX.BARK) {
+      // grooves along the trunk and patches of moss, near only
+      const g = jointCover(tu, WT.bark.groove, WT.bark.groove * 0.35, Math.max(1e-4, fp));
+      const moss = vnoise(x / 0.7 + own * 13, z / 0.7, 4214) * 2 - 1;
+      return 0.2 * own - 0.5 * (g - 0.35) * (1 - smooth(WT.bark.groove * 0.2, WT.bark.groove * 0.5, fp)) + 0.25 * moss * (1 - smooth(0.2, 0.6, fp));
+    }
+    if (tex === TX.RINGS) {
+      // a cut end: rings round the heart, the heart darker
+      let r;
+      if (S[q + P.TYPE] === PT.LOG) {
+        const ox = x - S[q + P.CX], oz = z - S[q + P.CZ], w = -ox * S[q + P.SA] + oz * S[q + P.CA];
+        r = Math.hypot(w, y - S[q + P.BASE]) / S[q + P.HZ];
+      } else r = Math.hypot(x - S[q + P.CX], z - S[q + P.CZ]) / S[q + P.HX];
+      const ring = Math.cos(r * S[q + P.HZ] / WT.rings * Math.PI * 2);
+      return 0.3 * ring * (1 - smooth(WT.rings * 0.25, WT.rings * 0.6, fp)) - 0.35 * (1 - Math.min(1, r)) * (1 - smooth(0.05, 0.2, fp)) + 0.15;
+    }
+    // reeds: the stems, paler at their tips and darker toward the water
+    const R = WT.reed, h = Math.max(0.1, S[q + P.Y1] - S[q + P.Y0]), up = Math.min(1, Math.max(0, (y - S[q + P.Y0]) / h));
+    const st = jointCover(tu, R.stem, R.stem * 0.45, Math.max(1e-4, fp));
+    return R.tip * (up - 0.5) - 0.45 * (st - 0.45) * (1 - smooth(R.stem * 0.25, R.stem * 0.6, fp)) + 0.15 * own;
+  },
+
   // Shade a building's hit into cell ci (slot 0 direct, 1 mirrored).
   primShade(ci, dx, dz, s, ey, slot, after) {
     const { v, m, light, hit } = this;
@@ -491,9 +543,14 @@ const methods = {
     // along a vertical face: the horizontal coordinate (a round shape's arc)
     let tu = 0;
     if (hit.kind === 0) {
-      if (S[q + P.TYPE] === PT.CYL) {
+      const ty = S[q + P.TYPE];
+      if (ty === PT.CYL || ty === PT.REED) {
         const ca = S[q + P.CA], sa = S[q + P.SA], ox = x - S[q + P.CX], oz = z - S[q + P.CZ];
         tu = Math.atan2(-ox * sa + oz * ca, ox * ca + oz * sa) * S[q + P.HX];
+      } else if (ty === PT.LOG) {
+        // (phase 4b) round a log's axis
+        const ox = x - S[q + P.CX], oz = z - S[q + P.CZ], w = -ox * S[q + P.SA] + oz * S[q + P.CA];
+        tu = Math.atan2(y - S[q + P.BASE], w) * S[q + P.HZ];
       } else tu = x * -nz + z * nx;
     }
     const seed = S[q + P.SEED];
@@ -624,6 +681,8 @@ const methods = {
       // a frame, cannot blink, and the gaps' average darkness)
       const plank = ((Math.imul(row * 73856093 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
       tone = -0.12 + 0.3 * plank * smooth(4, 6, 0.22 / Math.max(1e-4, fp));
+    } else if (tex >= TX.BOULDER) {
+      tone = this.wildTone(tex, S, q, x, y, z, fp, tu);
     } else if (K === this.figKit) {
       // (phase 4a) a person's clothes and skin: even, one tone to a part (a
       // grain fixed to the world would cut across a body narrower than its
@@ -680,6 +739,11 @@ const methods = {
       const o = ci * HIT_STRIDE + 2 * REC;
       m.hits[o] = MAT_SHELTER;
       m.hits[o + 1] = sh <= 0 ? 0 : sh >= 1 ? 255 : (sh * 255 + 0.5) | 0;
+    } else if (slot === 0 && hit.cover < 1 && K !== this.figKit) {
+      // (phase 4b) wild detail far off, held bigger than it is: faded by
+      // its true share (resolve blends it with what is behind)
+      const o = ci * HIT_STRIDE + 2 * REC;
+      m.hits[o] = MAT_FAINT; m.hits[o + 1] = (hit.cover * 255 + 0.5) | 0;
     }
   },
 };

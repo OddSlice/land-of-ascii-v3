@@ -25,6 +25,7 @@ import { TIER } from '../../world/objects.js';
 import { LOOK } from '../../look.js';
 import { installBuildings } from './build.js';
 import { installFigures, FIG } from './figures.js';
+import { installWild } from './wild.js';
 import { PT, PF, P as KP, P_STRIDE, reachOf } from '../../world/kit.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -72,7 +73,7 @@ export class ObjectPass {
       for (let i = 0; i < this.kit.np; i++) {
         const q = i * P_STRIDE, t = S[q + KP.TYPE], pane = t === PT.PANE;
         list.push({ kind: PRIM, o: q, x: S[q + KP.CX], z: S[q + KP.CZ], R: reachOf(S, q) + 0.05, y0: S[q + KP.Y0] - 0.05, y1: S[q + KP.Y1] + 0.05,
-          grow: pane ? 2.3 : (S[q + KP.FLAGS] & (PF.GROW | PF.HOLD) ? 1.5 : 0), up: pane || S[q + KP.FLAGS] & PF.HOLD ? 1 : 0 });
+          grow: pane ? 2.3 : (S[q + KP.FLAGS] & (PF.GROW | PF.HOLD | PF.FADE) ? 1.5 : 0), up: pane || S[q + KP.FLAGS] & (PF.HOLD | PF.FADE) ? 1 : 0 });
       }
     }
     this.list = list;
@@ -708,4 +709,5 @@ export class ObjectPass {
 }
 
 installBuildings(ObjectPass);
+installWild(ObjectPass);
 installFigures(ObjectPass);

@@ -13,7 +13,7 @@ export const LEVELS = 4;           // level L has nodes every 2^L metres
 // skips those three weights there, which are nothing over nearly all the land.)
 export function materialCode(T) {
   const { N, NN } = T;
-  const late = [T.wField, T.wPath, T.wWear].filter(Boolean);
+  const late = [T.wField, T.wPath, T.wWear, T.wFlower].filter(Boolean);
   const others = [T.wWater, T.wRoad, T.wSand, T.wSnow, T.wRock, T.wYard, ...late].filter(Boolean);
   const code = new Uint8Array(N * N);
   for (let k = 0; k < N; k++) {

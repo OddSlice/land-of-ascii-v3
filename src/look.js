@@ -177,6 +177,23 @@ export const LOOK = {
     iron:     { glyphs: ':=#%',      ink: { lit: -0.28, dark: 0.46 }, tone: 0.14 },
     // the dark down a well's shaft: nearly black at every hour
     shaft:   { glyphs: ' .:',        ink: { lit: 0.10, dark: 0.10 } },
+    // (phase 4b) the wild ground detail: pasture (grazed grass, its own
+    // muted tone), the meadow's flower drifts in three tones (yellow, lilac,
+    // pale), reeds and bark; then the animals' coats
+    pasture:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.16 },
+    flowera:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
+    flowerb:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
+    flowerc:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
+    reed:     { glyphs: '.:|!I',     ink: { lit: -0.28, dark: 0.46 }, tone: 0.20, toneRung: 0.2 },
+    bark:     { glyphs: ':|!I#',     ink: { lit: -0.28, dark: 0.46 }, tone: 0.20 },
+    wool:     { glyphs: '.,:;o%',    ink: { lit: -0.18, dark: 0.38 }, tone: 0.08 },
+    hide:     { glyphs: '.,:;=+',    ink: { lit: -0.22, dark: 0.42 }, tone: 0.08 },
+    fawn:     { glyphs: '.,:;=+',    ink: { lit: -0.22, dark: 0.42 }, tone: 0.08 },
+    gull:     { glyphs: '.,:;=+',    ink: { lit: -0.16, dark: 0.36 }, tone: 0.06 },
+    crow:     { glyphs: '.,:;=+',    ink: { lit: -0.24, dark: 0.44 }, tone: 0.08 },
+    duck:     { glyphs: '.,:;=+',    ink: { lit: -0.22, dark: 0.42 }, tone: 0.08 },
+    duckhead: { glyphs: '.,:;=+',    ink: { lit: -0.24, dark: 0.44 }, tone: 0.08 },
+    hare:     { glyphs: '.,:;=+',    ink: { lit: -0.22, dark: 0.42 }, tone: 0.08 },
   },
 
   // The coast (phase 2a, the generated world): a darker wet band where sand
@@ -203,6 +220,26 @@ export const LOOK = {
   // Water. Each water cell mixes what its ray sees reflected off the surface
   // with the bed seen through the water, by the Fresnel share. Ripples tilt
   // both rays; they never draw wave glyphs.
+  // (phase 4b) The wild ground detail's drawing rules (sizes and placing are
+  // in SCALE.wild):
+  // - `fadeMin`: under this share of the two cells and two rows it is held
+  //   at, a far boulder, log, stump or reed bed is not drawn
+  // - `boulder`: how much a stone's own shade varies (`own`); its lichen
+  //   patches [metres across, strength], drawn while a patch is a few cells
+  // - `outcrop.band`: the bedding planes of an outcrop's stones (metres)
+  // - `bark.groove`: bark's grooves (metres apart); `rings`: a cut end's
+  // - `reed`: `stem` (metres apart), `jag` (how much the stems' heights
+  //   differ), `tip` (paler toward their tips), `part`: a walker parts them
+  //   [from, to] metres from the eye, down to [2] of their height
+  wild: {
+    fadeMin: 0.06,
+    boulder: { own: 0.5, lichen: [0.6, 0.35] },
+    outcrop: { band: 0.32 },
+    bark: { groove: 0.07 },
+    rings: 0.035,
+    reed: { stem: 0.09, jag: 0.42, tip: 0.4, part: [0.45, 1.5, 0.3] },
+  },
+
   water: {
     ior: 1.33,                       // bends the ray toward the bed
     fresnel: { r0: 0.1, power: 4, max: 0.9 },    // Schlick, with a stylised floor and cap
@@ -275,6 +312,13 @@ export const LOOK = {
   // the share of 1.2 m squares that hold one). Both fade out as a cell's
   // footprint grows past them.
   meadow: { patch: [0, 0.45, 0.85], hue: [0, 0.45, 0.8], tufts: [0, 0.2, 0.34] },
+  // (phase 4b) a flower drift's heads up close: one in `share` of the
+  // squares of a `lattice`-metre grid, `head` metres across, `bright` in
+  // tone; drawn only while a head is several cells across
+  flowers: { lattice: 0.5, share: 0.45, head: 0.12, bright: 0.9,
+    // the heads' colours by day (yellow, lilac, pale), and how far a head
+    // goes toward them; the drifts themselves are their materials' colours
+    bloom: ['#c9bb5c', '#a28fae', '#d4d4c0'], hue: 0.8 },
 
   // A flame held at its minimum size (two rows) is faded toward what is
   // behind it by how much of it is really flame (its core stays bright, its
@@ -460,6 +504,21 @@ export const LOOK = {
       charcoal: { lit: '#3e3d40', shade: '#1b1a1e' },
       leather: { lit: '#5a4230', shade: '#271d17' },
       iron:   { lit: '#6c6e72', shade: '#34373e' },
+      // (phase 4b) the wild ground detail and the animals
+      pasture:  { lit: '#788a48', shade: '#30392a' },
+      flowera:  { lit: '#7f9142', shade: '#30382a' },
+      flowerb:  { lit: '#74805a', shade: '#2e3428' },
+      flowerc:  { lit: '#82985a', shade: '#313a2b' },
+      reed:     { lit: '#7a7c48', shade: '#343722' },
+      bark:     { lit: '#5a4c40', shade: '#28211c' },
+      wool:     { lit: '#c4b9a0', shade: '#5e5951' },
+      hide:     { lit: '#7c4a32', shade: '#36211a' },
+      fawn:     { lit: '#9a7448', shade: '#463522' },
+      gull:     { lit: '#c9c8c2', shade: '#5f6066' },
+      crow:     { lit: '#34353c', shade: '#16171b' },
+      duck:     { lit: '#7a6448', shade: '#33291f' },
+      duckhead: { lit: '#3e5040', shade: '#1a221c' },
+      hare:     { lit: '#86705a', shade: '#3a3028' },
       window: { lit: '#e2a65e', shade: '#24201d' }, windowStrength: 0,
       weather: { cast: '#8b9099', mist: '#b4b9bd', rain: '#c3c7cc' },
     },
@@ -517,6 +576,20 @@ export const LOOK = {
       charcoal: { lit: '#2c2b32', shade: '#141318' },
       leather: { lit: '#412e25', shade: '#1d1412' },
       iron:   { lit: '#4d4751', shade: '#28262e' },
+      pasture:  { lit: '#41463e', shade: '#23282d' },
+      flowera:  { lit: '#454a39', shade: '#23272d' },
+      flowerb:  { lit: '#3f414d', shade: '#21242b' },
+      flowerc:  { lit: '#464d4d', shade: '#24282e' },
+      reed:     { lit: '#665f40', shade: '#272a1e' },
+      bark:     { lit: '#3f3635', shade: '#201c1b' },
+      wool:     { lit: '#8c7772', shade: '#473f3d' },
+      hide:     { lit: '#593426', shade: '#271815' },
+      fawn:     { lit: '#815940', shade: '#35281e' },
+      gull:     { lit: '#90818a', shade: '#48434d' },
+      crow:     { lit: '#25252f', shade: '#101116' },
+      duck:     { lit: '#574638', shade: '#261d19' },
+      duckhead: { lit: '#2c332d', shade: '#141815' },
+      hare:     { lit: '#604f46', shade: '#2b2220' },
       window: { lit: '#eca45a', shade: '#1e1a1a' }, windowStrength: 0.8,
       weather: { cast: '#5d545c', mist: '#7c6e74', rain: '#93878c' },
     },
@@ -574,6 +647,20 @@ export const LOOK = {
       charcoal: { lit: '#14151b', shade: '#090a0c' },
       leather: { lit: '#1d1714', shade: '#0d0b09' },
       iron:   { lit: '#1d1d25', shade: '#0e0e12' },
+      pasture:  { lit: '#242728', shade: '#151617' },
+      flowera:  { lit: '#262925', shade: '#151617' },
+      flowerb:  { lit: '#222432', shade: '#141416' },
+      flowerc:  { lit: '#272b32', shade: '#151717' },
+      reed:     { lit: '#242822', shade: '#101411' },
+      bark:     { lit: '#212021', shade: '#110f10' },
+      wool:     { lit: '#353134', shade: '#191819' },
+      hide:     { lit: '#271a15', shade: '#130b0b' },
+      fawn:     { lit: '#2d2522', shade: '#161310' },
+      gull:     { lit: '#36353f', shade: '#19191f' },
+      crow:     { lit: '#111219', shade: '#07090b' },
+      duck:     { lit: '#27231d', shade: '#11100c' },
+      duckhead: { lit: '#101515', shade: '#070908' },
+      hare:     { lit: '#2b2725', shade: '#131210' },
       window: { lit: '#eeaa5e', shade: '#121112' }, windowStrength: 1,
       weather: { cast: '#1c1d25', mist: '#2a2c35', rain: '#3c404a' },
     },
@@ -647,6 +734,20 @@ export const LOOK = {
       charcoal: { lit: '#424044', shade: '#1b1a1e' },
       leather: { lit: '#5f4633', shade: '#271d17' },
       iron:   { lit: '#737274', shade: '#33353e' },
+      pasture:  { lit: '#848a52', shade: '#29312d' },
+      flowera:  { lit: '#8c914b', shade: '#29302d' },
+      flowerb:  { lit: '#7f8067', shade: '#282d2b' },
+      flowerc:  { lit: '#8f9867', shade: '#2a322e' },
+      reed:     { lit: '#89884e', shade: '#313523' },
+      bark:     { lit: '#635349', shade: '#2a221e' },
+      wool:     { lit: '#d1bfa3', shade: '#5b5651' },
+      hide:     { lit: '#834e35', shade: '#36211a' },
+      fawn:     { lit: '#ad7e4e', shade: '#433322' },
+      gull:     { lit: '#d6cfc6', shade: '#5c5d66' },
+      crow:     { lit: '#373840', shade: '#16171b' },
+      duck:     { lit: '#816a4d', shade: '#33291f' },
+      duckhead: { lit: '#425342', shade: '#19211c' },
+      hare:     { lit: '#8e7760', shade: '#3a3028' },
       window: { lit: '#e6a862', shade: '#22201f' }, windowStrength: 0.3,
       weather: { cast: '#8c8892', mist: '#c6bac4', rain: '#b2acb6' },
     },
@@ -705,6 +806,20 @@ export const LOOK = {
       charcoal: { lit: '#1b1e23', shade: '#0b0c10' },
       leather: { lit: '#27211b', shade: '#100d0b' },
       iron:   { lit: '#30333f', shade: '#13141a' },
+      pasture:  { lit: '#404a55', shade: '#192125' },
+      flowera:  { lit: '#444e4e', shade: '#192025' },
+      flowerb:  { lit: '#3e456a', shade: '#181e23' },
+      flowerc:  { lit: '#45526a', shade: '#1a2125' },
+      reed:     { lit: '#394337', shade: '#161c17' },
+      bark:     { lit: '#322f30', shade: '#161413' },
+      wool:     { lit: '#585658', shade: '#222123' },
+      hide:     { lit: '#36251c', shade: '#160e0d' },
+      fawn:     { lit: '#473f37', shade: '#1e1b18' },
+      gull:     { lit: '#5a5d6b', shade: '#23232b' },
+      crow:     { lit: '#171a21', shade: '#090b0e' },
+      duck:     { lit: '#353229', shade: '#151210' },
+      duckhead: { lit: '#1c2523', shade: '#090d0c' },
+      hare:     { lit: '#3a3833', shade: '#181514' },
       window: { lit: '#eeaa5e', shade: '#131315' }, windowStrength: 1,
       weather: { cast: '#262a33', mist: '#3a4051', rain: '#4c5262' },
     },
@@ -762,6 +877,20 @@ export const LOOK = {
       charcoal: { lit: '#111318', shade: '#090a0c' },
       leather: { lit: '#191412', shade: '#0d0b09' },
       iron:   { lit: '#1a1c23', shade: '#0e1014' },
+      pasture:  { lit: '#262c31', shade: '#191f21' },
+      flowera:  { lit: '#282e2d', shade: '#191e21' },
+      flowerb:  { lit: '#25293d', shade: '#181c20' },
+      flowerc:  { lit: '#29303d', shade: '#1a1f22' },
+      reed:     { lit: '#252c24', shade: '#141a16' },
+      bark:     { lit: '#1e1c1d', shade: '#120f10' },
+      wool:     { lit: '#2f2f31', shade: '#1a1b1b' },
+      hide:     { lit: '#221714', shade: '#130b0b' },
+      fawn:     { lit: '#2e2825', shade: '#1b1916' },
+      gull:     { lit: '#30333c', shade: '#1a1d21' },
+      crow:     { lit: '#0e1117', shade: '#07090b' },
+      duck:     { lit: '#211f1b', shade: '#11100c' },
+      duckhead: { lit: '#0f1414', shade: '#070a09' },
+      hare:     { lit: '#252322', shade: '#131210' },
       window: { lit: '#eeaa5e', shade: '#111113' }, windowStrength: 1,
       weather: { cast: '#181a21', mist: '#24262f', rain: '#32353e' },
     },
