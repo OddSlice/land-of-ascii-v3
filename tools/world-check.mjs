@@ -915,7 +915,7 @@ function animalChecks(w) {
       const lo = fly ? y - 0.05 : y + (perch ? 0.1 : 0.12), hi = fly ? y + 0.05 : y + Math.max(0.15, sp.back * sc * (pose === APOSE.LIE ? 0.5 : 0.9));
       const r = fly || perch ? 0.08 : sp.r * sc * 0.6, h = fly || perch ? 0 : Math.max(0, sp.len * sc / 2 - sp.r * sc * 0.8);
       const fx = Math.sin(st[o + AI.YAW]) * h, fz = Math.cos(st[o + AI.YAW]) * h;
-      if (pose !== APOSE.SWIM && (bodyBlocked(w.kit, x, z, lo, hi, r) || (h > 0 && (bodyBlocked(w.kit, x + fx, z + fz, lo, hi, r) || bodyBlocked(w.kit, x - fx, z - fz, lo, hi, r))))) { bad.inside++; note(`${KIND_NAMES[kind]} ${ids[i]} (${g.type}) inside a shape at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)}`); }
+      if (pose !== APOSE.SWIM && (bodyBlocked(w.kit, x, z, lo, hi, r) || (h > 0 && (bodyBlocked(w.kit, x + fx, z + fz, lo, hi, r) || bodyBlocked(w.kit, x - fx, z - fz, lo, hi, r))))) { bad.inside++; note(`${KIND_NAMES[kind]} ${ids[i]} (${g.type}) inside a shape at ${x.toFixed(1)},${z.toFixed(1)},${y.toFixed(1)} day ${d} ${hour.toFixed(2)} pose ${pose}`); }
       // in water
       if (!fly && !perch && kind !== AK.DUCK) {
         const depth = groundAt(surface, x, z) - groundAt(T, x, z);

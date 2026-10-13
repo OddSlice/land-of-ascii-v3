@@ -458,13 +458,20 @@ async function animalsSet(seed) {
   const fg = An.groups.find((q) => q.type === 'finches');
   let fly = null;
   if (fg) {
-    for (let m = 8 * 60; m < 18 * 60 && !fly; m += 0.25) {
-      const s = stAt(0, m / 60);
-      const o = s.st.findIndex((v, i) => i % AK.AS === AK.A.POSE && v === AK.APOSE.FLY && An.members[s.ids[Math.floor(i / AK.AS)]].group === fg.id);
-      if (o >= 0) fly = { hour: m / 60, x: s.st[o - AK.A.POSE], z: s.st[o - AK.A.POSE + 1], y: s.st[o - AK.A.POSE + 2] };
+    // (the moment the flock is highest over the ground, mid-crossing)
+    for (let m = 9 * 60; m < 17 * 60; m += 0.1) {
+      const st = new Float32Array(fg.members.length * AK.AS), ids = new Int32Array(fg.members.length);
+      const n = AST.animalsAt(An, 0, m / 60, [], st, ids, [fg]);
+      let k = 0, x = 0, z = 0, y = 0;
+      for (let i = 0; i < n; i++) if (st[i * AK.AS + AK.A.POSE] === AK.APOSE.FLY) { k++; x += st[i * AK.AS]; z += st[i * AK.AS + 1]; y += st[i * AK.AS + 2]; }
+      if (k > n / 2) { const up = y / k - OB.groundAt(w.terrain, x / k, z / k); if (!fly || up > fly.up) fly = { hour: m / 60, x: x / k, z: z / k, y: y / k, up }; else if (up < fly.up - 3) break; }
     }
   }
-  if (fly) RUNS.push({ label: 'small birds crossing the sky (camera still, clock running)', x: fly.x + 40, z: fly.z + 40, yaw: deg(Math.atan2(-40, -40)), pitch: 12, hour: fly.hour, step: 0, dir: 0, turn: 0, movingOnly: true });
+  if (fly) {
+    // (the camera 40 m off and looking at them; the run starts a second before)
+    const cx = fly.x + 30, cz = fly.z + 30, cy = pl.supportAt(cx, cz, OB.groundAt(w.terrain, cx, cz) + 0.3) + 1.7;
+    RUNS.push({ label: 'small birds crossing the sky (camera still, clock running)', x: cx, z: cz, y: cy, yaw: deg(Math.atan2(-30, -30)), pitch: deg(Math.atan2(fly.y - cy, 42)), hour: fly.hour - 1 / 3600, step: 0, dir: 0, turn: 0, movingOnly: true });
+  }
   const render = (be, cam, hour, t, s) => {
     const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, look, animals: s.st, marks: marksOf(s, cam) };
     const hits = new Uint8Array(n * CT.HIT_STRIDE);

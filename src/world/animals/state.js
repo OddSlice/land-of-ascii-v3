@@ -16,6 +16,7 @@ import { planOf, segmentAt, flockCentre, stateAt as personAt } from '../people/p
 import { FS, S as PS, POSE } from '../people/figure.js';
 import { hash2 } from '../noise.js';
 import { groundAt } from '../objects.js';
+import { supportAt as kitTop } from '../kit.js';
 import { weatherFor } from '../../weather.js';
 import { SCALE } from '../scale.js';
 
@@ -451,7 +452,8 @@ function birdsFinches(A, g, minutes, hour, night, put) {
     const x = a[0] + dx * e - dz / L * bow * 25 + ox * bow, z = a[1] + dz * e + dx / L * bow * 25 + oz * bow;
     let y = a[2] + (b[2] - a[2]) * e + bow * (18 + 3 * Math.sin(k)) + 1.5 * Math.sin(minutes * 2 + k);
     // (over a rise between the copses they keep clear of the ground)
-    y = Math.max(y, groundAt(A.world.terrain, x, z) + 4 + 8 * bow);
+    const K = A.world.kit, top = K ? Math.max(kitTop(K, x, z, 1e9), kitTop(K, x + 0.7, z, 1e9), kitTop(K, x - 0.7, z, 1e9), kitTop(K, x, z + 0.7, 1e9), kitTop(K, x, z - 0.7, 1e9)) : -Infinity;
+    y = Math.max(y, groundAt(A.world.terrain, x, z) + 4 + 8 * bow, top + 2);
     put(m, x, z, y, Math.atan2(dx, dz), APOSE.FLY, (minutes * 40 + k * 0.37) % 1, 1, 1);
   }
 }
