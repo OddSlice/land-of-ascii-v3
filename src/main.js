@@ -9,12 +9,13 @@ import { LOOK } from './look.js';
 import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
-import { buildYard, yardFigures } from './world/yard.js';
+import { buildYard, yardFigures, yardAnimals } from './world/yard.js';
 import { FS, S } from './world/people/figure.js';
 import { roomAt } from './world/kit.js';
 import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
 import { People } from './app/people.js';
+import { Animals } from './app/animals.js';
 import { peopleCameras } from './world/people/cameras.js';
 import { packWorld, unpackWorld, worldHash } from './world/pack.js';
 import { shadowStore } from './scene/cpu/light.js';
@@ -122,7 +123,7 @@ function worldProgress(stage, p) {
 if (THREADS > 0 && !WORLD) {
   pool = new Pool(THREADS, fail, {
     scene: STRESS ? 'stress' : YARD ? 'yard' : 'default',
-    init: {},
+    init: YARD ? { gen: GEN } : {},
     onProgress: (p) => { progress.workers = p; showProgress(); },
   });
   if (STRESS) pool.whenReady.then(() => { progress.workers = 1; });
@@ -155,7 +156,7 @@ async function makeWorld() {
     }
     return w;
   }
-  if (YARD) return buildYard();
+  if (YARD) return buildYard(GEN);
   if (!STRESS) return buildWorld();
   const gen = buildStressWorld({ render: THREADS === 0 });
   let r;
@@ -173,8 +174,12 @@ if (people && params.get('people') === '0') people.on = false;
 // (and the cameras that look at them: a green at midday, the wall walk at
 // night, a traveller on the road)
 if (people) world.cameras.push(...peopleCameras(world, people.P));
+// (phase 4b) the animals (?animals=0: none, nor their pastures and folds)
+const animals = people && GEN.animals ? new Animals(world, people.P) : null;
 // (in the building yard: a line of figures standing still, in every pose)
 const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
+// (phase 4b) and every animal in every pose, standing still
+const yardBeasts = YARD && GEN.animals ? { st: yardAnimals(), on: true } : null;
 // (each in the room the kit says they stand in, as the world's people are)
 if (yardFolk) for (let o = 0; o < yardFolk.st.length; o += FS) yardFolk.st[o + S.ROOM] = roomAt(world.kit, yardFolk.st[o + S.X], yardFolk.st[o + S.Z], yardFolk.st[o + S.FEET] + 0.02);
 const canvas = $('view');
@@ -285,6 +290,15 @@ function makeFrame() {
     f.lit = people.lit.slice();
   }
   if (yardFolk && yardFolk.on) f.people = yardFolk.st;
+  // (phase 4b) every animal's state, reacting to you and to the people
+  if (animals && animals.on) {
+    if (people && people.planned < 0) people.planDay(state.day);
+    const t0 = performance.now();
+    f.animals = animals.update(state.day, state.hour, { x: player.x, z: player.z, feet: player.feet }, f.people || null, player, f.weather);
+    f.marks = animals.marks(f);
+    lab.mainMs = (people && people.on ? people.updateMs : 0) + (performance.now() - t0);
+  } else if (people && people.on) lab.mainMs = people.updateMs;
+  if (yardBeasts && yardBeasts.on) f.animals = yardBeasts.st;
   return f;
 }
 
@@ -600,6 +614,38 @@ lab.people = {
     return true;
   },
   greet() { greet(); return lab.lastSaid || null; },
+};
+// (phase 4b) animals, for the tools and the menu: counts by kind, the
+// groups, and the camera to one of them
+lab.animals = {
+  get on() { return !!(animals ? animals.on : yardBeasts && yardBeasts.on); },
+  set(on) { if (animals) animals.setOn(on); if (yardBeasts) yardBeasts.on = !!on; if (!on && player) player.others = null; },
+  counts() { return animals ? animals.counts() : []; },
+  groups() { return animals ? animals.groups() : []; },
+  get updateMs() { return animals ? animals.updateMs : 0; },
+  get buildMs() { return animals ? animals.buildMs : 0; },
+  get left() { return animals ? animals.left : 0; },
+  // this frame's states (AS numbers each) and how many
+  states() { return animals ? Array.from(animals.st.subarray(0, animals.count * 16)) : []; },
+  // the camera `dist` metres off group g, looking at it (from its open side)
+  goTo(g, dist = 12, pitch = -0.1) {
+    if (!animals) return false;
+    if (people && people.planned < 0) people.planDay(state.day);
+    animals.update(state.day, state.hour, null, null, null, weatherNow());
+    const w = animals.where(g);
+    if (!w) return false;
+    const info = animals.groups()[g];
+    const a = (g * 2.39996) % (Math.PI * 2);
+    let best = null;
+    for (let k = 0; k < 12; k++) {
+      const b = a + k * Math.PI / 6, x = w.x + Math.sin(b) * dist, z = w.z + Math.cos(b) * dist;
+      if (!player.blocked(x, z, player.restAt ? player.restAt(x, z) : 0)) { best = [x, z]; break; }
+    }
+    const [x, z] = best || [w.x + Math.sin(a) * dist, w.z + Math.cos(a) * dist];
+    player.place(x, z, Math.atan2(w.x - x, w.z - z), pitch);
+    state.held = false; state.camName = `by the ${info.type}`;
+    return true;
+  },
 };
 const menu = new Menu($('menu'), game);
 let menuNext = 0, menuOpenedAt = 0, releasing = false;

@@ -19,6 +19,7 @@ import { SCALE } from './scale.js';
 import { FS, S, POSE, HATK, TOOL, LIGHT } from './people/figure.js';
 import { furnitureSpots } from './kit-village.js';
 import { MAT } from '../contract.js';
+import { AS, A as AN, APOSE, KIND, SPEC } from './animals/kinds.js';
 
 export const YARD_N = 512;
 export const YARD_GROUND = 10;
@@ -36,8 +37,10 @@ export const VILLAGE_ROWS = ['cottage', 'hall', 'barn', 'chapel', 'chapel with a
   'haystack and bench', 'signpost and lantern', 'timber bridge', 'stone bridge', 'inside a cottage'];
 const G0 = YARD_GROUND, POND = G0 - 0.35;
 // the ponds under the jetty and the bridges: [x0, x1, z0, z1]
-function ponds() {
+function ponds(opts = {}) {
   const out = [];
+  // (phase 4b) the pond of the ducks and the reed bed
+  if (opts.animals !== false || opts.wild !== false) out.push(...WILD_PONDS);
   VILLAGE_ROWS.forEach((name, r) => {
     const z = VROW0 + r * VROWS;
     YARD_ANGLES.forEach((deg, c) => {
@@ -131,8 +134,9 @@ function villageAt(name, x, z, a, seed) {
   }
 }
 
-export function yardLayout() {
+export function yardLayout(opts = {}) {
   const pieces = [];
+  if (opts.wild !== false) pieces.push(...yardWild());
   YARD_ROWS.forEach((name, r) => {
     YARD_ANGLES.forEach((deg, c) => {
       const x = COL0 + c * COLS, z = ROW0 + r * ROWS;
@@ -194,7 +198,7 @@ export function yardCameras() {
   return cams;
 }
 
-export function buildYard() {
+export function buildYard(opts = {}) {
   const t0 = performance.now();
   const N = YARD_N, NN = N + 1;
   const ground = new Float32Array(NN * NN).fill(YARD_GROUND);
@@ -207,7 +211,7 @@ export function buildYard() {
   const zero = () => new Uint8Array(NN * NN);
   const wWater = zero(), surface = ground.slice();
   // (phase 3b) ponds under the jetty and the bridges, with sloping banks
-  for (const [x0, x1, z0, z1] of ponds()) {
+  for (const [x0, x1, z0, z1] of ponds(opts)) {
     for (let k = z0 - 3; k <= z1 + 3; k++) for (let i = x0 - 3; i <= x1 + 3; i++) {
       const j = k * NN + i, e = Math.min(k - z0, z1 - k, i - x0, x1 - i);
       if (e < -2) continue;
@@ -221,10 +225,10 @@ export function buildYard() {
   terrain.code = materialCode(terrain);
   const b = new KitBuilder();
   const spans = emptySpans();
-  buildStructure(b, yardLayout());
+  buildStructure(b, yardLayout(opts));
   const kit = compileKit(b);
   const torches = kit.torches.map((t) => ({ ...t }));
-  const cams = [...yardCameras(), ...yardPeopleCameras()];
+  const cams = [...yardCameras(), ...yardPeopleCameras(), ...(opts.animals !== false || opts.wild !== false ? yardAnimalCameras(opts) : [])];
   return {
     kind: 'yard', N, NN, center: [N / 2, N / 2], viewDist: 1e9,
     terrain, spans, kit, objects: { trees: [], bushes: [], torches, water: POND },
@@ -282,5 +286,90 @@ export function yardPeopleCameras() {
   const bed = furnitureSpots(F, 3.2 - wt, 2.5 - wt, G0 + 0.32, 1).bed, [ix, iz] = F.at(-0.2, 0.1);
   cams.push({ name: 'someone asleep', x: ix, z: iz, yaw: look(ix, iz, bed.x, bed.z), pitch: -36, time: 'night', y: G0 + 0.32 + 1.7 });
   cams.push({ name: 'someone on the bench', x: bx + 1.5, z: bz + 3.5, yaw: look(bx + 1.5, bz + 3.5, bx, bz), pitch: -6, time: 'day' });
+  return cams;
+}
+
+// (phase 4b) The wild ground detail and the animals, west of the fort's
+// pieces: a row of each kind of ground detail (three sizes of boulder, an
+// outcrop, a log, a stump, a reed bed in a pond), and a row for each kind of
+// animal in every pose, standing still. For the cameras below.
+const WX0 = 24, WZ = 52, AZ0 = 86, AROWS = 16, AX0 = 30;
+const WILD_PONDS = [[WX0 + 84, WX0 + 98, WZ - 7, WZ + 7], [AX0 - 4, AX0 + 5, AZ0 + 6 * AROWS - 4, AZ0 + 6 * AROWS + 4]];
+export function yardWild() {
+  const g = G0, out = [];
+  out.push({ kind: 'boulder', at: [WX0, WZ], a: 0.4, r: 0.35, h: 0.4, top: g, low: g, seed: 70001 });
+  out.push({ kind: 'boulder', at: [WX0 + 8, WZ], a: 1.1, r: 0.8, h: 0.8, top: g, low: g, seed: 70002 });
+  out.push({ kind: 'boulder', at: [WX0 + 20, WZ], a: 2.0, r: 1.8, h: 1.7, top: g, low: g, seed: 70003 });
+  out.push({ kind: 'outcrop', at: [WX0 + 36, WZ], a: 0.3, r: 1.6, h: 1.1, top: g, ground: [], seed: 70004 });
+  out.push({ kind: 'log', at: [WX0 + 52, WZ], a: 0.5, len: 5, r: 0.28, base: g - 0.04, seed: 70005 });
+  out.push({ kind: 'stump', at: [WX0 + 66, WZ], r: 0.35, h: 0.5, top: g, low: g, seed: 70006 });
+  out.push({ kind: 'stump', at: [WX0 + 72, WZ + 1], r: 0.24, h: 0.35, top: g, low: g, seed: 70007 });
+  out.push({ kind: 'reeds', at: [WX0 + 86, WZ - 2], r: 2.2, h: 1.6, base: POND, seed: 70008 });
+  out.push({ kind: 'reeds', at: [WX0 + 89, WZ + 3], r: 1.6, h: 1.4, base: POND, seed: 70009 });
+  return out;
+}
+
+// the rows: each kind's poses (in air: y above the ground)
+const ROWS4B = [
+  [KIND.SHEEP, [APOSE.STAND, APOSE.GRAZE, APOSE.WALK, APOSE.RUN, APOSE.LIE]],
+  [KIND.COW, [APOSE.STAND, APOSE.GRAZE, APOSE.WALK, APOSE.LIE]],
+  [KIND.HEN, [APOSE.STAND, APOSE.PECK, APOSE.WALK]],
+  [KIND.DOG, [APOSE.STAND, APOSE.WALK, APOSE.RUN, APOSE.SIT, APOSE.LIE]],
+  [KIND.DEER, [APOSE.STAND, APOSE.GRAZE, APOSE.WALK, APOSE.RUN, APOSE.LIE]],
+  [KIND.HARE, [APOSE.SIT, APOSE.RUN]],
+  [KIND.DUCK, [APOSE.SWIM, APOSE.SWIM, APOSE.SIT, APOSE.WALK]],
+  [KIND.GULL, [APOSE.PERCH, APOSE.FLY, APOSE.FLY]],
+  [KIND.CROW, [APOSE.PERCH, APOSE.FLY, APOSE.FLY]],
+  [KIND.FINCH, [APOSE.PERCH, APOSE.FLY, APOSE.FLY]],
+  [KIND.KITE, [APOSE.FLY, APOSE.FLY]],
+];
+const COATS = { [KIND.SHEEP]: [MAT.WOOL, MAT.CHARCOAL], [KIND.COW]: [MAT.HIDE, MAT.CHARCOAL], [KIND.HEN]: [MAT.RUSSET, MAT.OCHRE], [KIND.DOG]: [MAT.UMBER, MAT.CHARCOAL],
+  [KIND.DEER]: [MAT.FAWN, MAT.LINEN], [KIND.HARE]: [MAT.HARE, MAT.LINEN], [KIND.DUCK]: [MAT.DUCK, MAT.DUCKHEAD], [KIND.GULL]: [MAT.GULL, MAT.SLATE],
+  [KIND.CROW]: [MAT.CROW, MAT.CROW], [KIND.FINCH]: [MAT.UMBER, MAT.OCHRE], [KIND.KITE]: [MAT.UMBER, MAT.CHARCOAL] };
+export function yardAnimals() {
+  const out = [];
+  ROWS4B.forEach(([kind, poses], r) => {
+    const z = AZ0 + r * AROWS, gap = Math.max(2.4, SPEC[kind].len * 2.2);
+    poses.forEach((pose, c) => {
+      const st = new Array(AS).fill(0);
+      const x = AX0 + c * gap + (kind === KIND.DUCK && c >= 2 ? 6 : 0);
+      const fly = pose === APOSE.FLY, swim = pose === APOSE.SWIM;
+      st[AN.X] = x; st[AN.Z] = z; st[AN.Y] = swim ? POND - 0.06 : fly ? G0 + 1.6 : pose === APOSE.PERCH ? G0 : G0;
+      // (side on to the cameras, which look from +z)
+      st[AN.YAW] = Math.PI / 2 + (c % 2 ? 0.35 : 0); st[AN.POSE] = pose; st[AN.PHASE] = fly ? (c === 1 ? 0.25 : 0.75) : pose === APOSE.WALK || pose === APOSE.RUN ? 0.25 : 0;
+      st[AN.HEAD] = pose === APOSE.GRAZE || pose === APOSE.LIE ? 0 : 1; st[AN.KIND] = kind; st[AN.ID] = out.length / AS; st[AN.SCALE] = 1;
+      st[AN.M1] = COATS[kind][0]; st[AN.M2] = COATS[kind][1]; st[AN.ROOM] = -1; st[AN.SPARE] = 0;
+      out.push(...st);
+    });
+  });
+  return Float32Array.from(out);
+}
+
+// the cameras: the ground detail near and from a way off, the animals near,
+// at middle distance, far and very far, and each row near
+export function yardAnimalCameras(opts = {}) {
+  const look = (x, zz, tx, tz) => Math.atan2(tx - x, tz - zz) / D;
+  const cams = [];
+  if (opts.wild !== false) {
+    const cx = WX0 + 45;
+    cams.push({ name: 'wild ground detail, near', x: WX0 + 14, z: WZ + 9, yaw: look(WX0 + 14, WZ + 9, WX0 + 10, WZ), pitch: -8, time: 'day' });
+    cams.push({ name: 'a log, a stump and reeds, near', x: WX0 + 66, z: WZ + 11, yaw: look(WX0 + 66, WZ + 11, WX0 + 70, WZ), pitch: -8, time: 'day' });
+    cams.push({ name: 'wild ground detail, far', x: cx, z: WZ + 70, yaw: look(cx, WZ + 70, cx, WZ), pitch: -2, time: 'day' });
+  }
+  if (opts.animals !== false) {
+    // (all the rows from the south-east and above: every row seen)
+    const cx = AX0 + 6, cz = AZ0 + 5 * AROWS;
+    for (const [name, d, h] of [['animals, middle distance', 40, 14], ['animals, far', 110, 22], ['animals, very far', 220, 30]]) {
+      const x = cx + d * 0.8, z = cz + d * 0.6;
+      cams.push({ name, x, z, y: G0 + h, yaw: look(x, z, cx, cz), pitch: -Math.atan2(h, d) / D, time: 'day' });
+    }
+    ROWS4B.forEach(([kind, poses], r) => {
+      const z = AZ0 + r * AROWS, gap = Math.max(2.4, SPEC[kind].len * 2.2);
+      const x0 = AX0, x1 = AX0 + (poses.length - 1) * gap + (kind === KIND.DUCK ? 6 : 0), x = (x0 + x1) / 2;
+      const d = Math.max(5, (x1 - x0) * 0.85 + 2), sky = kind >= KIND.GULL ? 1.2 : 0;
+      cams.push({ name: `animals: ${['sheep', 'cattle', 'hens', 'dog', 'deer', 'hare', 'ducks', 'gulls', 'crows', 'small birds', 'large birds'][kind]}, near`, x, z: z + d, yaw: look(x, z + d, x, z),
+        pitch: -Math.atan2(1.7 - 0.3 - sky, d) / D, time: 'day' });
+    });
+  }
   return cams;
 }

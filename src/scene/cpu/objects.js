@@ -140,6 +140,8 @@ export class ObjectPass {
     this.skip = this.kit ? PRIM : -1;
     this.pass(false);
     this.skip = -1;
+    // (phase 4b) the animals' shadows on what is now drawn
+    this.animalShadows();
     // reflections, if this stripe sees water within reach of them (objects
     // are mirrored only in water nearer than LOOK.water.objectsCap): one pass
     // for each group of water levels (a lake and a far mountain tarn would

@@ -11,7 +11,7 @@
 // with the next cell up (or down) its own column; stripes never touch.
 import { LOOK } from './look.js';
 import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
-import { FAMILY, SHADE_STEPS, RAIN_GLYPHS } from './glyphs.js';
+import { FAMILY, SHADE_STEPS, RAIN_GLYPHS, BIRD_GLYPHS } from './glyphs.js';
 import { weatherParams } from './weather.js';
 import { sunDir, moonDir, moonDirOn, moonLit } from './world/sky.js';
 
@@ -626,6 +626,36 @@ function rainStreaks(frame, P, hits, c0, sw, rows) {
     }
   }
 }
+// (phase 4b) Birds far off: each a mark (frame.marks: x, y, z, material,
+// wings 0 up / 1 level / 2 down, strength; six numbers each), projected into
+// the cells of this stripe as the rain is, in front of what the cell's ray
+// hit; where two fall in one cell the nearer wins.
+let markS = new Float32Array(0), markG = new Uint8Array(0), markM = new Uint8Array(0), markD = new Float32Array(0);
+function birdMarks(frame, hits, c0, sw, rows) {
+  const n = sw * rows, mk = frame.marks;
+  if (markS.length < n) { markS = new Float32Array(n); markG = new Uint8Array(n); markM = new Uint8Array(n); markD = new Float32Array(n); }
+  markS.fill(0, 0, n);
+  const cam = frame.cam, W = frame.cols, R = rows;
+  const ty = Math.tan(frame.fovY / 2), tx = ty * frame.aspect;
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const far = LOOK.animals.marks.far;
+  for (let k = 0; k < mk.length; k += 6) {
+    const rx = mk[k] - cam.x, ry = mk[k + 1] - cam.y, rz = mk[k + 2] - cam.z;
+    const a = rx * cy - rz * sy, b = rx * sy + rz * cy;
+    const cz = b * cp + ry * sp, cyv = ry * cp - b * sp;
+    if (cz < 0.5) continue;
+    const X = Math.floor((a / cz / tx + 1) / 2 * W), Y = Math.floor((1 - cyv / cz / ty) / 2 * R);
+    if (X < c0 || X >= c0 + sw || Y < 0 || Y >= R) continue;
+    const d = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    const st = mk[k + 5] * (1 - smooth(far * 0.6, far, d));
+    if (st <= 0.02) continue;
+    const ci = Y * sw + (X - c0), o = ci * HIT_STRIDE, hd = hits[o + 6] | (hits[o + 7] << 8);
+    if (hd !== 65535 && d >= hd / 10) continue;
+    if (markS[ci] > 0 && d >= markD[ci]) continue;
+    markS[ci] = st; markG[ci] = BIRD_GLYPHS[mk[k + 4]]; markM[ci] = mk[k + 3]; markD[ci] = d;
+  }
+}
+
 const hash01 = (i, k, n) => {
   let h = Math.imul(i | 0, 374761393) ^ Math.imul(k | 0, 668265263) ^ Math.imul(n + 0x3c6ef372, 1442695041);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -665,6 +695,9 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
     if (mistOn) relE = ey - floorAt(env.mist, ex, ez);
   }
   if (rainOn) rainStreaks(frame, P, hits, c0, sw, rows);
+  const marksOn = viewed && !!(frame.marks && frame.marks.length);
+  if (marksOn) birdMarks(frame, hits, c0, sw, rows);
+  const markLift = LOOK.animals.marks.lift;
   const mc = pal.mistC, rc = pal.rainC;
   const [ifr, ifg, ifb] = pal.inkFloor;
   const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
@@ -765,6 +798,12 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
         const st = rainS[i];
         cells[oc + 3] = rainG[i];
         fr = br + (rc[0] - br) * st; fg = bgG + (rc[1] - bgG) * st; fb = bb + (rc[2] - bb) * st;
+      } else if (marksOn && markS[i] > 0) {
+        // a bird far off: its mark, in its shaded colour (a little lit)
+        const st = markS[i], j = markM[i] * 3, sh = pal.shade, lt = pal.lit;
+        cells[oc + 3] = markG[i];
+        const mr = sh[j] + (lt[j] - sh[j]) * markLift, mg = sh[j + 1] + (lt[j + 1] - sh[j + 1]) * markLift, mb = sh[j + 2] + (lt[j + 2] - sh[j + 2]) * markLift;
+        fr = br + (mr - br) * st; fg = bgG + (mg - bgG) * st; fb = bb + (mb - bb) * st;
       } else { fr = br + ink * (br > ifr ? br : ifr); fg = bgG + ink * (bgG > ifg ? bgG : ifg); fb = bb + ink * (bb > ifb ? bb : ifb); }
       const fc = clampColour(fr, fg, fb);
       cells[oc + 4] = fc[0]; cells[oc + 5] = fc[1]; cells[oc + 6] = fc[2]; cells[oc + 7] = 0;

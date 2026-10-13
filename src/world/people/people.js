@@ -143,7 +143,7 @@ export function buildPeople(world) {
 
   // ---- the villages ----
   P.villages = world.sites.villages.map((v, q) => {
-    const pl = v.plan, V = { q, pattern: pl.pattern, centre: pl.centre, houses: [], wells: [], greens: [], benches: [], fields: [], jetty: [], chapel: -1, barns: [], shelter: [], name: `village ${q + 1}` };
+    const pl = v.plan, V = { q, pattern: pl.pattern, centre: pl.centre, houses: [], wells: [], greens: [], benches: [], fields: [], jetty: [], chapel: -1, barns: [], shelter: [], pastures: [], folds: [], name: `village ${q + 1}` };
     if (!pl) return V;
     const W = SCALE.kit.cottage.wallT;
     pl.houses.forEach((h, k) => {
@@ -205,10 +205,13 @@ export function buildPeople(world) {
     }
     // the fields: a gate where each field's footpath ends, and strips of
     // work spots into the field from there
+    const pasGate = new Map();
     for (const pa of pl.paths || []) {
       if (pa.to !== 'field') continue;
       const ex = pa.x[0], ez = pa.z[0];
-      // (phase 4b: a pasture is the flock's, not worked)
+      // (phase 4b: a pasture is the flock's, not worked: its path's end is its gate)
+      const nb = (pl.fields || []).reduce((b, f) => (!b || Math.hypot(f.x - ex, f.z - ez) < Math.hypot(b.x - ex, b.z - ez) ? f : b), null);
+      if (nb && nb.pasture) { if (!pasGate.has(nb)) pasGate.set(nb, [ex, ez]); continue; }
       const f = (pl.fields || []).filter((f) => !f.pasture).reduce((b, f) => (!b || Math.hypot(f.x - ex, f.z - ez) < Math.hypot(b.x - ex, b.z - ez) ? f : b), null);
       if (!f) continue;
       const gate = place('fieldgate', ex, ez, G(ex, ez), 0);
@@ -223,6 +226,48 @@ export function buildPeople(world) {
         if (p.blocked(x, z, ft) || !clearLine(move, [gp.ax, gp.az], [x, z], gp.ft) || !clearLine(move, [x, z], [gp.ax, gp.az], ft)) continue;
         V.fields.push(place('field', x, z, G(x, z), Math.atan2(-uz, ux), gate));
       }
+    }
+    // (phase 4b) the pastures: a gate where the footpath ends, and spots on
+    // a grid inside, each walkable from the gate and back; the folds: a
+    // gate outside the gap, the inside, and a place for each sheep
+    for (const f of pl.fields || []) {
+      if (!f.pasture) continue;
+      const ca = Math.cos(f.a), sa = Math.sin(f.a), toW = (u, w) => [f.x + u * ca - w * sa, f.z + u * sa + w * ca];
+      let gp = pasGate.get(f);
+      if (!gp) {
+        // (no footpath reached it: the middle of its side nearest the village)
+        let best = null;
+        for (const [u, w] of [[f.L + 2.5, 0], [-f.L - 2.5, 0], [0, f.W + 2.5], [0, -f.W - 2.5]]) { const q2 = toW(u, w), d = Math.hypot(q2[0] - pl.centre.x, q2[1] - pl.centre.z); if (!best || d < best[0]) best = [d, q2]; }
+        gp = best[1];
+      }
+      const gate = place('pastgate', gp[0], gp[1], G(gp[0], gp[1]), 0);
+      const gpl = P.places[gate], spots = [];
+      const S2 = SCALE.animals.pastureSpot;
+      for (let w = -f.W + S2; w <= f.W - S2 + 1e-6; w += S2) for (let u = -f.L + S2; u <= f.L - S2 + 1e-6; u += S2) {
+        const [x, z] = toW(u, w), ft = p.supportAt(x, z, G(x, z) + 0.3);
+        if (p.blocked(x, z, ft) || !clearLine(move, [gpl.ax, gpl.az], [x, z], gpl.ft) || !clearLine(move, [x, z], [gpl.ax, gpl.az], ft)) continue;
+        spots.push(place('pasture', x, z, G(x, z), 0, gate, { u, w }));
+      }
+      // (its lee: the side nearest trees within 30 m, else nearest the village)
+      const m = SCALE.animals.pastureEdge, toward = (() => {
+        let best = null;
+        for (const t of world.objects.trees) { const d = Math.hypot(t.x - f.x, t.z - f.z) - Math.hypot(f.L, f.W); if (d < 30 && (!best || d < best[0])) best = [d, t.x, t.z]; }
+        return best ? [best[1], best[2]] : [pl.centre.x, pl.centre.z];
+      })();
+      const lu = (toward[0] - f.x) * ca + (toward[1] - f.z) * sa, lw = -(toward[0] - f.x) * sa + (toward[1] - f.z) * ca;
+      const lee = [Math.max(-f.L + m, Math.min(f.L - m, lu)), Math.max(-f.W + m, Math.min(f.W - m, lw))];
+      V.pastures.push({ field: (pl.fields || []).indexOf(f), x: f.x, z: f.z, a: f.a, ca, sa, L: f.L, W: f.W, kind: f.pasture, gate, spots, lee });
+    }
+    for (const fd of pl.folds || []) {
+      const og = place('foldgate', fd.gate[0], fd.gate[1], G(fd.gate[0], fd.gate[1]), 0);
+      const inside = place('foldin', fd.gateIn[0], fd.gateIn[1], G(fd.gateIn[0], fd.gateIn[1]), 0, og);
+      const ca = Math.cos(fd.a), sa = Math.sin(fd.a), slots = [], m = SCALE.animals.foldMargin;
+      for (let w = -fd.hd + m; w <= fd.hd - m + 1e-6; w += SCALE.animals.foldSlot) for (let u = -fd.hw + m; u <= fd.hw - m + 1e-6; u += SCALE.animals.foldSlot) {
+        const x = fd.x + u * ca - w * sa, z = fd.z + u * sa + w * ca;
+        slots.push([x, z, G(x, z)]);
+      }
+      const pas = V.pastures.find((pp) => pp.field === fd.pasture);
+      V.folds.push({ x: fd.x, z: fd.z, a: fd.a, hw: fd.hw, hd: fd.hd, gate: og, inside, slots, pasture: V.pastures.indexOf(pas) });
     }
     // the jetty: along it to its end
     if (pl.jetty) {
@@ -327,6 +372,8 @@ export function buildPeople(world) {
     while (homes.length < n && rest.length) { homes.push(rest[k % rest.length]); k++; if (k >= rest.length * 2) break; }
     // roles from what the village has
     const roles = [];
+    // (phase 4b) a shepherd for each fold, first, so they are never left out
+    for (const fd of V.folds) if (fd.pasture >= 0) roles.push('shepherd');
     const nf = V.fields.length ? Math.max(2, Math.round(n * 0.35)) : 0;
     for (let i = 0; i < nf; i++) roles.push('farmer');
     if (V.jetty.length) roles.push('fisher', 'fisher');
@@ -348,6 +395,15 @@ export function buildPeople(world) {
   for (const per of P.persons) {
     const same = P.persons.filter((q) => q.village === per.village && q.role === per.role);
     per.rank = same.indexOf(per); per.peers = same.length;
+  }
+  // (phase 4b) each shepherd's flock (by their rank); each village's dog
+  // follows its first shepherd, else someone who keeps house
+  for (const V of P.villages) {
+    const sh = P.persons.filter((q) => q.village === V.q && q.role === 'shepherd');
+    const withPasture = V.folds.map((fd, i) => [fd, i]).filter(([fd]) => fd.pasture >= 0);
+    sh.forEach((per, k) => { per.flock = withPasture[k] ? withPasture[k][1] : -1; });
+    const owner = sh[0] || P.persons.find((q) => q.village === V.q && q.role === 'householder') || P.persons.find((q) => q.village === V.q);
+    V.dogOwner = V.folds.length && owner ? owner.id : -1;
   }
   // the guards
   if (P.fort) {
@@ -424,6 +480,7 @@ function makePerson(P, id, role, at, h) {
   if (role === 'farmer') { hatK = h(6) < 0.6 ? HATK.HAT : HATK.CAP; tool = TOOL.HOE; }
   else if (role === 'fisher') { hatK = h(6) < 0.5 ? HATK.CAP : HATK.HOOD; tool = TOOL.ROD; }
   else if (role === 'carter') { hatK = HATK.HAT; tool = TOOL.STAFF; }
+  else if (role === 'shepherd') { hatK = h(6) < 0.5 ? HATK.HAT : HATK.HOOD; tool = TOOL.STAFF; }
   else if (role === 'keeper') { hatK = HATK.HOOD; top = h(7) < 0.5 ? MAT.CHARCOAL : MAT.UMBER; tool = TOOL.BROOM; }
   else if (role === 'minder' || role === 'wellkeeper') { hatK = h(6) < 0.5 ? HATK.CAP : HATK.BARE; }
   else if (role === 'householder') { hatK = h(6) < 0.35 ? HATK.HOOD : h(6) < 0.6 ? HATK.CAP : HATK.BARE; }
@@ -483,6 +540,18 @@ export function routeOf(P, a, b) {
   if (P.routes.has(key)) return P.routes.get(key);
   const ca = chain(P, a), cb = chain(P, b);
   const pts = [];
+  // (phase 4b) between two spots of one pasture: straight across, where clear
+  const pa0 = P.places[a], pb0 = P.places[b];
+  if (pa0.kind === 'pasture' && pb0.kind === 'pasture' && pa0.via === pb0.via && clearLine(P.move, [pa0.ax, pa0.az], [pb0.ax, pb0.az], pa0.ft)) {
+    const line = sampleRoute(P.move, [[pa0.ax, pa0.az], [pb0.ax, pb0.az]], pa0.ft);
+    if (line) {
+      const cum = new Float64Array(line.n);
+      for (let i = 1; i < line.n; i++) cum[i] = cum[i - 1] + Math.hypot(line.x[i] - line.x[i - 1], line.z[i] - line.z[i - 1]);
+      line.cum = cum; line.len = cum[line.n - 1]; line.hideA = 0.35; line.hideB = 0.35;
+      P.routes.set(key, line);
+      return line;
+    }
+  }
   const common = ca.find((k) => cb.includes(k));
   const up = (c, until) => { for (const k of c) { if (k === until) break; const L = linkOf(P, k); for (let i = 0; i < L.length - 1; i++) pts.push(L[i]); } };
   const down = (c, until) => {
@@ -544,7 +613,7 @@ export function planOf(P, i, day) {
   if (plan) return plan;
   const per = P.persons[i];
   const fc = forecastOf(P.seed, day);
-  const plan2 = per.role === 'guard' ? guardPlan(P, per, day) : per.role === 'traveller' ? travellerPlan(P, per, day, fc) : villagerPlan(P, per, day, fc);
+  const plan2 = per.role === 'guard' ? guardPlan(P, per, day) : per.role === 'traveller' ? travellerPlan(P, per, day, fc) : per.role === 'shepherd' ? shepherdPlan(P, per, day, fc) : villagerPlan(P, per, day, fc);
   plan = finish(P, per, plan2);
   P.plans.set(key, plan);
   if (P.plans.size > 4000) P.plans.delete(P.plans.keys().next().value);
@@ -571,7 +640,7 @@ function finish(P, per, visits) {
     const arrive = leave + dur;
     if (arrive >= v.to - 0.02 && k < visits.length - 1) continue;
     segs[segs.length - 1].t1 = leave;
-    segs.push({ t0: leave, t1: arrive, kind: 'walk', from: cur.at, to: v.at, route, act: v.walkAct || 'walk' });
+    segs.push({ t0: leave, t1: arrive, kind: 'walk', from: cur.at, to: v.at, route, act: v.walkAct || 'walk', ...(v.lead ? { lead: v.lead } : {}) });
     segs.push({ t0: arrive, t1: Math.max(arrive, v.to), kind: 'stay', at: v.at, pose: v.pose, act: v.act });
     t = Math.max(arrive, v.to);
     cur = v;
@@ -583,6 +652,55 @@ function finish(P, per, visits) {
 // rain or mist between a and b in the forecast?
 const overlaps = (fc, kind, a, b) => fc.some(([f, t, k]) => k === kind && f < b && t > a);
 const rainSpans = (fc) => fc.filter(([, , k]) => k === 'rain').map(([f, t]) => [f, t]);
+
+// (phase 4b) Where a pasture's flock grazes round at an hour: a point that
+// drifts slowly over the pasture (two slow swings, from the seed and the
+// day), and in rain toward its sheltered side (`shelter`, 0..1). Local (u, w)
+// and world (x, z).
+export function flockCentre(P, PA, day, hour, shelter = 0) {
+  const ph = hash2(PA.field * 31 + day, 7, P.seed + 4951) * TAU, ph2 = hash2(PA.field * 31 + day, 8, P.seed + 4951) * TAU;
+  const m = SCALE.animals.pastureEdge;
+  let u = (PA.L - m) * 0.85 * Math.sin(hour * TAU / 4.3 + ph), w = (PA.W - m) * 0.85 * Math.sin(hour * TAU / 3.1 + ph2);
+  if (shelter > 0 && PA.lee) { u += (PA.lee[0] - u) * shelter; w += (PA.lee[1] - w) * shelter; }
+  return { u, w, x: PA.x + u * PA.ca - w * PA.sa, z: PA.z + u * PA.sa + w * PA.ca };
+}
+
+// (phase 4b) A shepherd's day: out to the fold after dawn and leading the
+// flock to its pasture (later while it rains), by the flock through the
+// day, moving with it, and bringing it in at dusk (sooner when rain comes
+// in the afternoon); home, and to bed. No grazing on a day it rains all day.
+function shepherdPlan(P, per, day, fc) {
+  const V = P.villages[per.village], H = V.houses[per.home], F = V.folds[per.flock], PA = V.pastures[F.pasture];
+  const h = (k) => hash2(per.id * 131 + k, day, P.seed + 4801);
+  const home = H.enter ? H.inside : H.closed, sleepAt = H.enter ? H.bed : H.closed, sitAt = H.enter ? H.sit : H.closed;
+  const wake = 5.2 + 0.5 * h(1), bed = 21.3 + 0.8 * h(2);
+  const v = [];
+  v.push({ at: sleepAt, from: 0, to: wake, pose: H.enter ? POSE.SLEEP : POSE.HIDDEN, act: 'asleep' });
+  v.push({ at: H.enter ? H.hearth : home, from: wake, to: wake + 0.35, pose: H.enter ? POSE.STAND : POSE.HIDDEN, act: 'at home' });
+  let out = 6.4 + 0.5 * h(3), back = 18.0 + 0.5 * h(4);
+  for (const [f0, f1, k] of fc) if (k === 'rain' && f0 <= out + 0.5 && f1 > out - 0.2) out = f1 + 0.2;
+  for (const [f0, , k] of fc) if (k === 'rain' && f0 > out + 1 && f0 < back) { back = f0 + 0.15; break; }
+  if (PA && PA.spots.length && out < back - 1.2) {
+    v.push({ at: F.gate, from: out - 0.12, to: out, pose: POSE.STAND, act: 'opening the fold' });
+    const near = (t) => {
+      const c = flockCentre(P, PA, day, t);
+      let best = PA.spots[0], bd = Infinity;
+      for (const id of PA.spots) { const q = P.places[id], d = Math.hypot(q.x - c.x, q.z - c.z); if (d < bd) { bd = d; best = id; } }
+      return best;
+    };
+    let t = out + 0.1, first = true;
+    while (t < back - 0.3) {
+      const t1 = Math.min(back - 0.15, t + 0.9 + 0.4 * h(10 + Math.floor(t)));
+      v.push({ at: near(t + 0.2), from: t, to: t1, pose: h(30 + Math.floor(t)) < 0.3 ? POSE.SIT : POSE.STAND, act: 'minding the flock', ...(first ? { walkAct: 'leading the flock out', lead: 'out' } : { walkAct: 'following the flock' }) });
+      first = false; t = t1 + 0.02;
+    }
+    v.push({ at: F.gate, from: back, to: back + 0.2, pose: POSE.STAND, act: 'shutting the fold', walkAct: 'bringing the flock in', lead: 'in' });
+  }
+  const tHome = Math.max(back + 0.5, (v[v.length - 1].to || 0) + 0.1);
+  v.push({ at: H.enter ? sitAt : home, from: tHome, to: bed, pose: H.enter ? POSE.SIT : POSE.HIDDEN, act: 'at home' });
+  v.push({ at: sleepAt, from: bed, to: 24, pose: H.enter ? POSE.SLEEP : POSE.HIDDEN, act: 'asleep' });
+  return v;
+}
 
 function villagerPlan(P, per, day, fc) {
   const V = P.villages[per.village], H = V.houses[per.home];

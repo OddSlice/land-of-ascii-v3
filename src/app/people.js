@@ -101,7 +101,7 @@ export class People {
     tags.add(wk);
     if (wk === 'clear') tags.add('fair');
     const pl = seg.kind === 'stay' ? this.P.places[seg.at] : null;
-    const placeTag = { field: 'field', fieldgate: 'field', jetty: 'jetty', jettyfoot: 'jetty', green: 'green', bench: 'green', shelter: 'green', well: 'well', chapel: 'chapel',
+    const placeTag = { pasture: 'field', pastgate: 'field', foldgate: 'field', foldin: 'field', field: 'field', fieldgate: 'field', jetty: 'jetty', jettyfoot: 'jetty', green: 'green', bench: 'green', shelter: 'green', well: 'well', chapel: 'chapel',
       door: 'home', in: 'inside', sit: 'inside', hearth: 'inside', bed: 'inside', closed: 'home', post: 'gate', gate: 'gate', walk: 'wall', yard: 'fort', inner: 'fort', hall: 'inside', keepdoor: 'fort', barn: 'field' };
     if (pl && placeTag[pl.kind]) tags.add(placeTag[pl.kind]);
     if (seg.kind === 'walk') { tags.add('walk'); if (this.onRoad(i)) tags.add('road'); }
@@ -151,7 +151,7 @@ export class People {
 
 function walkName(P, seg) {
   const to = P.places[seg.to].kind;
-  const where = { door: 'home', in: 'home', sit: 'home', bed: 'home to bed', closed: 'home', hearth: 'home', field: 'to the fields', jetty: 'to the jetty', well: 'to the well', green: 'to the green',
+  const where = { pasture: 'to the pasture', pastgate: 'to the pasture', foldgate: 'to the fold', door: 'home', in: 'home', sit: 'home', bed: 'home to bed', closed: 'home', hearth: 'home', field: 'to the fields', jetty: 'to the jetty', well: 'to the well', green: 'to the green',
     bench: 'to a bench', chapel: 'to the chapel', post: 'to the gate', walk: 'up to the wall', yard: 'across the yard', gate: 'to the fort', barn: 'to the barn', shelter: 'to the shelter', hall: 'to the hall' }[to] || 'along the road';
   return `walking ${where}`;
 }

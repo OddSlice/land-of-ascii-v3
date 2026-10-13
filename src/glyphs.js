@@ -45,6 +45,10 @@ export const RAIN_GLYPHS = Uint8Array.from(LOOK.weather.rain.glyphs, add);
 // The building kit's families (phase 3a).
 for (const name of MAT_NAMES.slice(KIT_FIRST)) FAMILY.push(familyOf(name));
 
+// (phase 4b) A bird in the air seen far off: one mark, its wings up, level
+// or down (LOOK.animals.marks.glyphs). Added last, so no earlier index changes.
+export const BIRD_GLYPHS = Uint8Array.from(LOOK.animals.marks.glyphs, add);
+
 // Glyphs the atlas draws by hand when the font renders them badly.
 export const SHADES = { '░': 0.25, '▒': 0.5, '▓': 0.75, '█': 1 };
 

@@ -21,6 +21,7 @@ export const ROLES = {
   farmer: { label: 'farmer' },
   fisher: { label: 'fisher', needs: 'water' },
   carter: { label: 'carter' },
+  shepherd: { label: 'shepherd' },
   keeper: { label: 'keeper of the chapel' },
   minder: { label: 'minds the green', needs: 'green' },
   wellkeeper: { label: 'keeps the well' },

@@ -51,6 +51,19 @@
 //     its surroundings by a visible step by day and shows at least two lit
 //     cells at night.
 //
+// 12. (phase 4b) the animals: every village has its flocks, a fold for each,
+//     a shepherd, hens and a dog, and every world deer, hares, ducks, gulls,
+//     crows, small birds and large birds; every animal sampled every ten
+//     minutes for three days is never inside a wall, fence, building,
+//     boulder or another animal, never in water (but ducks), never outside
+//     its pasture or habitat; every flock is in its fold at night; a walker
+//     coming up to each deer group, hare and crow always sees it lift its
+//     head before it moves, then flee, and finds it back when gone; the same
+//     day and hour give the same states from a fresh start.
+// 13. (phase 4b) the wild ground detail: no boulder, outcrop, log, stump or
+//     reed bed on a road or a footpath, nor near a door, the fort's gate, a
+//     bridge's or a jetty's end (and the people's routes are walked again in 11).
+//
 //   node tools/world-check.mjs [--seeds 1,2,3,4,5] [--points 300] [--road 50] [--out file.json]
 //   node tools/world-check.mjs --fort-only --sweep 60 [--from 1000]   (phase 3a) the fort's
 //         checks (8) alone on sixty random seeds
@@ -75,6 +88,10 @@ import { inPoly, polyDist } from '../src/world/gen/fort.js';
 import { buildPeople, planOf, stateAt, alongOf, litGroups, segmentAt, routeOf } from '../src/world/people/people.js';
 import { adjust } from '../src/world/people/meet.js';
 import { FS, S as PS, POSE } from '../src/world/people/figure.js';
+import { buildAnimals } from '../src/world/animals/build.js';
+import { animalsAt } from '../src/world/animals/state.js';
+import { settle, overlap } from '../src/world/animals/meet.js';
+import { AS, A as AI, APOSE, KIND as AK, SPEC, KIND_NAMES } from '../src/world/animals/kinds.js';
 
 const a = args();
 // (the default seed and four others: 3, 1, 2, 4, 5)
@@ -830,6 +847,181 @@ function peopleChecks(w) {
   out.ok = !homeFails.length && !routeFails.length && !bad.inside && !bad.water && !bad.deck && !bad.same && !bad.guardGate && !bad.guardWall && !bad.lit && out.same && !P.bad.length;
   return out;
 }
+// (phase 4b) the animals' checks (12)
+function animalChecks(w) {
+  const t0 = performance.now();
+  const P = buildPeople(w), A = buildAnimals(w, P), out = { counts: {}, groups: A.groups.length };
+  for (let k = 0; k < KIND_NAMES.length; k++) out.counts[KIND_NAMES[k]] = A.count[k] || 0;
+  const T = w.terrain, NN = w.NN;
+  const surface = { ground: T.levels[0].H, N: w.N, NN };
+  // presence
+  const missing = [];
+  for (const V of P.villages) {
+    const gs = A.groups.filter((g) => g.village === V.q);
+    const flocks = gs.filter((g) => g.type === 'flock');
+    if (!flocks.length) missing.push(`village ${V.q + 1}: no flock`);
+    if (V.folds.length < flocks.length || !V.folds.length) missing.push(`village ${V.q + 1}: a flock without a fold`);
+    if (!P.persons.some((q) => q.village === V.q && q.role === 'shepherd')) missing.push(`village ${V.q + 1}: no shepherd`);
+    if (!gs.some((g) => g.type === 'hens')) missing.push(`village ${V.q + 1}: no hens`);
+    if (!gs.some((g) => g.type === 'dog')) missing.push(`village ${V.q + 1}: no dog`);
+    for (const f of flocks) if (f.members.length < 8 || f.members.length > 20) missing.push(`village ${V.q + 1}: a flock of ${f.members.length}`);
+  }
+  for (const t of ['deer', 'hare', 'ducks', 'gulls', 'crow', 'finches', 'kites']) if (!A.groups.some((g) => g.type === t)) missing.push(`no ${t}`);
+  out.missing = missing;
+  // where each may be
+  const inRect = (R, x, z, m) => { const ox = x - R.x, oz = z - R.z, ca = Math.cos(R.a), sa = Math.sin(R.a); return Math.abs(ox * ca + oz * sa) <= R.hw + m && Math.abs(-ox * sa + oz * ca) <= R.hd + m; };
+  const inPas = (PA, x, z, m) => { const ox = x - PA.x, oz = z - PA.z; return Math.abs(ox * PA.ca + oz * PA.sa) <= PA.L + m && Math.abs(-ox * PA.sa + oz * PA.ca) <= PA.W + m; };
+  const nearLine = (R, x, z, m) => { if (!R) return false; for (let k = 0; k < R.n - 1; k++) { const ax = R.x[k], az = R.z[k], bx = R.x[k + 1], bz = R.z[k + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, f = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); if (Math.hypot(ax + dx * f - x, az + dz * f - z) <= m) return true; } return false; };
+  const wet = (x, z) => T.wWater[Math.round(z) * NN + Math.round(x)] > 127;
+  const habitat = (g, o, st, day) => {
+    const x = st[o + AI.X], z = st[o + AI.Z], y = st[o + AI.Y], pose = st[o + AI.POSE];
+    switch (g.type) {
+      case 'flock': {
+        if (inRect(g.F, x, z, 0.3) || inPas(g.PA, x, z, 0.3)) return true;
+        const plan = planOf(P, g.shepherd, day);
+        return plan.some((sg) => sg.lead && nearLine(sg.route, x, z, 4)) || Math.hypot(x - g.F.x, z - g.F.z) < 8;
+      }
+      case 'herd': return inPas(g.PA, x, z, 0.3);
+      case 'hens': return Math.hypot(x - g.door[0], z - g.door[1]) < 14;
+      case 'dog': return true;
+      case 'deer': return Object.values(g.ways).some((R) => nearLine(R, x, z, 8)) || Math.hypot(x - g.bed[0], z - g.bed[1]) < 8;
+      case 'hare': return g.spots.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3);
+      case 'ducks': return pose === APOSE.SWIM ? wet(x, z) : Math.hypot(x - g.bank[0], z - g.bank[1]) < 4 || wet(x, z);
+      case 'gulls': return pose === APOSE.FLY ? y > groundAt(surface, x, z) + 1 : g.perches.some((p) => Math.hypot(p[0] - x, p[1] - z) < 1.5);
+      case 'crow': return pose === APOSE.FLY ? Math.hypot(x - g.perch.x, z - g.perch.z) < SCALE.animals.crowCircle + 2 : Math.hypot(x - g.perch.x, z - g.perch.z) < 0.5;
+      case 'finches': return pose === APOSE.FLY ? y > groundAt(T, x, z) + 2 : g.copses.some((c) => Math.hypot(c[0] - x, c[1] - z) < 9);
+      case 'kites': return y > groundAt(T, x, z) + 40;
+    }
+    return true;
+  };
+  const n0 = A.members.length, st = new Float32Array(n0 * AS), ids = new Int32Array(n0);
+  const bad = { inside: 0, overlap: 0, water: 0, outside: 0, unfolded: 0, nan: 0 }, ex = [];
+  let samples = 0, nightChecks = 0;
+  const note = (s2) => { if (ex.length < 8) ex.push(s2); };
+  for (let d = 0; d < 3; d++) for (let m = 0; m < 24 * 6; m++) {
+    const hour = m / 6;
+    const n = animalsAt(A, d, hour, [], st, ids);
+    const left = settle(st, n, [], P.p);
+    bad.overlap += left;
+    if (left) note(`${left} pairs too close on day ${d} at ${hour.toFixed(2)}`);
+    for (let i = 0; i < n; i++) {
+      const o = i * AS, mb = A.members[ids[i]], g = A.groups[mb.group], pose = st[o + AI.POSE], kind = mb.kind;
+      if (pose === APOSE.HIDDEN) continue;
+      samples++;
+      const x = st[o + AI.X], z = st[o + AI.Z], y = st[o + AI.Y];
+      if (![x, z, y, st[o + AI.YAW]].every(Number.isFinite)) { bad.nan++; note(`${KIND_NAMES[kind]} ${ids[i]} not a number`); continue; }
+      const sp = SPEC[kind], sc = st[o + AI.SCALE] || 1, fly = pose === APOSE.FLY, perch = pose === APOSE.PERCH;
+      // inside something (a bird in the air or perched: its body only)
+      const lo = fly ? y - 0.05 : y + (perch ? 0.1 : 0.12), hi = fly ? y + 0.05 : y + Math.max(0.15, sp.back * sc * (pose === APOSE.LIE ? 0.5 : 0.9));
+      const r = fly || perch ? 0.08 : sp.r * sc * 0.6, h = fly || perch ? 0 : Math.max(0, sp.len * sc / 2 - sp.r * sc * 0.8);
+      const fx = Math.sin(st[o + AI.YAW]) * h, fz = Math.cos(st[o + AI.YAW]) * h;
+      if (pose !== APOSE.SWIM && (bodyBlocked(w.kit, x, z, lo, hi, r) || (h > 0 && (bodyBlocked(w.kit, x + fx, z + fz, lo, hi, r) || bodyBlocked(w.kit, x - fx, z - fz, lo, hi, r))))) { bad.inside++; note(`${KIND_NAMES[kind]} ${ids[i]} (${g.type}) inside a shape at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)}`); }
+      // in water
+      if (!fly && !perch && kind !== AK.DUCK) {
+        const depth = groundAt(surface, x, z) - groundAt(T, x, z);
+        if (wet(x, z) && depth > 0.15 && y < groundAt(surface, x, z) - 0.05) { bad.water++; note(`${KIND_NAMES[kind]} ${ids[i]} in ${depth.toFixed(2)} m of water at ${x.toFixed(1)},${z.toFixed(1)}`); }
+      }
+      if (!habitat(g, o, st, d)) { bad.outside++; note(`${KIND_NAMES[kind]} ${ids[i]} (${g.type}) out of its place at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)} pose ${pose}`); }
+      if (g.type === 'flock' && (hour >= 21.5 || hour < 5)) { nightChecks++; if (!inRect(g.F, x, z, 0.05)) { bad.unfolded++; note(`a sheep of flock ${g.id} out of its fold at night, ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)}`); } }
+    }
+  }
+  out.samples = { samples, nightChecks, ...bad, examples: ex };
+  // a walker coming up to each deer group, hare and crow
+  const walk = { groups: 0, ok: 0, fails: [] };
+  const p = P.p;
+  for (const g of A.groups) {
+    if (!['deer', 'hare', 'crow'].includes(g.type)) continue;
+    // a time it is at rest (a deer grazing the edge at dawn; a hare in its
+    // form; a crow on its perch)
+    let hour = g.type === 'deer' ? 6.5 : 11;
+    const n0g = g.members.length, base = new Float32Array(n0g * AS), cur = new Float32Array(n0g * AS), id2 = new Int32Array(n0g);
+    if (g.type === 'crow') for (let k = 0; k < 40; k++) { animalsAt(A, 0, hour, [], base, id2, [g]); if (base[AI.POSE] === APOSE.PERCH) break; hour += 0.05; }
+    animalsAt(A, 0, hour, [], base, id2, [g]);
+    let cx = 0, cz = 0;
+    for (let k = 0; k < n0g; k++) { cx += base[k * AS + AI.X]; cz += base[k * AS + AI.Z]; }
+    cx /= n0g; cz /= n0g;
+    walk.groups++;
+    // from 90 m out, on open ground
+    let dir = null;
+    for (let k = 0; k < 16 && !dir; k++) {
+      const b = k * Math.PI / 8, x = cx + Math.sin(b) * 90, z = cz + Math.cos(b) * 90;
+      if (x > 2 && z > 2 && x < w.N - 2 && z < w.N - 2 && !wet(x, z)) dir = b;
+    }
+    if (dir === null) { walk.fails.push(`${g.type} ${g.id}: no open approach`); continue; }
+    let alertAt = -1, fleeAt = -1, maxMove = 0;
+    for (let dd = 90; dd >= 3; dd -= 0.5) {
+      const wx = cx + Math.sin(dir) * dd, wz = cz + Math.cos(dir) * dd;
+      animalsAt(A, 0, hour, [wx, wz, groundAt(T, wx, wz)], cur, id2, [g]);
+      let al = 0, mv = 0;
+      for (let k = 0; k < n0g; k++) {
+        const o = k * AS;
+        al = Math.max(al, cur[o + AI.ALERT], cur[o + AI.HEAD] > 0.5 && base[o + AI.HEAD] <= 0.5 ? 1 : 0);
+        mv = Math.max(mv, Math.hypot(cur[o + AI.X] - base[o + AI.X], cur[o + AI.Z] - base[o + AI.Z], cur[o + AI.Y] - base[o + AI.Y]));
+      }
+      if (alertAt < 0 && al >= 0.5) alertAt = dd;
+      if (fleeAt < 0 && mv > 0.5) fleeAt = dd;
+      maxMove = Math.max(maxMove, mv);
+    }
+    // gone again: all back where they were
+    animalsAt(A, 0, hour, [cx + 400, cz + 400, 0], cur, id2, [g]);
+    let back = true;
+    for (let k = 0; k < cur.length; k++) if (Math.abs(cur[k] - base[k]) > 1e-4) back = false;
+    const need = g.type === 'deer' ? 8 : g.type === 'hare' ? 5 : 3;
+    const ok = alertAt > 0 && fleeAt > 0 && alertAt > fleeAt + 2 && maxMove >= need && back;
+    if (ok) walk.ok++; else walk.fails.push(`${g.type} ${g.id}: alert at ${alertAt} m, moves at ${fleeAt} m, at most ${maxMove.toFixed(1)} m, back ${back ? 'yes' : 'NO'}`);
+    if (!walk.first) walk.first = {};
+    if (!walk.first[g.type]) walk.first[g.type] = { alertAt, fleeAt, moved: +maxMove.toFixed(1) };
+  }
+  out.walker = walk;
+  // the same from a fresh start
+  const A2 = buildAnimals(w, buildPeople(w)), sa = new Float32Array(n0 * AS), sb = new Float32Array(n0 * AS), ia = new Int32Array(n0), ib = new Int32Array(n0);
+  let differ = 0;
+  for (const [d, h] of [[0, 6.5], [1, 12.25], [2, 19.9], [4, 23.5]]) {
+    const na = animalsAt(A, d, h, [], sa, ia), nb = animalsAt(A2, d, h, [], sb, ib);
+    settle(sa, na, [], P.p); settle(sb, nb, [], A2.P.p);
+    if (na !== nb) differ++;
+    for (let k = 0; k < na * AS; k++) if (sa[k] !== sb[k]) differ++;
+  }
+  out.same = differ === 0;
+  out.ms = Math.round(performance.now() - t0);
+  out.ok = !missing.length && !bad.inside && !bad.overlap && !bad.water && !bad.outside && !bad.unfolded && !bad.nan && walk.ok === walk.groups && out.same;
+  return out;
+}
+
+// (phase 4b) the wild ground detail's checks (13)
+function wildChecks(w) {
+  const pieces = ((w.kitDesc && w.kitDesc.pieces) || []).filter((p) => ['boulder', 'outcrop', 'log', 'stump', 'reeds'].includes(p.kind));
+  const T = w.terrain, NN = w.NN, out = { counts: {}, fails: [] };
+  for (const p of pieces) out.counts[p.kind] = (out.counts[p.kind] || 0) + 1;
+  // the places to keep clear: doors, the fort's gate, bridges' and jetties' ends
+  const P = buildPeople(w), keep = [];
+  for (const pl of P.places) if (pl.kind === 'door' || pl.kind === 'gate' || pl.kind === 'jettyfoot' || pl.kind === 'foldgate' || pl.kind === 'pastgate') keep.push([pl.x, pl.z, pl.kind]);
+  for (const b of w.sites.bridges || []) { const ca = Math.cos(b.a), sa = Math.sin(b.a), h = b.len / 2; keep.push([b.x + ca * h, b.z + sa * h, 'bridge'], [b.x - ca * h, b.z - sa * h, 'bridge']); }
+  for (const v of w.sites.villages) if (v.plan && v.plan.jetty) keep.push([v.plan.jetty.a[0], v.plan.jetty.a[1], 'jetty']);
+  const paths = T.wPath || null;
+  for (const p of pieces) {
+    const [x, z] = p.at, r = p.kind === 'log' ? p.len / 2 + p.r : p.r * (p.kind === 'outcrop' ? 2.2 : 1.3);
+    // on a road or a footpath: any cell under it
+    let road = 0;
+    for (let k = Math.floor(z - r); k <= Math.ceil(z + r); k++) for (let i = Math.floor(x - r); i <= Math.ceil(x + r); i++) {
+      if (Math.hypot(i - x, k - z) > r || i < 0 || k < 0 || i > w.N || k > w.N) continue;
+      const j = k * NN + i;
+      if (T.wRoad[j] > 90 || (paths && paths[j] > 90)) road++;
+    }
+    if (road && p.kind !== 'reeds') out.fails.push(`${p.kind} on a road or path at ${x.toFixed(1)},${z.toFixed(1)}`);
+    for (const [kx, kz, what] of keep) if (Math.hypot(kx - x, kz - z) < r + 1.5) out.fails.push(`${p.kind} at ${x.toFixed(1)},${z.toFixed(1)} by a ${what}`);
+  }
+  out.ok = !out.fails.length;
+  return out;
+}
+function printAnimals(seed, ac, wc) {
+  const s2 = ac.samples;
+  console.log(`  animals: ${ac.ok ? 'ok' : 'FAIL'}, ${Object.entries(ac.counts).map(([k, v]) => `${v} ${k}`).join(', ')} in ${ac.groups} groups${ac.missing.length ? `; MISSING: ${ac.missing.join('; ')}` : '; every village with its flocks, folds, shepherd, hens and dog'}`);
+  console.log(`  animals sampled every ten minutes for three days (${s2.samples} positions): inside a shape ${s2.inside}, too close to another ${s2.overlap}, in water ${s2.water}, out of their place ${s2.outside}, flocks out of the fold at night ${s2.unfolded} (of ${s2.nightChecks}); the same from a fresh start ${ac.same ? 'yes' : 'NO'}${s2.examples.length ? `; e.g. ${s2.examples.slice(0, 5).join('; ')}` : ''} (${ac.ms} ms)`);
+  console.log(`  walker up to deer, hares and crows: ${ac.walker.ok} of ${ac.walker.groups} alert, then flee, then back${ac.walker.first ? ` (${Object.entries(ac.walker.first).map(([k, v]) => `${k}: alert ${v.alertAt} m, moves ${v.fleeAt} m, ${v.moved} m`).join('; ')})` : ''}${ac.walker.fails.length ? `; FAILED: ${ac.walker.fails.slice(0, 5).join('; ')}` : ''}`);
+  console.log(`  wild ground detail: ${wc.ok ? 'ok' : 'FAIL'}, ${Object.entries(wc.counts).map(([k, v]) => `${v} ${k}`).join(', ')}${wc.fails.length ? `; FAILED: ${wc.fails.slice(0, 6).join('; ')}` : '; none on a road or path, nor by a door, gate, bridge or jetty'}`);
+}
+
 function routeTo(P, place) {
   // (a home's door can be reached: a route from it to the village's first well, or any other place)
   const other = P.places.find((q) => q.id !== place && q.via < 0);
@@ -857,24 +1049,41 @@ function printFort(seed, ft) {
   console.log(`  random walks: ${ft.walks.attempts}, through a wall ${ft.walks.through}, stuck ${ft.walks.stuck}, inside stone ${ft.walks.inside}${ft.walks.examples.length ? ` e.g. ${JSON.stringify(ft.walks.examples)}` : ''}`);
 }
 
+if (a['animals-only']) {
+  // (phase 4b) the animals' and the wild ground detail's checks alone
+  let all = true;
+  for (const seed of seeds) {
+    const w = unpackWorld(packWorld(build(seed)));
+    const ac = animalChecks(w), wc = wildChecks(w);
+    console.log(`seed ${seed}: ${ac.ok && wc.ok ? 'PASS' : 'FAIL'}`);
+    printAnimals(seed, ac, wc);
+    all = all && ac.ok && wc.ok;
+  }
+  process.exit(all ? 0 : 1);
+}
 if (a['fort-only']) {
   const n = Number(a.sweep || 60), from = Number(a.from || 1000);
   const list = a.seeds ? seeds : Array.from({ length: n }, (_, i) => from + i * 7919 % 100000);
   const rows = [];
   for (const seed of list) {
     let ft, vc, err = null;
-    let pc = null;
-    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); pc = peopleChecks(w); } catch (e) { err = String(e.stack || e); }
-    rows.push({ seed, ft, vc, pc, err, approach: null });
+    let pc = null, ac = null, wc = null;
+    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); pc = peopleChecks(w); ac = animalChecks(w); wc = wildChecks(w); } catch (e) { err = String(e.stack || e); }
+    rows.push({ seed, ft, vc, pc, ac, wc, err, approach: null });
     if (err) console.log(`seed ${seed}: FAIL ${err}`); else {
-      console.log(`seed ${seed}: ${ft.ok && vc.ok && pc.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}${pc.ok ? '' : ' (the people)'}`);
+      console.log(`seed ${seed}: ${ft.ok && vc.ok && pc.ok && ac.ok && wc.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}${pc.ok ? '' : ' (the people)'}${ac.ok ? '' : ' (the animals)'}${wc.ok ? '' : ' (the wild ground detail)'}`);
       if (!ft.ok || a.detail) printFort(seed, ft);
       if (!vc.ok || a.detail) printVillages(seed, vc);
       if (!pc.ok || a.detail) printPeople(seed, pc);
+      if (!ac.ok || !wc.ok || a.detail) printAnimals(seed, ac, wc);
     }
   }
-  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok && r.pc && r.pc.ok).length;
-  console.log(`\n${okN} of ${rows.length} seeds pass the fort's, the villages' and the people's checks`);
+  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok && r.pc && r.pc.ok && r.ac && r.ac.ok && r.wc && r.wc.ok).length;
+  console.log(`\n${okN} of ${rows.length} seeds pass the fort's, the villages', the people's, the animals' and the wild ground detail's checks`);
+  {
+    const Q = rows.filter((r) => r.ac), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0);
+    console.log(`animals: ${sum((r) => Object.values(r.ac.counts).reduce((x, y) => x + y, 0))} on ${Q.length} seeds; missing kinds or village animals on ${Q.filter((r) => r.ac.missing.length).length}; ${sum((r) => r.ac.samples.samples)} positions sampled: inside a shape ${sum((r) => r.ac.samples.inside)}, too close ${sum((r) => r.ac.samples.overlap)}, in water ${sum((r) => r.ac.samples.water)}, out of place ${sum((r) => r.ac.samples.outside)}, out of the fold at night ${sum((r) => r.ac.samples.unfolded)}; walker ${sum((r) => r.ac.walker.ok)} of ${sum((r) => r.ac.walker.groups)}; same from a fresh start on ${Q.filter((r) => r.ac.same).length} of ${Q.length}; wild detail fails ${rows.filter((r) => r.wc).reduce((s2, r) => s2 + r.wc.fails.length, 0)}`);
+  }
   {
     const Q = rows.filter((r) => r.pc), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0);
     console.log(`people: ${sum((r) => r.pc.persons)} on ${Q.length} seeds; ${sum((r) => r.pc.plans.routes)} routes walked (${sum((r) => r.pc.plans.fails.length)} failed); ${sum((r) => r.pc.samples.samples)} positions sampled: inside a shape ${sum((r) => r.pc.samples.inside)}, in deep water ${sum((r) => r.pc.samples.water)}, off a deck ${sum((r) => r.pc.samples.deck)}, on one spot ${sum((r) => r.pc.samples.same)}; guardless hours at the gate ${sum((r) => r.pc.samples.guardGate)}, on the wall ${sum((r) => r.pc.samples.guardWall)}; windows wrong ${sum((r) => r.pc.samples.lit)}; same from a fresh start on ${Q.filter((r) => r.pc.same).length} of ${Q.length}`);
@@ -909,7 +1118,10 @@ for (const seed of seeds) {
   r.vil = villageChecks(w);
   // (phase 4a) the people's (11)
   r.ppl = peopleChecks(w);
-  r.ok = r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok && r.ppl.ok;
+  // (phase 4b) the animals' (12) and the wild ground detail's (13)
+  r.ani = animalChecks(w);
+  r.wild = wildChecks(w);
+  r.ok = r.ani.ok && r.wild.ok && r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok && r.ppl.ok;
   results.push(r);
   const pc = (x) => `${(100 * x).toFixed(1)}%`;
   console.log(`seed ${seed}: ${r.ok ? 'PASS' : 'FAIL'}  build ${r.buildMs} ms, hash ${h1} ${r.same ? '(same twice)' : `!= ${h2}`}`);
@@ -925,6 +1137,7 @@ for (const seed of seeds) {
   printFort(seed, r.fort);
   printVillages(seed, r.vil);
   printPeople(seed, r.ppl);
+  printAnimals(seed, r.ani, r.wild);
   console.log(`  villages from the viewpoints: ${r.vread.villages.map((x) => x.viewpoint ? `village ${x.village} (${x.pattern}) from viewpoint ${x.viewpoint}, ${x.dist} m: step ${x.step}${x.step > STEP ? '' : ' TOO FAINT'}, ${x.lights} light cells at night${x.lights >= 2 ? '' : ' (TOO FEW)'}` : `village ${x.village}: ${x.note}`).join('; ')}`);
 }
 const out = a.out || path.join(ROOT, 'shots', 'world-check', `world-check-${seeds.join('-')}.json`);

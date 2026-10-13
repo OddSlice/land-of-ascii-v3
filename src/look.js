@@ -320,6 +320,23 @@ export const LOOK = {
     // goes toward them; the drifts themselves are their materials' colours
     bloom: ['#c9bb5c', '#a28fae', '#d4d4c0'], hue: 0.8 },
 
+  // (phase 4b) The animals.
+  // - `shadow`: an animal's shadow on the ground, `dark` at its middle (of a
+  //   full cast shadow), soft from `soft` of the way out, faded out between
+  //   two thirds of `far` metres and `far`;
+  // - `marks`: a bird in the air past the shapes' distance is one mark, its
+  //   wings up, level or down (`glyphs`), in its shaded colour lifted by
+  //   `lift` of the way to its lit one, faded out toward `far` metres; a far
+  //   flock shows `keep` marks at `near` metres and fewer beyond (by count,
+  //   the last one fading), never fewer than `least`.
+  animals: {
+    // (a far silhouette held at two cells is drawn while it is at least this
+    // share of them, and faded by that share)
+    fadeMin: 0.05,
+    shadow: { dark: 0.62, soft: 0.45, far: 90 },
+    marks: { glyphs: 'v-^', lift: 0.3, far: 700, near: 160, least: 3 },
+  },
+
   // A flame held at its minimum size (two rows) is faded toward what is
   // behind it by how much of it is really flame (its core stays bright, its
   // rim fades), to this power (less keeps a far light brighter), and

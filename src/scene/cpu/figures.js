@@ -14,14 +14,20 @@
 //   they light only surfaces near them, never start the shadow sweep, and
 //   leave the fixed lights as they were.
 import { figureParts, lightOf, FS, S, PART, POSE, NEAR_D } from '../../world/people/figure.js';
+import { animalParts } from '../../world/animals/shapes.js';
+import { AS, A as AN, APOSE, ANEAR_D, SPEC } from '../../world/animals/kinds.js';
+import { LOOK } from '../../look.js';
 import { P as KP, P_STRIDE, PT, PF, ZONE_OUT, ZONE_YARD, roomBit } from '../../world/kit.js';
-import { MAT, MAT_FAINT, HIT_STRIDE, REC } from '../../contract.js';
+import { MAT, MAT_FAINT, HIT_STRIDE, REC, H_SHADOW } from '../../contract.js';
 import { torchPower } from './light.js';
 import { Plane } from './build.js';
+
+const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
 export const FIG = 4;
 const MAXP = 24;                 // parts a figure can have
 const FAR = 420;                 // beyond this a figure is not drawn (it has faded)
+const AFAR = 320;                // (phase 4b) an animal's
 
 const methods = {
   initFigures() {
@@ -35,70 +41,136 @@ const methods = {
 
   // The frame's figures as shapes: the same in every worker.
   prepareFigures(v, frame) {
-    const st = frame.people, items = this.figItems;
+    const st = frame.people, sa = frame.animals, items = this.figItems;
     items.length = 0;
-    if (!st || !st.length) return;
-    const n = st.length / FS, wk = this.world.kit;
-    if (!this.figKit || this.figKit.cap < n * MAXP) {
-      const cap = Math.max(256, n * MAXP);
+    this.figAnimals = sa || null;
+    const n = st ? st.length / FS : 0, na = sa ? sa.length / AS : 0;
+    if (!n && !na) return;
+    const wk = this.world.kit;
+    if (!this.figKit || this.figKit.cap < (n + na) * MAXP) {
+      const cap = Math.max(256, (n + na) * MAXP);
       this.figKit = { cap, prims: new Float64Array(cap * P_STRIDE), holes: new Float64Array(0), cover: new Float32Array(cap), flame: new Uint8Array(cap),
         rooms: wk ? wk.rooms : [], roomBits: wk ? wk.roomBits : [], yards: wk ? wk.yards : [], np: 0 };
     }
-    const K = this.figKit, P = K.prims, buf = this.figParts;
     let np = 0;
     for (let i = 0; i < n; i++) {
       const o = i * FS;
       if (st[o + S.POSE] === POSE.HIDDEN) continue;
       const x = st[o + S.X], z = st[o + S.Z], dist = Math.hypot(x - v.ex, z - v.ez);
       if (dist > FAR) continue;
-      const k = figureParts(st, o, dist, v.colAngle, v.rowAngle, frame.t, buf, 0);
-      if (!k) continue;
-      const minC = v.colAngle * Math.max(dist, 0.5), minR = v.rowAngle * Math.max(dist, 0.5);
-      let reach = 0, y0 = Infinity, y1 = -Infinity, flames = 0;
-      let kk = 0;
-      for (let j = 0; j < k; j++) {
-        const b = j * PART, q = (np + kk) * P_STRIDE;
-        let hx = buf[b + 3], hz = buf[b + 4], ya = buf[b + 5], yb = buf[b + 6], cover = buf[b + 9];
-        const flame = buf[b + 8] === 2;
-        if (flame) {
-          // held at a column wide and two rows tall, faded by its true share
-          const w = hx, h = (yb - ya) / 2, wm = Math.max(w, minC / 2), hm = Math.max(h, minR);
-          cover = Math.min(cover, (w * h) / (wm * hm));
-          hx = hz = wm; const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm;
-          flames++;
-        } else if (buf[b + 8] === 1) {
-          // a small part (a brim, a tool's shaft, a torch's stick): held at
-          // two rows tall and two columns across (its width across the view),
-          // and further off faded by how much of that it really is, so it
-          // cannot fall between rows or columns and blink
-          const h = (yb - ya) / 2, hm = Math.max(h, minR);
-          const vx = buf[b] - v.ex, vz = buf[b + 1] - v.ez, vl = Math.hypot(vx, vz) || 1, px = -vz / vl, pz = vx / vl;
-          const ca = Math.cos(buf[b + 2]), sa = Math.sin(buf[b + 2]);
-          const across = hx * Math.abs(ca * px + sa * pz) + hz * Math.abs(-sa * px + ca * pz);
-          if (hm > h) { const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm; }
-          // (faded only past the near detail: close by, the parts are whole
-          // and a faded one's blend with what lies behind would jump)
-          if (dist >= NEAR_D) cover = Math.min(cover, (h / hm) * Math.min(1, across / minC));
-          if (cover < 0.06) continue;
-        }
-        const ang = buf[b + 2];
-        P[q + KP.TYPE] = PT.BOX; P[q + KP.CX] = buf[b]; P[q + KP.CZ] = buf[b + 1];
-        P[q + KP.CA] = Math.cos(ang); P[q + KP.SA] = Math.sin(ang);
-        P[q + KP.HX] = hx; P[q + KP.HZ] = hz; P[q + KP.Y0] = ya; P[q + KP.Y1] = yb;
-        P[q + KP.MAT] = buf[b + 7]; P[q + KP.MAT2] = buf[b + 7];
-        P[q + KP.FLAGS] = buf[b + 8] === 1 ? PF.GROW : 0;
-        P[q + KP.H0] = 0; P[q + KP.HN] = 0; P[q + KP.ROOM] = st[o + S.ROOM];
-        P[q + KP.SEED] = st[o + S.ID] * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ya;
-        K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; kk++;
-        const dx = buf[b] - x, dz = buf[b + 1] - z, r = Math.sqrt(dx * dx + dz * dz) + Math.max(hx, hz) * 1.42;
-        if (r > reach) reach = r;
-        if (ya < y0) y0 = ya; if (yb > y1) y1 = yb;
-      }
-      if (!kk) continue;
-      items.push({ kind: FIG, pi: i, p0: np, np: kk, x, z, R: reach + 0.05, y0: y0 - 0.05, y1: y1 + 0.05, grow: 1.5, up: flames ? 1 : 0, id: st[o + S.ID], dist });
-      np += kk;
+      const k = figureParts(st, o, dist, v.colAngle, v.rowAngle, frame.t, this.figParts, 0);
+      if (k) np = this.figItem(v, np, k, i, x, z, dist, st[o + S.ROOM], st[o + S.ID], NEAR_D);
     }
-    K.np = np;
+    // (phase 4b) the frame's animals, the same way: frustum first
+    const spread = -v.t0;
+    for (let i = 0; i < na; i++) {
+      const o = i * AS;
+      if (sa[o + AN.POSE] === APOSE.HIDDEN) continue;
+      const x = sa[o + AN.X], z = sa[o + AN.Z], dx = x - v.ex, dz = z - v.ez, dist = Math.hypot(dx, dz);
+      if (dist > AFAR) continue;
+      const fwd = dx * v.syaw + dz * v.cyaw, lat = dx * v.cyaw - dz * v.syaw;
+      if (fwd < -3 || Math.abs(lat) > spread * Math.max(fwd, 0) + 3) continue;
+      const k = animalParts(sa, o, dist, v.colAngle, v.rowAngle, frame.t, this.figParts, 0, v.ex, v.ez);
+      if (k) np = this.figItem(v, np, k, 100000 + i, x, z, dist, sa[o + AN.ROOM], 50000 + sa[o + AN.ID], ANEAR_D);
+    }
+    this.figKit.np = np;
+  },
+
+  // One figure's parts (in this.figParts) into the kit's prims, and its item.
+  figItem(v, np, k, pi, x, z, dist, room, id, nearD) {
+    const K = this.figKit, P = K.prims, buf = this.figParts, items = this.figItems;
+    const minC = v.colAngle * Math.max(dist, 0.5), minR = v.rowAngle * Math.max(dist, 0.5);
+    let reach = 0, y0 = Infinity, y1 = -Infinity, flames = 0;
+    let kk = 0;
+    for (let j = 0; j < k; j++) {
+      const b = j * PART, q = (np + kk) * P_STRIDE;
+      let hx = buf[b + 3], hz = buf[b + 4], ya = buf[b + 5], yb = buf[b + 6], cover = buf[b + 9];
+      const flame = buf[b + 8] === 2;
+      if (flame) {
+        // held at a column wide and two rows tall, faded by its true share
+        const w = hx, h = (yb - ya) / 2, wm = Math.max(w, minC / 2), hm = Math.max(h, minR);
+        cover = Math.min(cover, (w * h) / (wm * hm));
+        hx = hz = wm; const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm;
+        flames++;
+      } else if (buf[b + 8] === 1) {
+        // a small part (a brim, a tool's shaft, a torch's stick, a leg, a
+        // wing): held at two rows tall and two columns across (its width
+        // across the view), and further off faded by how much of that it
+        // really is, so it cannot fall between rows or columns and blink
+        const h = (yb - ya) / 2, hm = Math.max(h, minR);
+        const vx = buf[b] - v.ex, vz = buf[b + 1] - v.ez, vl = Math.hypot(vx, vz) || 1, px = -vz / vl, pz = vx / vl;
+        const ca = Math.cos(buf[b + 2]), sa = Math.sin(buf[b + 2]);
+        const across = hx * Math.abs(ca * px + sa * pz) + hz * Math.abs(-sa * px + ca * pz);
+        if (hm > h) { const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm; }
+        // (faded only past the near detail: close by, the parts are whole
+        // and a faded one's blend with what lies behind would jump)
+        if (dist >= nearD) cover = Math.min(cover, (h / hm) * Math.min(1, across / minC));
+        if (cover < 0.06) continue;
+      }
+      const ang = buf[b + 2];
+      P[q + KP.TYPE] = PT.BOX; P[q + KP.CX] = buf[b]; P[q + KP.CZ] = buf[b + 1];
+      P[q + KP.CA] = Math.cos(ang); P[q + KP.SA] = Math.sin(ang);
+      P[q + KP.HX] = hx; P[q + KP.HZ] = hz; P[q + KP.Y0] = ya; P[q + KP.Y1] = yb;
+      P[q + KP.MAT] = buf[b + 7]; P[q + KP.MAT2] = buf[b + 7];
+      P[q + KP.FLAGS] = buf[b + 8] === 1 ? PF.GROW : 0;
+      P[q + KP.H0] = 0; P[q + KP.HN] = 0; P[q + KP.ROOM] = room;
+      P[q + KP.SEED] = id * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ya;
+      K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; kk++;
+      const dx = buf[b] - x, dz = buf[b + 1] - z, r = Math.sqrt(dx * dx + dz * dz) + Math.max(hx, hz) * 1.42;
+      if (r > reach) reach = r;
+      if (ya < y0) y0 = ya; if (yb > y1) y1 = yb;
+    }
+    if (!kk) return np;
+    items.push({ kind: FIG, pi, p0: np, np: kk, x, z, R: reach + 0.05, y0: y0 - 0.05, y1: y1 + 0.05, grow: 1.5, up: flames ? 1 : 0, id, dist });
+    return np + kk;
+  },
+
+  // (phase 4b) The animals' shadows on the ground: each one's footprint
+  // moved away from the light by its height over the light's slope (and
+  // drawn out that way), soft at its edge, darkening the cast-shadow byte of
+  // the ground cells it falls on. A function of the positions and the light
+  // alone; faded out with distance, never cut.
+  animalShadows() {
+    const sa = this.figAnimals, light = this.light;
+    if (!sa || !light) return;
+    const L = light.L, W = LOOK.animals.shadow;
+    const hh = Math.hypot(L[0], L[2]);
+    if (L[1] <= 0.02 || hh < 1e-4) return;
+    const tanE = L[1] / hh, ax = -L[0] / hh, az = -L[2] / hh;
+    const { v, rays, m } = this, H = m.hits, sw = rays.sw, jlo = rays.jlo, c0 = rays.c0, bb = this.bb;
+    for (const it of this.figItems) {
+      if (it.pi < 100000 || it.dist > W.far) continue;
+      const o = (it.pi - 100000) * AS, pose = sa[o + AN.POSE];
+      if (pose === APOSE.FLY || pose === APOSE.PERCH || pose === APOSE.SWIM || pose === APOSE.HIDDEN) continue;
+      const sp = SPEC[sa[o + AN.KIND]], sc = sa[o + AN.SCALE] || 1, y = sa[o + AN.Y], x = sa[o + AN.X], z = sa[o + AN.Z];
+      const low = pose === APOSE.LIE || pose === APOSE.SIT;
+      const h = sp.back * sc * (low ? 0.55 : 1), half = sp.len * sc / 2 + 0.05, rr = sp.r * sc * 1.05;
+      const off = Math.min(h * 0.55 / tanE, 4 * half), k = off / (2 * half);
+      const cx = x + ax * off * 0.6, cz = z + az * off * 0.6, R = half + off * 0.6 + rr;
+      const fade = W.dark * (1 - smooth(W.far * 0.65, W.far, it.dist)) * (sa[o + AN.ROOM] >= 0 ? 0 : 1);
+      if (fade <= 0.01) continue;
+      if (!this.screenBox(cx - R, cx + R, y - 0.6, y + 0.4, cz - R, cz + R)) continue;
+      const yaw = sa[o + AN.YAW], fx = Math.sin(yaw), fz = Math.cos(yaw), m1 = sa[o + AN.M1], m2 = sa[o + AN.M2];
+      for (let ccx = bb[0]; ccx <= bb[1]; ccx++) {
+        for (let ccy = bb[2]; ccy <= bb[3]; ccy++) {
+          const ci = ccy * sw + (ccx - c0), d = rays.depth[ci];
+          if (!(d < 1e9)) continue;
+          const ho = ci * HIT_STRIDE, mat = H[ho];
+          if (mat === m1 || mat === m2 || mat === MAT.WATER) continue;
+          const p = rays.plane[ci] - jlo, X = v.ex + rays.pdx[p] * d, Z = v.ez + rays.pdz[p] * d, Y = v.ey + rays.sigma[ci] * d;
+          let qx = X - cx, qz = Z - cz;
+          const dist = Math.hypot(X - x, Z - z);
+          if (Math.abs(Y - y) > 0.2 + 0.35 * dist) continue;
+          // (drawn out away from the light)
+          const qa = qx * ax + qz * az, sq = qa * (1 - 1 / (1 + k));
+          qx -= ax * sq; qz -= az * sq;
+          const u = (qx * fx + qz * fz) / half, w = (qx * fz - qz * fx) / rr, e = Math.sqrt(u * u + w * w);
+          if (e >= 1) continue;
+          const sh = fade * (1 - smooth(W.soft, 1, e)) * 255;
+          if (sh > H[ho + H_SHADOW]) H[ho + H_SHADOW] = sh + 0.5 | 0;
+        }
+      }
+    }
   },
 
   // Test every cell of a figure's box against its parts; true if any was drawn.

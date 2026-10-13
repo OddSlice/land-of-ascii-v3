@@ -563,7 +563,9 @@ export function* generateWorld(seed, opts = {}) {
     kind: 'world', seed, N, NN, center: [N / 2, N / 2], viewDist: SCALE.viewDist, openEdge: true, sea: SEA,
     terrain, spans, kit, fortDesc: plan.desc, kitDesc, objects: { trees, bushes, torches: kit.torches.map((t) => ({ ...t })), water: SEA },
     clouds: buildClouds(0, worldCloudList(seed, N)),
-    sites: { fort: fortRec, villages, viewpoints, spawn, bridges: bridgeRecs, lake: { x: lake.x, z: lake.z, level: lake.level, area: lake.area } },
+    sites: { fort: fortRec, villages, viewpoints, spawn, bridges: bridgeRecs, lake: { x: lake.x, z: lake.z, level: lake.level, area: lake.area },
+      // (phase 4b) the copses, where small birds settle
+      ...(ANIMALS ? { copses: clumps.map((c) => [Math.round(c.x * 10) / 10, Math.round(c.z * 10) / 10]) } : {}) },
     roads, lakes: lk.lakes, rivers: wet.rivers, shapes: { hills, basins, rises },
     kindMap: kind, levelMap: level,
   };

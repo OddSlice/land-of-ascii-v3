@@ -70,6 +70,18 @@ export const SCALE = {
   animals: {
     // a sheepfold: half sizes, the ground's most fall across it, its gate's width
     fold: { hw: 4.5, hd: 3.5, fall: 1.0, gate: 2.6 },
+    foldMargin: 0.9, foldSlot: 1.35,     // sheep's places in a fold: off the fence, apart
+    pastureSpot: 6, pastureEdge: 3.5,    // a pasture's grid of spots; how far its flock keeps off the fence
+    flock: [8, 20], herd: [3, 6], hens: [4, 7],     // how many to a flock, a herd, a village's hens
+    deerGrid: 16, deerApart: 300, deer: [4, 7], deerN: [3, 6],   // deer: where looked for, how far apart, groups, a group's size
+    hareGrid: 20, hareApart: 140, hares: 12,
+    duckGrid: 10, duckLoop: 3, duckApart: 180, ducks: 6,
+    gullGrid: 12, gullApart: 220, gullGroups: 3, gulls: [3, 6],
+    crowsFort: 4, crowsRoofs: 5,
+    finchFlocks: 4, finches: [12, 22],
+    flockSpace: 1.25, flockLead: 2.6, flockFile: 0.7,   // sheep grazing apart; behind their shepherd on the way, and one behind another
+    herdSpace: 3.2, dogLag: 1.6,
+    crowCircle: 9, gullCircle: 16, gullAlt: 14, kiteCircle: 140, kiteAlt: 110,
   },
   wall: { length: 120, thick: 3, height: 6, gate: 4 },
 
