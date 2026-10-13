@@ -352,8 +352,9 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN, amb = 1) {
     }
   } else if (m === MAT.WINDOW) {
     // (phase 3a) a window: a dark opening by day, lit from within at night by
-    // the keyframe's `windowStrength`
-    const j = m * 3, f = pal.k.windowStrength * (0.85 + 0.15 * light);
+    // the keyframe's `windowStrength`; (phase 4a) dark at any hour while
+    // nobody inside is awake (its light 0; a fixed window is never 0)
+    const j = m * 3, f = light <= 0 ? 0 : pal.k.windowStrength * (0.85 + 0.15 * light);
     r = shade[j] + (lit[j] - shade[j]) * f; g = shade[j + 1] + (lit[j + 1] - shade[j + 1]) * f; b = shade[j + 2] + (lit[j + 2] - shade[j + 2]) * f;
     bright = f;
   } else if (m === MAT.SUN || m === MAT.MOON || m === MAT.FLAME) {

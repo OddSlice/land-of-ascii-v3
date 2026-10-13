@@ -91,14 +91,16 @@ export function furnitureSpots(F, iw, id, floor, side = 1) {
   };
 }
 
-export function furnish(b, F, iw, id, floor, room, timber, seed, side = 1, phase = 0) {
+// (`group`, phase 4a: the house's light group, so its hearth burns down to
+// embers while everyone at home sleeps)
+export function furnish(b, F, iw, id, floor, room, timber, seed, side = 1, phase = 0, group = 0) {
   const Hh = K.hearth, T = K.table, Bd = K.bed, Sh = K.shelf;
   const inside = PF.INSIDE | PF.WALK;
   // the hearth: stone, in the middle of an end wall, its fire low in it
   const [hx, hz] = F.at(side * (iw - Hh.d), 0);
   b.add({ type: PT.BOX, x: hx, z: hz, a: F.a + Math.PI / 2, hx: Hh.w, hz: Hh.d, y0: floor - 0.1, y1: floor + Hh.h, mat: MAT.STONE, tex: TX.RUBBLE, tex2: TX.PAVING, room, flags: inside, seed });
   const [fx, fz] = F.at(side * (iw - Hh.d * 2 - 0.25), 0);
-  b.torch({ x: fx, z: fz, base: floor + Hh.h - 0.02, h: 0.01, flameY: floor + Hh.h + 0.16, phase, mask: 0, rooms: [room], mount: 'hearth' });
+  b.torch({ x: fx, z: fz, base: floor + Hh.h - 0.02, h: 0.01, flameY: floor + Hh.h + 0.16, phase, mask: 0, rooms: [room], mount: 'hearth', group });
   // a table in the middle, toward the hearth
   const [tx, tz] = F.at(side * iw * 0.15, 0.1);
   b.add({ type: PT.BOX, x: tx, z: tz, a: F.a, hx: T.w, hz: T.d, y0: floor + T.h - 0.06, y1: floor + T.h, mat: timber, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 1 });
@@ -151,7 +153,7 @@ export function dwelling(b, p) {
   b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hw, hz: hd, y0: floor - 0.1, y1: floor + S.eave, mat: walls, tex: TX.TIMBERED, tex2: TX.PLAIN, base: floor, seed, holes, flags: PF.GROW });
   if (p.enter) {
     b.add({ type: PT.BOX, x: F.x, z: F.z, a: F.a, hx: hw - wt + 0.01, hz: hd - wt + 0.01, y0: floor - 0.1, y1: floor + 0.02, mat: timber, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 1 });
-    furnish(b, F, hw - wt, hd - wt, floor + 0.02, room, timber, seed + 40, p.hearthSide || 1, seed * 0.17);
+    furnish(b, F, hw - wt, hd - wt, floor + 0.02, room, timber, seed + 40, p.hearthSide || 1, seed * 0.17, p.group || 0);
   }
   const ridge = roof(b, F, hw, hd, floor + S.eave, S.pitch, S.overhang, p.roof, timber, room, seed + 2);
   if (p.chimney || p.enter) chimney(b, F, (p.hearthSide || 1) * (hw - wt - 0.35), 0, floor + S.eave - 0.3, ridge, seed + 3);

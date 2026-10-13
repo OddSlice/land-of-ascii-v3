@@ -659,6 +659,8 @@ lab.people = {
   set(on) { if (people) people.setOn(on, player); if (yardFolk) yardFolk.on = !!on; },
   list() { return people ? people.list() : []; },
   get updateMs() { return people ? people.updateMs : 0; },
+  // which houses are lit, asleep or awake at home this frame (see litGroups)
+  get lit() { return people ? Array.from(people.lit) : []; },
   get buildMs() { return people ? people.buildMs : 0; },
   // the camera beside person i, `dist` metres off, looking at them
   goTo(i, dist = 3) {

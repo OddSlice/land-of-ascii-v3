@@ -478,7 +478,7 @@ const methods = {
       // (phase 4a: with people, a house's windows are lit while someone
       // inside is awake; without, as they were)
       const lg = S[q + P.LIT], lit = this.litG;
-      const power = lg && lit ? (lit[lg >> 1] && (lg & 1) ? 1 : 0.02) : S[q + P.POWER] || 1;
+      const power = lg && lit ? ((lit[lg >> 1] & 1) && (lg & 1) ? 1 : 0) : S[q + P.POWER] || 1;
       m.write(ci, slot, MAT.WINDOW, power, 0, 0, 0, hit.cover * 2 - 1, leg);
       return;
     }

@@ -855,19 +855,22 @@ function roomOfPerson(P, per, pl) {
   return pl.room;
 }
 
-// Who is at home and awake in each house (the light groups of its windows):
-// out[group] = 1 if lit.
+// Who is at home in each house (by the light groups of its windows):
+// out[group] bit 1 if its windows are lit (someone awake at home after
+// dark), bit 2 if someone sleeps there, bit 4 if someone is awake at home.
 export function litGroups(P, day, hour, out) {
   out.fill(0);
   for (const per of P.persons) {
     if (per.village === undefined) continue;
     const seg = segmentAt(planOf(P, per.id, day), hour);
     // (asleep, in a bed one can see or behind closed doors, is dark)
-    if (seg.kind !== 'stay' || seg.pose === POSE.SLEEP || seg.act.startsWith('asleep')) continue;
+    if (seg.kind !== 'stay') continue;
+    const H = P.villages[per.village].houses[per.home];
+    if (seg.pose === POSE.SLEEP || seg.act.startsWith('asleep')) { out[H.group] |= 2; continue; }
     const pl = P.places[seg.at];
     if (pl.kind === 'closed' || pl.kind === 'sit' || pl.kind === 'in' || pl.kind === 'hearth') {
-      const H = P.villages[per.village].houses[per.home];
-      if (hour >= 16.5 || hour < 9) out[H.group] = 1;
+      out[H.group] |= 4;
+      if (hour >= 16.5 || hour < 9) out[H.group] |= 1;
     }
   }
   return out;
