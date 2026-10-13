@@ -3,7 +3,7 @@
 // mirrored ones (R1). A direct ray that meets water also writes the surface
 // (R0), marches its refracted ray down to the bed (R2) and leaves a mirrored
 // row for reflect.js.
-import { MAT, MAT_NONE, MAT_SHELTER, HIT_STRIDE, REC } from '../../contract.js';
+import { MAT, MAT_NONE, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC } from '../../contract.js';
 import { TORCH_RANGE } from './light.js';
 import { rippleSlope, swellSlope, ringSlope, waterRays, RING_TILT } from './water.js';
 import { bil2, bil2S, bil2U8, bil1, bilU8, bilD } from './sample.js';
@@ -41,7 +41,7 @@ const methods = {
     if (slot === 0 && mat !== MAT.WATER && h[o] === MAT.WATER) { h[o + REC] = MAT_NONE; h[o + 2 * REC] = MAT_NONE; this.rays.rdepth[ci] = -1; }
     // (phase 3a) a surface inside a building that something now stands in
     // front of: its shelter is no longer the cell's
-    else if (slot === 0 && h[o + 2 * REC] === MAT_SHELTER) h[o + 2 * REC] = MAT_NONE;
+    else if (slot === 0 && (h[o + 2 * REC] === MAT_SHELTER || h[o + 2 * REC] === MAT_FAINT)) h[o + 2 * REC] = MAT_NONE;
     h[o] = mat;
     h[o + 1] = light <= 0 ? 0 : light >= 1 ? 255 : (light * 255 + 0.5) | 0;
     h[o + 2] = shadow <= 0 ? 0 : shadow >= 1 ? 255 : (shadow * 255 + 0.5) | 0;
@@ -71,6 +71,27 @@ const methods = {
     this.tg = { G, n, cells: cells.map((c) => Int16Array.from(c)) };
   },
 
+  // (phase 4a) The moving lights of this frame (the lanterns and torches
+  // people carry), in 16 m squares like the fixed torches, so a surface
+  // looks only at the few near it. None: nothing changes.
+  setMovers(list) {
+    this.movers = list;
+    if (!list.length) { this.mvg = null; return; }
+    const G = 16, n = Math.ceil(this.world.N / G), R = TORCH_RANGE, cells = new Map();
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      for (let gz = Math.max(0, Math.floor((t.z - R) / G)); gz <= Math.min(n - 1, Math.floor((t.z + R) / G)); gz++) {
+        for (let gx = Math.max(0, Math.floor((t.x - R) / G)); gx <= Math.min(n - 1, Math.floor((t.x + R) / G)); gx++) {
+          const k = gz * n + gx;
+          let c = cells.get(k);
+          if (!c) cells.set(k, (c = []));
+          c.push(i);
+        }
+      }
+    }
+    this.mvg = { G, n, cells };
+  },
+
   // (phase 3a) `zone`: the light zones of the surface (see world/kit.js); a
   // torch lights it only if its mask shares one. `strict`: a building's
   // surface, lit only from the side it faces (no wrap round the side).
@@ -91,6 +112,25 @@ const methods = {
       const f = 1 - d / TORCH_RANGE;
       const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
       sum += f * f * (strict ? (c > 0 ? c : 0) : 0.35 + 0.65 * Math.max(0, c)) * t.power * t.light;
+    }
+    const mg = this.mvg;
+    if (mg) {
+      let mx = Math.floor(x / mg.G), mz = Math.floor(z / mg.G);
+      mx = mx < 0 ? 0 : mx >= mg.n ? mg.n - 1 : mx; mz = mz < 0 ? 0 : mz >= mg.n ? mg.n - 1 : mz;
+      const ml = mg.cells.get(mz * mg.n + mx);
+      if (ml) {
+        for (let k = 0; k < ml.length; k++) {
+          const t = this.movers[ml[k]];
+          if ((t.mask & zone) === 0) continue;
+          const lx = t.x - x, ly = t.y - y, lz = t.z - z;
+          const d2 = lx * lx + ly * ly + lz * lz;
+          if (d2 >= TORCH_RANGE * TORCH_RANGE) continue;
+          const d = Math.sqrt(d2);
+          const f = 1 - d / TORCH_RANGE;
+          const c = d > 1e-6 ? (lx * nx + ly * ny + lz * nz) / d : 1;
+          sum += f * f * (strict ? (c > 0 ? c : 0) : 0.35 + 0.65 * Math.max(0, c)) * t.power * t.light;
+        }
+      }
     }
     return sum;
   },

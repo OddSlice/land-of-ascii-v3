@@ -8,7 +8,7 @@
 //   node tools/lookbook.mjs --phase 0c --ref DIR [--built]   docs/phase0c.md: each look candidate at near, middle
 //       and far distance, and the three fixes before (the build in DIR, e.g. a copy of phase 0b) and after
 //       (shots/phase0c/)
-//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look cloud=A,...] [--why]
+//   node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard] [--look cloud=A,...] [--why] [--people off]
 //       the regression lookbook: the fixed cameras (nine in the lab, three in
 //       the stress scene, the generated world's twelve for the default seed,
 //       phase 3a's building yard's fourteen) at day, dusk and night with every clock frozen and the
@@ -192,8 +192,10 @@ async function regress() {
       const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
       for (let i = 0; i < cams.length; i++) {
         for (const t of times) {
-          const cells = await page.evaluate(async ({ i, t, look, weather }) => {
+          const cells = await page.evaluate(async ({ i, t, look, weather, people }) => {
             const L = window.lab;
+            // (phase 4a: people on, or off with --people off)
+            if (L.people) L.people.set(people);
             L.resetLook();
             if (look) L.setLook(look);
             // (phase 2b: the weather held at fair, the look before weather)
@@ -202,7 +204,7 @@ async function regress() {
             await L.whenIdle();
             const st = L.state();
             return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
-          }, { i, t, look, weather });
+          }, { i, t, look, weather, people: a.people !== 'off' });
           await lab.check();
           frames.push({ name: `${scene} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
         }

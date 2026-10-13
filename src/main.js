@@ -12,6 +12,7 @@ import { buildStressWorld } from './world/stress.js';
 import { buildYard } from './world/yard.js';
 import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
+import { People } from './app/people.js';
 import { packWorld, unpackWorld, worldHash } from './world/pack.js';
 import { shadowStore } from './scene/cpu/light.js';
 import { buildInWorker, SharedShadows } from './app/worldboot.js';
@@ -160,6 +161,9 @@ const worldBuild = { total: 0 };
 const world = await makeWorld();
 const CAMS = STRESS || WORLD || YARD ? world.cameras : CAMERAS;
 const player = new Player(world, { rules: WORLD || YARD ? 'world' : 'lab' });
+// (phase 4a) the people of the generated world (?people=0: none)
+const people = WORLD ? new People(world) : null;
+if (people && params.get('people') === '0') people.on = false;
 const canvas = $('view');
 const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
@@ -232,6 +236,7 @@ const input = new Input(canvas, {
   },
   toggleFly: () => { if (WORLD || YARD) player.toggleFly(); },
   toggleMap: () => { if (map) map.toggle(); },
+  greet: () => greet(),
   toggleHud: () => hud.toggle(),
   toggleLook: () => lookPanel.toggle(),
   cycleLook: (name) => { state.look = nextOption(state.look, name); },
@@ -258,7 +263,32 @@ function makeFrame() {
   };
   // which shared shadow store this frame reads
   if (shadows) f.shadow = shadows.frame;
+  // (phase 4a) everyone's state at this frame's day and hour, and the houses
+  // with someone awake inside
+  if (people && people.on) {
+    if (people.planned < 0) people.planDay(state.day);
+    f.people = people.update(state.day, state.hour, { x: player.x, z: player.z, feet: player.feet }, player);
+    f.lit = people.lit.slice();
+  }
   return f;
+}
+
+// (phase 4a) Greeting whoever is in front of you (E): their line, a few seconds.
+let sayTimer = 0;
+function greet() {
+  if (!people || !people.on || QUIET || menu.open) return;
+  const i = people.greetable({ x: player.x, z: player.z, feet: player.feet, yaw: player.yaw });
+  if (i < 0) return;
+  const said = people.say(i, state.day, state.hour, weatherNow());
+  const el = $('say');
+  el.querySelector('.who').innerHTML = '';
+  const b = document.createElement('b'); b.textContent = said.name;
+  el.querySelector('.who').append(b, document.createTextNode(` · ${said.role}`));
+  el.querySelector('.line').textContent = said.text;
+  el.classList.add('on');
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => el.classList.remove('on'), 5200);
+  lab.lastSaid = said;
 }
 
 // The frame's weather (src/weather.js): a pure function of the seed, the day
@@ -608,6 +638,26 @@ function hideHint() { clearTimeout(hintTimer); $('hint').classList.remove('on');
 
 // ---- the debug handle ---------------------------------------------------------
 
+// (phase 4a) people, for the tools and the menu
+lab.people = {
+  get count() { return people ? people.n : 0; },
+  get on() { return !!(people && people.on); },
+  set(on) { if (people) people.setOn(on, player); },
+  list() { return people ? people.list() : []; },
+  get updateMs() { return people ? people.updateMs : 0; },
+  get buildMs() { return people ? people.buildMs : 0; },
+  // the camera beside person i, `dist` metres off, looking at them
+  goTo(i, dist = 3) {
+    if (!people) return false;
+    const p = people.list()[i];
+    if (!p) return false;
+    const a = p.yaw + 0.6, x = p.x + Math.sin(a) * dist, z = p.z + Math.cos(a) * dist;
+    player.place(x, z, Math.atan2(p.x - x, p.z - z), -0.08);
+    state.held = false; state.camName = `with ${p.name}`;
+    return true;
+  },
+  greet() { greet(); return lab.lastSaid || null; },
+};
 Object.assign(lab, {
   ready,
   threads: THREADS,

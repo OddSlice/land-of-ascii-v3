@@ -54,6 +54,8 @@ export class Player {
     this.surface = { ground: world.terrain.levels[0].H, N: world.terrain.N, NN: world.terrain.NN };
     // (phase 3a) the building kit's shapes: walked on and blocking exactly as drawn
     this.kit = world.kit && world.kit.np ? world.kit : null;
+    // (phase 4a) the people near, as [x, z, radius, bottom, top, ...] (set each frame)
+    this.others = null;
   }
 
   // (the eye lags a step up or down by a little, so a stair is climbed
@@ -160,6 +162,14 @@ export class Player {
       }
     }
     if (this.kit && bodyBlocked(this.kit, x, z, lo, hi, RADIUS)) return true;
+    // (phase 4a) people near: upright bodies one cannot walk through
+    const others = this.others;
+    if (others) {
+      for (let k = 0; k < others.length; k += 5) {
+        const dx = x - others[k], dz = z - others[k + 1], r = others[k + 2] + RADIUS;
+        if (dx * dx + dz * dz < r * r && others[k + 3] < hi && others[k + 4] > feet + 0.2) return true;
+      }
+    }
     const { B, n, cells } = this.tb;
     const gx = Math.floor(x / B), gz = Math.floor(z / B);
     for (let a = gz - 1; a <= gz + 1; a++) {

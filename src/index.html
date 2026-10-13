@@ -38,6 +38,14 @@
     color: var(--ink); background: rgba(13, 14, 18, .72); border: 1px solid var(--line); border-radius: 5px; pointer-events: none;
     opacity: 0; transition: opacity 300ms ease; }
   #hint.on { opacity: 1; }
+  /* (phase 4a) what someone says when greeted: their name and role, then
+     the line, low on the screen, in the menu's quiet style */
+  #say { position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%); max-width: min(620px, calc(100vw - 32px)); padding: 9px 16px 10px;
+    font: 13px/1.5 var(--mono); color: var(--ink); background: rgba(13, 14, 18, .78); border: 1px solid var(--line); border-radius: 6px;
+    pointer-events: none; opacity: 0; transition: opacity 260ms ease; text-align: center; }
+  #say.on { opacity: 1; }
+  #say .who { font-size: 11px; color: var(--quiet); letter-spacing: .02em; margin-bottom: 3px; }
+  #say .who b { color: var(--head); font-weight: 600; }
   #hint kbd, #card kbd, .menu kbd { display: inline-block; min-width: 1.9em; padding: 0 5px; margin-right: 3px; font: 600 11px/1.6 var(--mono);
     color: var(--head); text-align: center; background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
   #hint kbd { margin-right: 8px; }
@@ -189,6 +197,7 @@
 <div id="progress"></div>
 <div id="look" style="display:none"></div>
 <div id="hint" aria-hidden="true"><kbd>Esc</kbd>menu and controls</div>
+<div id="say" role="status" aria-live="polite"><div class="who"></div><div class="line"></div></div>
 <div id="card" role="dialog" aria-labelledby="card-title" tabindex="-1">
   <div class="box">
     <h1 id="card-title">Land of Ascii</h1>

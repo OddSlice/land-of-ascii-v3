@@ -490,6 +490,8 @@ export function planVillage(q, v, pattern, water, env) {
     if (rects.some((B) => overlaps(BR, B, 1.0)) || env.built.some((B) => overlaps(BR, B, 1.0))) continue;
     pieces.push({ kind: 'bench', at, angle: a, base: gAt(at[0], at[1]), seed: 3400 + q * 2 + t });
     rects.push(BR);
+    // (phase 4a: where people sit)
+    (rec.benches || (rec.benches = [])).push({ x: at[0], z: at[1], a, base: gAt(at[0], at[1]) });
   }
 
   // ---- the signpost where its road meets the main road -----------------------------------
@@ -515,6 +517,9 @@ export function planVillage(q, v, pattern, water, env) {
     }
   }
 
+  // (phase 4a) each house's windows a light group, so they can be lit
+  // while someone inside is awake (people/people.js uses the same numbers)
+  houses.forEach((h, k) => { h.group = 1 + q * 32 + k; });
   rec.houses = houses.map((h) => ({ kind: h.kind, x: h.at[0], z: h.at[1], a: h.angle, w: h.w, d: h.d, floor: h.floor, enter: !!h.enter, lit: !!h.lit }));
   rec.enter = houses.filter((h) => h.enter).map((h) => {
     const ca = Math.cos(h.angle), sa = Math.sin(h.angle);

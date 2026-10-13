@@ -10,7 +10,7 @@
 // It reads nothing but its own cell, except that a faint flame is blended
 // with the next cell up (or down) its own column; stripes never touch.
 import { LOOK } from './look.js';
-import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, MAT_SHELTER, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
+import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
 import { FAMILY, SHADE_STEPS, RAIN_GLYPHS } from './glyphs.js';
 import { weatherParams } from './weather.js';
 import { sunDir, moonDir, moonDirOn, moonLit } from './world/sky.js';
@@ -296,8 +296,13 @@ for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.SNOW, MAT.FLOOR]) 
 // how much rain darkens a material (phase 2b; foliage less, snow and the
 // already wet bed not at all), and the stripe's wetness: how much darker wet
 // ground is, how much sky it mirrors
-const WETM = new Float32Array(32);
+const WETM = new Float32Array(64);
 for (const m of [MAT.GRASS, MAT.DIRT, MAT.SAND, MAT.ROCK, MAT.STONE, MAT.FLOOR, MAT.TRUNK, MAT.WOOD, MAT.TIMBER, MAT.PLASTER, MAT.ROOF, MAT.YARD, MAT.MASONRY]) WETM[m] = 1;
+// (phase 4a: the villages' materials, which phase 3b left dry by mistake, and
+// people's clothes, which darken a little less than stone)
+for (const m of [MAT.THATCH, MAT.PLASTER2, MAT.PLASTER3, MAT.TIMBER2, MAT.TIMBER3, MAT.CROP, MAT.STUBBLE, MAT.FALLOW]) WETM[m] = 1;
+for (const m of [MAT.HAIR, MAT.LINEN, MAT.RUSSET, MAT.OCHRE, MAT.MOSS, MAT.SLATE, MAT.UMBER, MAT.CHARCOAL, MAT.LEATHER]) WETM[m] = 0.7;
+WETM[MAT.SKIN] = 0.3; WETM[MAT.SKIN2] = 0.3; WETM[MAT.IRON] = 0.5;
 WETM[MAT.CONIFER] = 0.5; WETM[MAT.BUSH] = 0.5;
 let wetDark = 0, wetSheen = 0;
 // the rules of the stripe being resolved: air (aerial perspective and the
@@ -695,6 +700,13 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
           if (nf >= faint.length) { const a = new Int32Array(nf * 2); a.set(faint); faint = a; const b = new Float32Array(nf * 2); b.set(faintW); faintW = b; }
           faint[nf] = mirrorFlame ? -1 - i : i; faintW[nf] = w; nf++;
         }
+      } else if (hits[o + 2 * REC] === MAT_FAINT) {
+        // (phase 4a) a far figure: by how much of its drawn size it really is
+        const w = hits[o + 2 * REC + 1] / 255;
+        if (w < 0.999) {
+          if (nf >= faint.length) { const a = new Int32Array(nf * 2); a.set(faint); faint = a; const b = new Float32Array(nf * 2); b.set(faintW); faintW = b; }
+          faint[nf] = i; faintW[nf] = w; nf++;
+        }
       }
       if (m === MAT.CLOUD && rec.cover < 0.92) {
         // the edge: sky behind, the cloud in a shade block over it
@@ -752,7 +764,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
       if (y < 0 || y >= rows) break;
       const jj = y * sw + q, oj = jj * HIT_STRIDE;
       const lj = hits[oj] === MAT.WATER ? hits[oj + REC] : hits[oj];
-      const isFlame = lj === MAT.FLAME || lj === MAT.WINDOW;
+      const isFlame = lj === MAT.FLAME || lj === MAT.WINDOW || hits[oj + 2 * REC] === MAT_FAINT;
       if (!isFlame) { j = jj; break; }
     }
     const oc = i * CELL_STRIDE;

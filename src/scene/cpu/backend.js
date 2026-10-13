@@ -10,6 +10,7 @@ import { HIT_STRIDE, REC, MAT_NONE } from '../../contract.js';
 import { ruleOf } from '../../look.js';
 import { backdropOf } from '../../world/backdrop.js';
 import { ZONE_ALL } from '../../world/kit.js';
+import { moversOf } from './figures.js';
 
 export function createCpuBackend(world, opts = {}) {
   // the generated world's backdrop: built once, the same in every thread
@@ -40,6 +41,8 @@ export function createCpuBackend(world, opts = {}) {
       const torches = world.objects.torches.map((T) => ({ x: T.x, y: T.flameY, z: T.z, power: torchPower(frame.t + T.phase), light: T.light !== undefined ? T.light : 1, mask: T.mask !== undefined ? T.mask : ZONE_ALL }));
       // (phase 3a) the buildings first, so the march stops behind them
       marcher.begin(v, rays, hits, frame, torches);
+      // (phase 4a) the lights people carry
+      marcher.setMovers(moversOf(frame, world.kit));
       objects.buildings(v, rays, marcher, frame, torches);
       marcher.march();
       objects.run(v, rays, marcher, frame, torches);

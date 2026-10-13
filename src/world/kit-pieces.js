@@ -367,6 +367,27 @@ function roundTower(b, p, wa, holes, lights, top) {
 // The keep: a large tower against the far wall, its door toward the yard
 // (local +u), one hall inside lit by its door, slits and torches; lit
 // windows high up; a crenellated top.
+// (phase 4a) The keep's bunks: where each stands (its middle, its length's
+// angle, its top) and, for people, the angle to lie along it. In the hall's
+// furnishing frame (its +w the front wall with the door, the bed and shelf
+// on its back wall, the hearth on its +u end): along the front wall clear of
+// the door, then down the -u end clear of the bed.
+export function keepBunks(p) {
+  const Kp = K.keep, wt = Kp.wallT, F = frame(p.at[0], p.at[1], p.angle - D2), iw = p.w - wt, id = p.d - wt, Bd = K.bed;
+  const top = p.base + 0.06 + Bd.h, out = [];
+  const add = (u, w, along) => {
+    const [x, z] = F.at(u, w), a = along ? F.a : F.a + D2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    out.push({ x, z, a, top, yaw: Math.atan2(ca, sa), k: out.length });
+  };
+  const wf = id - Bd.d - 0.05, step = 2 * Bd.w + 0.2;
+  for (let u = -1.4 - Bd.w; u - Bd.w > -iw + 0.05; u -= step) add(u, wf, true);
+  for (let u = 1.4 + Bd.w; u + Bd.w < iw - 1.3; u += step) add(u, wf, true);
+  const ue = -iw + Bd.d + 0.05;
+  for (let w = wf - Bd.d - 0.3 - Bd.w; w - Bd.w > -id + 2 * Bd.d + 0.4; w -= step) add(ue, w, false);
+  return out;
+}
+
 export function keep(b, p) {
   const Kp = K.keep, W = K.wall, base = p.base, top = base + W.height + Kp.above, wt = Kp.wallT, seed = p.seed || 401;
   const F = frame(p.at[0], p.at[1], p.angle), hd = p.d, hw = p.w;
@@ -395,6 +416,9 @@ export function keep(b, p) {
   // (phase 3b) the hall furnished as a house is: a hearth at one end, a
   // table, a bed along the back wall, a shelf
   furnish(b, frame(p.at[0], p.at[1], F.a - D2), hw - wt, hd - wt, base + 0.06, room, MAT.TIMBER, seed + 500, 1, seed * 0.29);
+  // (phase 4a) the guards' bunks, along the hall's front wall either side of
+  // the door and down its far end
+  for (const bk of keepBunks(p)) b.add({ type: PT.BOX, x: bk.x, z: bk.z, a: bk.a, hx: K.bed.w, hz: K.bed.d, y0: base + 0.06, y1: bk.top, mat: MAT.PLASTER2, tex: TX.PLAIN, tex2: TX.PLAIN, room, flags: PF.INSIDE | PF.WALK, seed: seed + 520 + bk.k });
   // torches in the hall, on its back wall
   {
     const [nx, nz] = F.dir(1, 0);

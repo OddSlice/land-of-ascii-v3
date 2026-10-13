@@ -27,11 +27,13 @@ const K = SCALE.kit;
 // sill at y: a recess `depth` deep with a pane at its back, lit at night if
 // `lit` (else dark glass). Pushes its hole; returns its middle (for a room's
 // openings).
-function pane(b, F, u, face, y, ww, wh, depth, holes, room, lit, seed) {
+// (`group`, phase 4a: the house's light group; `pattern`: whether this
+// window is one of those lit while anyone inside is awake)
+function pane(b, F, u, face, y, ww, wh, depth, holes, room, lit, seed, group = 0, pattern = false) {
   const [hx, hz] = F.at(u, face - depth / 2 + 0.05);
   holes.push({ type: HT.BOX, x: hx, z: hz, a: F.a, hx: ww / 2, hz: depth / 2 + 0.05, y0: y, y1: y + wh, room, close: 1, depth });
   const [px, pz] = F.at(u, face - depth + 0.04);
-  b.add({ type: PT.PANE, x: px, z: pz, a: F.a, hx: ww / 2 - 0.04, hz: 0.03, y0: y + 0.04, y1: y + wh - 0.04, mat: MAT.WINDOW, power: lit ? 1 : 0.02, seed });
+  b.add({ type: PT.PANE, x: px, z: pz, a: F.a, hx: ww / 2 - 0.04, hz: 0.03, y0: y + 0.04, y1: y + wh - 0.04, mat: MAT.WINDOW, power: lit ? 1 : 0.02, seed, lit: group ? group * 2 + (pattern ? 1 : 0) : 0 });
   return { x: hx, z: hz, y: y + wh / 2 };
 }
 
@@ -68,6 +70,27 @@ function closedDoor(b, F, u, face, floor, dw, dh, holes, timber, seed) {
 // -w) and its sides, in a box iw by id (half, inside the walls) at floor:
 // a hearth (with its fire, which lights the room), a table, a bed and a
 // shelf. `side`: which end the hearth is at.
+// (phase 4a) Where people find a room's furniture (the same sums as
+// furnish's): the bed (its middle, its top, its length's angle), a place to
+// sit on its edge facing the room (the seat's height), and where to stand at
+// the hearth.
+export function furnitureSpots(F, iw, id, floor, side = 1) {
+  const Hh = K.hearth, Bd = K.bed;
+  const [bx, bz] = F.at(-side * (iw - Bd.w - 0.05), -(id - Bd.d - 0.05));
+  const edge = -(id - 2 * Bd.d - 0.05);
+  const [sx, sz] = F.at(-side * (iw - Bd.w - 0.05), edge - 0.12);
+  const [fx, fz] = F.dir(0, 1);
+  // (beside the fire, toward the door, clear of the table)
+  const [hx, hz] = F.at(side * (iw - Hh.d * 2 - 0.8), Math.min(0.95, id - 0.5));
+  const [tx, tz] = F.dir(side, 0);
+  return {
+    bed: { x: bx, z: bz, top: floor + Bd.h, a: F.a, yaw: Math.atan2(F.ca, F.sa) },
+    sit: { x: sx, z: sz, seat: floor + Bd.h, yaw: Math.atan2(fx, fz) },
+    hearth: { x: hx, z: hz, yaw: Math.atan2(tx, tz) },
+    floor,
+  };
+}
+
 export function furnish(b, F, iw, id, floor, room, timber, seed, side = 1, phase = 0) {
   const Hh = K.hearth, T = K.table, Bd = K.bed, Sh = K.shelf;
   const inside = PF.INSIDE | PF.WALK;
@@ -119,7 +142,8 @@ export function dwelling(b, p) {
       const Fs = sgn > 0 ? F : frame(F.x, F.z, F.a + Math.PI);
       // (an upper window lights the upper storey, not the room one enters)
       const inRoom = p.enter && !upper;
-      const o = pane(b, Fs, sgn > 0 ? u : -u, hd, floor + y, 0.62, upper ? 0.7 : 0.85, inRoom ? through : 0.22, holes, inRoom ? room : -1, p.lit && (k++ % 3 !== 2 || upper), seed + 20 + k);
+      const pat = k % 3 !== 2 || upper;
+      const o = pane(b, Fs, sgn > 0 ? u : -u, hd, floor + y, 0.62, upper ? 0.7 : 0.85, inRoom ? through : 0.22, holes, inRoom ? room : -1, p.lit && (k++ % 3 !== 2 || upper), seed + 20 + k, p.group || 0, pat);
       if (inRoom) { const [nx, nz] = Fs.dir(0, -1); ops.push({ x: o.x, y: o.y, z: o.z, nx, ny: 0, nz, area: 0.62 * 0.85 }); }
     }
   }

@@ -65,6 +65,7 @@ export const P = {
   MAT2: 23, TEX2: 24,   // a roof's gable ends; a wall's top
   ZONE: 25,             // which side its outer surfaces face (see zoneBits)
   POWER: 26,            // a pane's brightness
+  LIT: 27,              // (phase 4a) a window's light group * 2 + 1 if lit while anyone is awake there (0: none)
 };
 // hole table
 export const H_STRIDE = 14;
@@ -148,6 +149,7 @@ export function compileKit(b) {
     prims[q + P.MAT2] = o.mat2 !== undefined ? o.mat2 : o.mat; prims[q + P.TEX2] = o.tex2 !== undefined ? o.tex2 : (o.tex || 0);
     prims[q + P.ZONE] = o.zone !== undefined ? o.zone : -1;
     prims[q + P.POWER] = o.power || 0;
+    prims[q + P.LIT] = o.lit || 0;
     const R = reachOf(prims, q);
     x0 = Math.min(x0, o.x - R); x1 = Math.max(x1, o.x + R); z0 = Math.min(z0, o.z - R); z1 = Math.max(z1, o.z + R);
     top = Math.max(top, o.y1);
@@ -302,6 +304,24 @@ const NEAR_TMP = [];
 const LS = new Int32Array(4096), LB = new Int32Array(4096), YS = new Float64Array(8192);
 
 // Is world point (x, y, z) inside any shape's solid?
+// (phase 4a) The room whose floor holds (x, z) at about height y (a shape
+// marked INSIDE and WALK under the point, its top within half a metre of y),
+// or -1 outside.
+export function roomAt(kit, x, z, y) {
+  if (!kit) return -1;
+  const list = near(kit, x, z, NEAR_TMP), S = kit.prims;
+  let best = -1, bd = Infinity;
+  for (const i of list) {
+    const q = i * P_STRIDE, room = S[q + P.ROOM];
+    if (room < 0 || (S[q + P.FLAGS] & (PF.INSIDE | PF.WALK)) !== (PF.INSIDE | PF.WALK)) continue;
+    const ox = x - S[q + P.CX], oz = z - S[q + P.CZ], u = ox * S[q + P.CA] + oz * S[q + P.SA], w = -ox * S[q + P.SA] + oz * S[q + P.CA];
+    if (Math.abs(u) > S[q + P.HX] || Math.abs(w) > S[q + P.HZ]) continue;
+    const d = Math.abs(S[q + P.Y1] - y);
+    if (d < 0.5 && d < bd) { bd = d; best = room; }
+  }
+  return best;
+}
+
 export function solidAt(kit, x, y, z) {
   const list = near(kit, x, z, NEAR_TMP);
   for (const i of list) if (inPrim(kit, i, x, y, z)) return true;

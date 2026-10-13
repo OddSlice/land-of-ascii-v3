@@ -24,6 +24,7 @@ import { MAX_RIPPLE, RING_TILT, MAX_SWELL } from './water.js';
 import { TIER } from '../../world/objects.js';
 import { LOOK } from '../../look.js';
 import { installBuildings } from './build.js';
+import { installFigures, FIG } from './figures.js';
 import { PT, PF, P as KP, P_STRIDE, reachOf } from '../../world/kit.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -93,9 +94,11 @@ export class ObjectPass {
       return { items: Int32Array.from(items), x0: bx * BUCKET - R - 2, x1: (bx + 1) * BUCKET + R + 2, z0: bz * BUCKET - R - 2, z1: (bz + 1) * BUCKET + R + 2, y0, y1, grow, up };
     }).filter((bk) => bk.items.length);
     // per-frame scratch
-    this.cand = new Int32Array(list.length);
-    this.cdist = new Float64Array(list.length);
-    this.box = new Int32Array(list.length * 4);
+    // (phase 4a: room after the list for the frame's figures)
+    this.cand = new Int32Array(list.length + 1024);
+    this.cdist = new Float64Array(list.length + 1024);
+    this.box = new Int32Array((list.length + 1024) * 4);
+    this.initFigures();
     this.tiles = new Float32Array(64);
     this.bb = [0, 0, 0, 0];
     this.margin = 0;
@@ -119,6 +122,7 @@ export class ObjectPass {
 
   setup(v, rays, m, frame, torches) {
     this.v = v; this.rays = rays; this.m = m; this.t = frame.t; this.torches = torches;
+    this.litG = frame.lit || null;
     // (under rain trees are mirrored only in nearer water, phase 2b)
     const wp = weatherParams(frame.weather);
     const mk = wp.rain > 0 ? 1 - (1 - LOOK.weather.rain.mirror.objects) * wp.rain : 1;
@@ -129,6 +133,7 @@ export class ObjectPass {
 
   run(v, rays, m, frame, torches) {
     this.setup(v, rays, m, frame, torches);
+    this.prepareFigures(v, frame);
     const wp = this.wp;
     // (the buildings' direct view was drawn before the march)
     this.skip = this.kit ? PRIM : -1;
@@ -313,6 +318,21 @@ export class ObjectPass {
         box[i * 4] = bb[0]; box[i * 4 + 1] = bb[1]; box[i * 4 + 2] = bb[2]; box[i * 4 + 3] = bb[3];
       }
     }
+    // (phase 4a) the frame's figures, after the list
+    const L = list.length, figs = this.figItems;
+    for (let j = 0; j < figs.length && j < 1024; j++) {
+      const it = figs[j];
+      if (!mirror && this.only >= 0) break;
+      const dist = it.dist;
+      if (dist - it.R > (mirror ? this.objFar : view)) continue;
+      const gr = it.grow * v.colAngle * Math.max(dist, 0.5), RR = it.R + gr, gy = it.up * gr;
+      const oy0 = mirror ? 2 * wlo - it.y1 - gy : it.y0 - gy, oy1 = mirror ? 2 * whi - it.y0 + gy : it.y1 + gy;
+      if (!this.screenBox(it.x - RR, it.x + RR, oy0, oy1, it.z - RR, it.z + RR)) continue;
+      const i = L + j;
+      cand[nc++] = i; cdist[i] = dist;
+      const bb = this.bb;
+      box[i * 4] = bb[0]; box[i * 4 + 1] = bb[1]; box[i * 4 + 2] = bb[2]; box[i * 4 + 3] = bb[3];
+    }
     if (!nc) return;
     if (!mirror) st.candidates = nc;
     // front to back (ties by index, so every stripe agrees)
@@ -321,7 +341,7 @@ export class ObjectPass {
     this.buildTiles(mirror);
     const bb = [0, 0, 0, 0];
     for (let k = 0; k < nc; k++) {
-      const i = order[k], it = list[i], dist = cdist[i];
+      const i = order[k], it = i < L ? list[i] : figs[i - L], dist = cdist[i];
       const RR = this.reachOf(it) + it.grow * v.colAngle * Math.max(dist, 0.5);
       bb[0] = box[i * 4]; bb[1] = box[i * 4 + 1]; bb[2] = box[i * 4 + 2]; bb[3] = box[i * 4 + 3];
       if (this.covered(bb, dist - RR)) { if (!mirror) st.culled++; continue; }
@@ -334,6 +354,7 @@ export class ObjectPass {
   // Column by column, so a conifer's sizes along a plane are worked out once
   // for all the rows that share it.
   draw(it, dist, bb, mirror) {
+    if (it.kind === FIG) return this.drawFigure(it, dist, bb, mirror);
     const { v, rays, hit } = this;
     const minR = v.colAngle * Math.max(dist, 0.5);
     // how many rows a conifer tier covers; under ~3 the tiers melt into a cone
@@ -687,3 +708,4 @@ export class ObjectPass {
 }
 
 installBuildings(ObjectPass);
+installFigures(ObjectPass);

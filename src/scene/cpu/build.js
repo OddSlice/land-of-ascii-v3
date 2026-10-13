@@ -58,7 +58,7 @@ function slab(q0, dq, h, out, fLo, fHi) {
 }
 const SA = [0, 0, 0, 0], SB = [0, 0, 0, 0];
 
-class Plane {
+export class Plane {
   constructor() {
     this.miss = true;
     this.hu0 = new Float64Array(MAXH); this.hw0 = new Float64Array(MAXH); this.hdu = new Float64Array(MAXH); this.hdw = new Float64Array(MAXH);
@@ -475,7 +475,11 @@ const methods = {
     const len = Math.sqrt(1 + s * s);
     const leg = (D - after) * len;
     if (hit.mat === MAT.WINDOW) {
-      m.write(ci, slot, MAT.WINDOW, S[q + P.POWER] || 1, 0, 0, 0, hit.cover * 2 - 1, leg);
+      // (phase 4a: with people, a house's windows are lit while someone
+      // inside is awake; without, as they were)
+      const lg = S[q + P.LIT], lit = this.litG;
+      const power = lg && lit ? (lit[lg >> 1] && (lg & 1) ? 1 : 0.02) : S[q + P.POWER] || 1;
+      m.write(ci, slot, MAT.WINDOW, power, 0, 0, 0, hit.cover * 2 - 1, leg);
       return;
     }
     const nx = hit.nx, ny = hit.ny, nz = hit.nz;

@@ -81,6 +81,7 @@ export class Input {
       case 'KeyL': a.toggleLook(); break;
       case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
       case 'KeyM': if (a.toggleMap) a.toggleMap(); break;
+      case 'KeyE': if (a.greet) a.greet(); break;
       case 'Space': if (a.jump) a.jump(); break;
       default: {
         // the look panel's keys (LOOK.choices)

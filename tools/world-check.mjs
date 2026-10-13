@@ -72,6 +72,9 @@ import { hash2 } from '../src/world/noise.js';
 import { Player } from '../src/app/player.js';
 import { solidAt, bodyBlocked, PF, P as KP, P_STRIDE } from '../src/world/kit.js';
 import { inPoly, polyDist } from '../src/world/gen/fort.js';
+import { buildPeople, planOf, stateAt, alongOf, litGroups, segmentAt, routeOf } from '../src/world/people/people.js';
+import { adjust } from '../src/world/people/meet.js';
+import { FS, S as PS, POSE } from '../src/world/people/figure.js';
 
 const a = args();
 // (the default seed and four others: 3, 1, 2, 4, 5)
@@ -718,6 +721,129 @@ function villageWalker(w, p, move, v, vi) {
   return { states: list.length, targets: res.length, reached: res.filter((r) => r.reached).length, out: res.filter((r) => r.reached && r.out).length, failed, walks, ok: !failed.length && !through && !stuck && !inside };
 }
 
+// ---- 11. People (phase 4a) ------------------------------------------------
+// Every person has a home with a door that can be reached and a plan for
+// each of ten days running; every route in those plans can be walked by the
+// player's rules (walked again here, point to point); sampled every ten
+// game minutes over three days, nobody is inside a wall, a fence or any
+// closed shape, in water deeper than a ford, off a bridge's or a jetty's
+// deck where they stand on one, or on the same spot as anyone else; the
+// wall walk and the gate have a guard at every hour; a house's windows are
+// lit only when someone inside is awake; the same seed, day and hour give
+// the same positions and poses, byte for byte, from a fresh start.
+function peopleChecks(w) {
+  const t0 = performance.now();
+  const P = buildPeople(w), n = P.persons.length, out = { persons: n, roles: {} };
+  for (const per of P.persons) out.roles[per.role] = (out.roles[per.role] || 0) + 1;
+  const p = new Player(w, { rules: 'world' }), move = makeMove(w, p), STEP = 0.6, HEAD = 1.8, R = 0.3;
+  // homes and their doors
+  const homeFails = [];
+  for (const per of P.persons) {
+    if (per.village === undefined) continue;
+    const H = P.villages[per.village].houses[per.home], st = P.places[H.step];
+    const ok = routeTo(P, H.step);
+    if (!ok) homeFails.push(`${per.name}'s door at ${Math.round(st.x)},${Math.round(st.z)}`);
+  }
+  out.homes = { fails: homeFails };
+  // ten days of plans, every route walked again
+  const DAYS = 10, routes = new Set(), routeFails = [];
+  let segs = 0;
+  for (let d = 0; d < DAYS; d++) for (let i = 0; i < n; i++) {
+    const plan = planOf(P, i, d);
+    if (!plan || !plan.length || plan[0].t0 !== 0 || plan[plan.length - 1].t1 !== 24) routeFails.push(`${P.persons[i].name} day ${d}: no whole plan`);
+    for (const sg of plan) {
+      segs++;
+      if (sg.kind !== 'walk') continue;
+      if (!sg.route) { routeFails.push(`${P.persons[i].name} day ${d}: a route that cannot be walked`); continue; }
+      routes.add(sg.route);
+    }
+  }
+  let walked = 0;
+  for (const R2 of routes) {
+    walked++;
+    // through a closed door the last steps go in at its sill: those are not walked
+    let x = R2.x[0], z = R2.z[0], ft = R2.y[0], bad = -1;
+    for (let k = 1; k < R2.n; k++) {
+      const L = Math.hypot(R2.x[k] - x, R2.z[k] - z);
+      if (L < 1e-6) continue;
+      const r = move(x, z, ft, (R2.x[k] - x) / L, (R2.z[k] - z) / L, L);
+      if (!r) { if (k >= R2.n - 3 || k <= 3) { x = R2.x[k]; z = R2.z[k]; ft = R2.y[k]; continue; } bad = k; break; }
+      [x, z, ft] = r;
+    }
+    if (bad >= 0) routeFails.push(`a route stops at ${R2.x[bad].toFixed(1)},${R2.z[bad].toFixed(1)}`);
+  }
+  out.plans = { days: DAYS, segments: segs, routes: walked, fails: routeFails };
+  // three days, every ten minutes
+  const st = new Float32Array(n * FS), segsAt = new Array(n), along = new Float64Array(n), lit = new Uint8Array(200);
+  const bad = { inside: 0, water: 0, deck: 0, same: 0, guardGate: 0, guardWall: 0, lit: 0 }, ex = [];
+  const surface = { ground: w.terrain.levels[0].H, N: w.N, NN: w.NN };
+  const decks = [];
+  for (const b of w.sites.bridges || []) decks.push({ x: b.x, z: b.z, a: b.a, hl: b.len / 2, hw: SCALE.kit.bridge.half, y: b.y });
+  for (const v of w.sites.villages) if (v.plan && v.plan.jetty) { const j = v.plan.jetty, L = Math.hypot(j.b[0] - j.a[0], j.b[1] - j.a[1]); decks.push({ x: (j.a[0] + j.b[0]) / 2, z: (j.a[1] + j.b[1]) / 2, a: Math.atan2(j.b[1] - j.a[1], j.b[0] - j.a[0]), hl: L / 2, hw: SCALE.kit.jetty.width, y: j.y }); }
+  const onDeck = (x, z) => decks.find((D) => { const ox = x - D.x, oz = z - D.z, u = ox * Math.cos(D.a) + oz * Math.sin(D.a), v2 = -ox * Math.sin(D.a) + oz * Math.cos(D.a); return Math.abs(u) < D.hl - 0.6 && Math.abs(v2) < D.hw - 0.2; });
+  let samples = 0;
+  for (let d = 0; d < 3; d++) for (let m = 0; m < 24 * 6; m++) {
+    const hour = m / 6;
+    for (let i = 0; i < n; i++) { const sg = stateAt(P, i, d, hour, st, i * FS); segsAt[i] = sg; along[i] = alongOf(P, i, sg, hour); }
+    adjust(st, n, segsAt, along, null, P.p);
+    let gate = 0, wall = 0;
+    for (let i = 0; i < n; i++) {
+      const o = i * FS, pose = st[o + PS.POSE], x = st[o + PS.X], z = st[o + PS.Z], ft = st[o + PS.FEET];
+      const per = P.persons[i];
+      if (per.role === 'guard' && segsAt[i].kind === 'stay') { const k = P.places[segsAt[i].at].kind; if (k === 'post') gate++; if (k === 'walk') wall++; }
+      if (pose === POSE.HIDDEN) continue;
+      samples++;
+      // (sitting on a seat or lying on a bed, the body is on the shape: not inside it)
+      if (pose !== POSE.SIT && pose !== POSE.SLEEP && bodyBlocked(w.kit, x, z, ft + STEP + 0.02, ft + HEAD - 0.02, R * 0.85)) { bad.inside++; if (ex.length < 6) ex.push(`${per.name} inside at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)} (${segsAt[i].kind} ${segsAt[i].act})`); }
+      const dk = onDeck(x, z);
+      if (dk && Math.abs(ft - dk.y) > 0.35 && pose !== POSE.SIT) { bad.deck++; if (ex.length < 6) ex.push(`${per.name} off the deck at ${x.toFixed(1)},${z.toFixed(1)} feet ${ft.toFixed(2)} deck ${dk.y.toFixed(2)}`); }
+      const water = groundAt(surface, x, z) - groundAt(w.terrain, x, z);
+      if (!dk && water > SCALE.river.ford + 0.05 && ft < groundAt(surface, x, z) - 0.1) { bad.water++; if (ex.length < 6) ex.push(`${per.name} in ${water.toFixed(2)} m of water at ${x.toFixed(1)},${z.toFixed(1)}`); }
+      for (let j = i + 1; j < n; j++) {
+        const oj = j * FS;
+        if (st[oj + PS.POSE] === POSE.HIDDEN || Math.abs(st[oj + PS.FEET] - ft) > 1.2) continue;
+        if (Math.hypot(st[oj + PS.X] - x, st[oj + PS.Z] - z) < 0.5) { bad.same++; if (ex.length < 6) ex.push(`${per.name} and ${P.persons[j].name} on one spot at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)}`); }
+      }
+    }
+    if (m % 6 === 0 && P.fort) { if (!gate) bad.guardGate++; if (!wall) bad.guardWall++; }
+    // the windows: lit only with someone awake inside (and after dark, lit then)
+    litGroups(P, d, hour, lit);
+    for (const V of P.villages) for (const H of V.houses) {
+      const res = P.persons.filter((q) => q.village === V.q && q.home === H.k);
+      const awake = res.some((q) => { const sg = segmentAt(planOf(P, q.id, d), hour); return sg.kind === 'stay' && sg.pose !== POSE.SLEEP && ['closed', 'sit', 'in', 'hearth'].includes(P.places[sg.at].kind); });
+      const dark = hour >= 16.5 || hour < 9;
+      if (lit[H.group] && !awake) bad.lit++;
+      if (!lit[H.group] && awake && dark) bad.lit++;
+    }
+  }
+  out.samples = { samples, ...bad, examples: ex };
+  // the same again from a fresh start
+  const P2 = buildPeople(w), sta = new Float32Array(n * FS), stb = new Float32Array(n * FS);
+  let differ = 0;
+  for (const [d, h] of [[0, 6.5], [1, 12.25], [2, 19.9], [4, 23.5]]) {
+    for (let i = 0; i < n; i++) { stateAt(P, i, d, h, sta, i * FS); stateAt(P2, i, d, h, stb, i * FS); }
+    for (let k = 0; k < sta.length; k++) if (sta[k] !== stb[k] && !(Number.isNaN(sta[k]) && Number.isNaN(stb[k]))) differ++;
+  }
+  out.same = differ === 0;
+  out.ms = Math.round(performance.now() - t0);
+  out.bad = P.bad.length;
+  out.ok = !homeFails.length && !routeFails.length && !bad.inside && !bad.water && !bad.deck && !bad.same && !bad.guardGate && !bad.guardWall && !bad.lit && out.same && !P.bad.length;
+  return out;
+}
+function routeTo(P, place) {
+  // (a home's door can be reached: a route from it to the village's first well, or any other place)
+  const other = P.places.find((q) => q.id !== place && q.via < 0);
+  return !!(other && planRoute(P, place, other.id));
+}
+function planRoute(P, a, b) { try { return routeOf(P, a, b); } catch { return null; } }
+
+function printPeople(seed, pc) {
+  const rs = Object.entries(pc.roles).map(([k, v]) => `${v} ${k}${v > 1 ? 's' : ''}`).join(', ');
+  console.log(`  people: ${pc.ok ? 'ok' : 'FAIL'}, ${pc.persons} (${rs}); homes ${pc.homes.fails.length ? `FAILED: ${pc.homes.fails.slice(0, 4).join('; ')}` : 'all with a door one can reach'}; plans ${pc.plans.days} days, ${pc.plans.segments} segments, ${pc.plans.routes} routes walked${pc.plans.fails.length ? `; FAILED: ${pc.plans.fails.slice(0, 4).join('; ')}` : ', all passable'}${pc.bad ? `; ${pc.bad} unwalkable` : ''}`);
+  const s2 = pc.samples;
+  console.log(`  people sampled every ten minutes for three days (${s2.samples} positions): inside a shape ${s2.inside}, in deep water ${s2.water}, off a deck ${s2.deck}, on one spot ${s2.same}; hours without a guard at the gate ${s2.guardGate}, on the wall ${s2.guardWall}; windows not matching who is awake ${s2.lit}; the same from a fresh start ${pc.same ? 'yes' : 'NO'}${s2.examples.length ? `; e.g. ${s2.examples.slice(0, 4).join('; ')}` : ''} (${pc.ms} ms)`);
+}
+
 function printVillages(seed, vc) {
   console.log(`  villages: ${vc.ok ? 'ok' : 'FAIL'}, patterns ${vc.patterns.join(', ')}${vc.distinct ? '' : ' (NOT ALL DIFFERENT)'}; ${vc.counts.map((c, i) => c ? `village ${i + 1}: ${c.houses} houses (${c.enter} to enter), ${c.barns} barns, chapel ${c.chapel ? 'yes' : 'NO'}, well ${c.well ? 'yes' : 'NO'}, signpost ${c.signpost ? 'yes' : 'NO'}, ${c.lanterns} lanterns, ${c.fields} fields, ${c.paths} paths${c.jetty ? ', a jetty' : ''}${c.shelter ? ', a market shelter' : ''}` : 'NONE').join('; ')}`);
   console.log(`  by road: ${vc.roadsWalked.roads} roads walked, ${vc.roadsWalked.bridges} bridges${vc.roadsWalked.failed.length ? `; FAILED at ${vc.roadsWalked.failed.join('; ')}` : ', all passable'}; footpaths ${vc.pathsWalked.paths}${vc.pathsWalked.failed.length ? `; FAILED: ${vc.pathsWalked.failed.join('; ')}` : ', all passable'}`);
@@ -737,16 +863,22 @@ if (a['fort-only']) {
   const rows = [];
   for (const seed of list) {
     let ft, vc, err = null;
-    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); } catch (e) { err = String(e.stack || e); }
-    rows.push({ seed, ft, vc, err, approach: null });
+    let pc = null;
+    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); pc = peopleChecks(w); } catch (e) { err = String(e.stack || e); }
+    rows.push({ seed, ft, vc, pc, err, approach: null });
     if (err) console.log(`seed ${seed}: FAIL ${err}`); else {
-      console.log(`seed ${seed}: ${ft.ok && vc.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}`);
+      console.log(`seed ${seed}: ${ft.ok && vc.ok && pc.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}${pc.ok ? '' : ' (the people)'}`);
       if (!ft.ok || a.detail) printFort(seed, ft);
       if (!vc.ok || a.detail) printVillages(seed, vc);
+      if (!pc.ok || a.detail) printPeople(seed, pc);
     }
   }
-  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok).length;
-  console.log(`\n${okN} of ${rows.length} seeds pass the fort's and the villages' checks`);
+  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok && r.pc && r.pc.ok).length;
+  console.log(`\n${okN} of ${rows.length} seeds pass the fort's, the villages' and the people's checks`);
+  {
+    const Q = rows.filter((r) => r.pc), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0);
+    console.log(`people: ${sum((r) => r.pc.persons)} on ${Q.length} seeds; ${sum((r) => r.pc.plans.routes)} routes walked (${sum((r) => r.pc.plans.fails.length)} failed); ${sum((r) => r.pc.samples.samples)} positions sampled: inside a shape ${sum((r) => r.pc.samples.inside)}, in deep water ${sum((r) => r.pc.samples.water)}, off a deck ${sum((r) => r.pc.samples.deck)}, on one spot ${sum((r) => r.pc.samples.same)}; guardless hours at the gate ${sum((r) => r.pc.samples.guardGate)}, on the wall ${sum((r) => r.pc.samples.guardWall)}; windows wrong ${sum((r) => r.pc.samples.lit)}; same from a fresh start on ${Q.filter((r) => r.pc.same).length} of ${Q.length}`);
+  }
   const V = rows.filter((r) => r.vc);
   const sum = (f) => V.reduce((s2, r) => s2 + f(r), 0);
   console.log(`villages: all three placed, each a different pattern, on ${V.filter((r) => r.vc.placed && r.vc.distinct).length} of ${V.length}; houses ${Math.min(...V.flatMap((r) => r.vc.counts.map((c) => c.houses)))} to ${Math.max(...V.flatMap((r) => r.vc.counts.map((c) => c.houses)))}; roads walked ${sum((r) => r.vc.roadsWalked.roads)} (${sum((r) => r.vc.roadsWalked.failed.length)} blocked), bridges ${sum((r) => r.vc.roadsWalked.bridges)}, footpaths ${sum((r) => r.vc.pathsWalked.paths)} (${sum((r) => r.vc.pathsWalked.failed.length)} blocked); overlaps ${sum((r) => r.vc.overlaps.length)}, bad doors ${sum((r) => r.vc.doors.length)}`);
@@ -775,7 +907,9 @@ for (const seed of seeds) {
   // (phase 3a) the fort's checks (8); (phase 3b) the villages' (9)
   r.fort = fortChecks(w);
   r.vil = villageChecks(w);
-  r.ok = r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok;
+  // (phase 4a) the people's (11)
+  r.ppl = peopleChecks(w);
+  r.ok = r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok && r.ppl.ok;
   results.push(r);
   const pc = (x) => `${(100 * x).toFixed(1)}%`;
   console.log(`seed ${seed}: ${r.ok ? 'PASS' : 'FAIL'}  build ${r.buildMs} ms, hash ${h1} ${r.same ? '(same twice)' : `!= ${h2}`}`);
@@ -790,6 +924,7 @@ for (const seed of seeds) {
   }
   printFort(seed, r.fort);
   printVillages(seed, r.vil);
+  printPeople(seed, r.ppl);
   console.log(`  villages from the viewpoints: ${r.vread.villages.map((x) => x.viewpoint ? `village ${x.village} (${x.pattern}) from viewpoint ${x.viewpoint}, ${x.dist} m: step ${x.step}${x.step > STEP ? '' : ' TOO FAINT'}, ${x.lights} light cells at night${x.lights >= 2 ? '' : ' (TOO FEW)'}` : `village ${x.village}: ${x.note}`).join('; ')}`);
 }
 const out = a.out || path.join(ROOT, 'shots', 'world-check', `world-check-${seeds.join('-')}.json`);

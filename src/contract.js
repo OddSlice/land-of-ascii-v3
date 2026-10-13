@@ -35,6 +35,10 @@ export const MAT = {
   PLASTER2: 28, PLASTER3: 29,      // plaster in two more tints
   TIMBER2: 30, TIMBER3: 31,        // timber in two more tints
   CROP: 32, STUBBLE: 33, FALLOW: 34, // a field's strips (ground)
+  // phase 4a: people
+  SKIN: 35, SKIN2: 36, HAIR: 37,
+  LINEN: 38, RUSSET: 39, OCHRE: 40, MOSS: 41, SLATE: 42, UMBER: 43, CHARCOAL: 44, // cloth
+  LEATHER: 45, IRON: 46,
 };
 export const MAT_NAMES = Object.keys(MAT).map((k) => k.toLowerCase());
 export const MAT_COUNT = MAT_NAMES.length;
@@ -44,6 +48,11 @@ export const MAT_NONE = 255;
 // inside walls: R2[1] is how much of the sky's soft light reaches it there
 // (0..255), through the doorways, windows and open tops of its room.
 export const MAT_SHELTER = 254;
+// Not a material (phase 4a): R2 of a cell where a far figure, held at its
+// least drawn size, covers only part of what it is drawn over: R2[1] is that
+// share (0..255); resolve blends the cell with what is behind it, as a faint
+// flame's.
+export const MAT_FAINT = 253;
 
 // ---- HitBuffer: 24 bytes per cell = three records of 8 bytes ------------------
 // R0 (bytes 0..7)    what the cell's own ray hit.
