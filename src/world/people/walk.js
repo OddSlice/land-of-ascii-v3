@@ -148,9 +148,18 @@ export function latticeWay(move, a, b, ft0, pad = 14, cap = 6000) {
   return keep.map((q) => [q[0], q[1]]);
 }
 
-// Can the straight line from a to b be walked from the feet at ft?
-export function clearLine(move, a, b, ft) {
+// Can the straight line from a to b be walked from the feet at ft? (in the
+// same half-metre steps a route is walked in: one long step can pass over
+// a post or a bench end that the steps would meet)
+export function clearLine(move, a, b, ft, step = 0.5) {
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1e-6) return true;
-  return !!move(a[0], a[1], ft, (b[0] - a[0]) / L, (b[1] - a[1]) / L, L);
+  const n = Math.max(1, Math.ceil(L / step)), dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L, h = L / n;
+  let x = a[0], z = a[1], f = ft;
+  for (let k = 0; k < n; k++) {
+    const r = move(x, z, f, dx, dz, h);
+    if (!r) return false;
+    [x, z, f] = r;
+  }
+  return true;
 }

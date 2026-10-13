@@ -511,6 +511,12 @@ export function routeOf(P, a, b) {
     const cum = new Float64Array(line.n);
     for (let i = 1; i < line.n; i++) cum[i] = cum[i - 1] + Math.hypot(line.x[i] - line.x[i - 1], line.z[i] - line.z[i - 1]);
     line.cum = cum; line.len = cum[line.n - 1];
+    // through a closed door: hidden until the body is clear of the house
+    // (at least the last 35 cm; more where the wall is thick or the door deep)
+    const clearAt = (k) => !P.p.blocked(line.x[k], line.z[k], line.y[k]);
+    line.hideA = 0.35; line.hideB = 0.35;
+    if (P.places[a].kind === 'closed') { let k = 0; while (k < line.n - 1 && (k < 3 || !clearAt(k) || !clearAt(k + 1))) k++; line.hideA = Math.max(0.35, cum[Math.min(k + 1, line.n - 1)]); }
+    if (P.places[b].kind === 'closed') { let k = line.n - 1; while (k > 0 && (k > line.n - 4 || !clearAt(k) || !clearAt(k - 1))) k--; line.hideB = Math.max(0.35, line.len - cum[Math.max(k - 1, 0)]); }
   } else P.bad.push({ route: [a, b] });
   P.routes.set(key, line);
   return line;
@@ -786,9 +792,9 @@ export function stateAt(P, i, day, hour, out, o) {
     pose = POSE.WALK; phase = (s / STRIDE) % 1;
     // through a closed door: gone once past it
     const to = P.places[seg.to];
-    if (to.kind === 'closed' && R.len - s < 0.35) pose = POSE.HIDDEN;
+    if (to.kind === 'closed' && R.len - s < R.hideB) pose = POSE.HIDDEN;
     const from = P.places[seg.from];
-    if (from.kind === 'closed' && s < 0.35) pose = POSE.HIDDEN;
+    if (from.kind === 'closed' && s < R.hideA) pose = POSE.HIDDEN;
   } else {
     const pl = P.places[seg.at];
     x = pl.x; z = pl.z; y = pl.ft; yaw = pl.yaw; pose = seg.pose;

@@ -53,7 +53,7 @@ export function adjust(st, n, segs, along, you, p) {
       if (ahead <= 0 || Math.abs(lat) > 0.95) continue;
       // step round: away from you, as much as you are in the way
       const side = lat > 0 ? -1 : 1, push = 0.8 * (1 - d / 2.2);
-      const sx = st[o + S.X] + fz * side * push, sz = st[o + S.Z] - fx * side * push;
+      const sx = Math.fround(st[o + S.X] + fz * side * push), sz = Math.fround(st[o + S.Z] - fx * side * push);
       if (free(sx, sz, st[o + S.FEET])) { st[o + S.X] = sx; st[o + S.Z] = sz; continue; }
       // no room (a doorway): wait a metre short of you, along the route
       placeAt(st, o, seg.route, Math.max(0, along[i] - Math.max(0, 1.05 - ahead)));
@@ -61,6 +61,16 @@ export function adjust(st, n, segs, along, you, p) {
     }
   }
   // ---- with each other ----
+  // (rounds until nobody is too close, at most four: in a crowd at a well
+  // or under a shelter one making way can come close to a third)
+  for (let round = 0; round < 4; round++) if (!apart(st, n, segs, along, free, round)) break;
+}
+
+// One round of making way; true if anybody moved.
+function apart(st, n, segs, along, free, round) {
+  let any = false;
+  // (further aside in later rounds: the near places are taken)
+  const fars = round === 0 ? [0, 0.35] : [0, 0.35, 0.7, 1.1];
   for (let i = 0; i < n; i++) {
     const oi = i * FS;
     if (st[oi + S.POSE] === POSE.HIDDEN || st[oi + S.POSE] === POSE.SLEEP) continue;
@@ -77,30 +87,33 @@ export function adjust(st, n, segs, along, you, p) {
       else { const a = (j * 2.399) % (2 * Math.PI); ux = Math.cos(a); uz = Math.sin(a); }
       const need = GAP - d + 0.05;
       let moved = false;
-      // (the first way that is clear: aside, the other side, then round)
+      // (the first way that is clear: aside, the other side, then round;
+      // tested where the state will hold it, in single precision)
+      const tryMove = (o, k2, vx, vz) => {
+        for (const f of fars) {
+          const sx = Math.fround(st[o + S.X] + vx * (need + f)), sz = Math.fround(st[o + S.Z] + vz * (need + f));
+          if (free(sx, sz, st[o + S.FEET], k2)) { st[o + S.X] = sx; st[o + S.Z] = sz; return true; }
+        }
+        return false;
+      };
       for (let k = 0; k < 8 && !moved; k++) {
         const a = k === 0 ? 0 : k === 1 ? Math.PI : (k - 1) * Math.PI / 3.5;
-        const ca = Math.cos(a), sa = Math.sin(a), vx = ux * ca - uz * sa, vz = ux * sa + uz * ca;
-        for (const far of [need, need + 0.35]) {
-          const sx = st[oj + S.X] + vx * far, sz = st[oj + S.Z] + vz * far;
-          if (free(sx, sz, st[oj + S.FEET], j)) { st[oj + S.X] = sx; st[oj + S.Z] = sz; moved = true; break; }
-        }
+        const ca = Math.cos(a), sa = Math.sin(a);
+        moved = tryMove(oj, j, ux * ca - uz * sa, ux * sa + uz * ca);
       }
       // (no room for j: i makes way instead, the same ways round)
       if (!moved && st[oi + S.POSE] !== POSE.SIT) {
         for (let k = 0; k < 8 && !moved; k++) {
           const a = k * Math.PI / 4;
-          const vx = -ux * Math.cos(a) + uz * Math.sin(a), vz = -uz * Math.cos(a) - ux * Math.sin(a);
-          for (const far of [need, need + 0.35]) {
-            const sx = st[oi + S.X] + vx * far, sz = st[oi + S.Z] + vz * far;
-            if (free(sx, sz, st[oi + S.FEET], i)) { st[oi + S.X] = sx; st[oi + S.Z] = sz; moved = true; break; }
-          }
+          moved = tryMove(oi, i, -ux * Math.cos(a) + uz * Math.sin(a), -uz * Math.cos(a) - ux * Math.sin(a));
         }
       }
       // (a walker with no room aside waits behind)
-      if (!moved && st[oj + S.POSE] === POSE.WALK && segs[j] && segs[j].kind === 'walk') { placeAt(st, oj, segs[j].route, Math.max(0, along[j] - need - 0.3)); st[oj + S.PHASE] = 0; }
+      if (!moved && st[oj + S.POSE] === POSE.WALK && segs[j] && segs[j].kind === 'walk') { placeAt(st, oj, segs[j].route, Math.max(0, along[j] - need - 0.3)); st[oj + S.PHASE] = 0; moved = true; }
+      if (moved) any = true;
     }
   }
+  return any;
 }
 
 // Put a walker at distance s along a route.

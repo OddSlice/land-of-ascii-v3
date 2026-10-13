@@ -414,6 +414,9 @@ export function bodyBlocked(kit, x, z, lo, hi, r) {
     const y = YS[j];
     if (solidAtList(kit, LB, n, x, y, z)) return true;
     for (let k = 0; k < 48; k += 2) if (solidAtList(kit, LB, n, x + RING[k] * r, y, z + RING[k + 1] * r)) return true;
+    // (phase 4a: and a ring at half the radius, so a post thinner than the
+    // body, between its middle and its edge, is not missed)
+    for (let k = 0; k < 48; k += 4) if (solidAtList(kit, LB, n, x + RING[k] * r * 0.5, y, z + RING[k + 1] * r * 0.5)) return true;
   }
   return false;
 }

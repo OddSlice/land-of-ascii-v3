@@ -136,3 +136,27 @@ The village pieces' sizes, in `SCALE.kit`, and the rules a village is composed b
 | Lit windows | 80% of houses | |
 | Fields | 3 to 5 blocks a village, 22–40 by 16–28 m, on ground no steeper than 10%, strips 6–11 m wide along the contour | Crop, stubble and fallow strips. |
 
+## People (phase 4a)
+
+A person's sizes are in `FIG` (`src/world/people/figure.js`), before each person's own scale of 0.93 to 1.04. Speeds and numbers are in `src/world/people/people.js`.
+
+| | | |
+|---|---|---|
+| Height | 1.72 m (1.60 to 1.79 m by person) | The fort's doors (2.2 m) and the houses' (2.2 m) clear the tallest with room for a helmet. |
+| Shoulders, chest | 0.42 m across, 0.24 m deep | |
+| Hip | 0.86 m | The legs' top; a tunic falls 0.1 m below it. |
+| Head | 0.2 by 0.22 m, 0.24 m tall | |
+| Legs, arms | 0.15 m and 0.11 m thick | Held at two cells near; merged into the body past 14 m. |
+| Body, for meeting | radius 0.28 m | You cannot walk through anyone upright; someone in bed is a low body on it. |
+| Walking | 1.15 to 1.45 m/s by person, a cycle of two steps every 1.3 m | Slower than you (4.5 m/s), so you overtake. |
+| The watch on the wall walk | 0.8 m/s, to and fro along its beat | |
+| Making way | closer than 0.75 m, one steps aside (up to four rounds in a crowd); a walker meeting you within 2.2 m steps round you or waits a metre short | |
+| Greeting | within about 2.3 m, in front of you and facing you; the line shows for about 5 s | |
+| Lights | a lantern or torch out of doors from 18.4 h to 6.1 h | |
+
+| Who | | |
+|---|---|---|
+| Villagers | 10 to 20 a village (1.15 to a house) | About 60 people to a world in all (301 on the five checked seeds). |
+| Guards | 9, three watches of three changing at 6 h, 14 h and 22 h; the watch asleep has a bunk each in the keep, the watches taking turns | The gate and the wall walk always have one; the relief goes up a quarter of an hour early. |
+| Travellers | 3 or 4, each walking a main road over a day or two | Rest by a well by day, on a bench only after about 19.8 h. |
+

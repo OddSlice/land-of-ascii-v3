@@ -271,6 +271,7 @@ So everything has a floor that grows with distance (`minR`, the width of a cell 
 | Buildings: lit windows | held at two rows, faded by how much of that is really window, as a flame is |
 | Buildings: masonry's courses (after phase 3a) | a course joint darkens each cell by how much of it the joint covers (the joint drawn at least about a row wide), so it slides across the cells instead of blinking; it fades once a course is under two and a half rows, leaving its average darkness. Joints between blocks are kept near: walking sweeps them sideways across the cells, and drawn further they blinked more than the lab's wall |
 | Buildings: block joints, framing, shingles, boards, paving | each fades as a cell's footprint on the surface passes its size (a block, a frame bay, a shingle row) |
+| People (phase 4a) | thin parts (arms, legs, tools, a rod) held at least two cells across; past 14 m the limbs merge into the body, past 40 m a person is a two-cell silhouette faded by its true size; a carried flame is held at two rows and faded, as a torch's is |
 
 **Time moves only what should move:**
 - the clouds drift;
@@ -396,6 +397,44 @@ The villages' and bridges' stone is the fort's dressed stone (`masonry`) with it
 **Footpaths and the worn yard:** drawn as dirt, 1.4 m wide (2.6 m across the fort's yard), faded at their edges and only near; further off they are part of the meadow.
 
 **At night:** lanterns (as the fort's torches, on posts) at each village's centre, at its jetty and at both ends of each bridge; lit windows in most houses; a hearth's fire inside a house one can enter. From each village's viewpoint its lights must be visible at night (`tools/world-check.mjs`).
+
+### People (phase 4a)
+
+People live in the villages and keep the fort: 10 to 20 villagers to a village, in proportion to its houses, each with a home, a name and a role from what the village has (farmers if it has fields, two fishers if it has a jetty, a carter, a keeper of the chapel, someone who minds the green or keeps the well, the rest keeping house); nine guards in three watches, who sleep in the keep's bunks by turns; three or four travellers on the main roads. What each does is a timetable (`src/world/people/people.js`): a day's plan is made from the seed, the day and the forecast, and where someone is and how they stand is a pure function of the plan and the clock, so a frozen clock repeats exactly and every render worker draws the same people. Meetings (with you, with each other) move a person aside or hold a walker back by an amount worked out from the moment alone (`meet.js`); nobody keeps an offset once its cause has gone.
+
+**The figure:** a few upright boxes in the kit's own system (`figure.js`): legs, a tunic, arms and hands, a head with hair, a hat, a hood, a cap or a helmet, and what the role carries: a hoe, a rod, a broom, a staff, a pack, a spear; a lantern or a torch after dusk (18.4 h) and before dawn (6.1 h) out of doors. Walking swings the legs and arms by the distance walked (a cycle every 1.3 m), never by the clock; standing, working, fishing, sweeping, sitting on a real bench or bed's edge and lying in a real bed are still poses. A head turns toward you when you come within 5 m.
+
+**The colours** (each a shift of a colour already in the palette; the cloth is muted dye, never bright):
+
+| Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | Worn by |
+|---|---|---|---|---|---|
+| Skin (`skin`, `skin2`) | `.:-=` | `#b08a6e` / `#56453b`, `#8e6a52` / `#45352c` | `#7e594e`, `#66443a` | `#4f413d`, `#3f322d` | faces and hands, two tones |
+| Hair | `,;%#` | `#3a2c22` / `#191310` | `#2a1f1a` | `#191513` | the bare-headed |
+| Linen (undyed) | `.,:;=+` | `#b9ae98` / `#5a5652` | `#84706c` | `#535154` | tunics, caps |
+| Russet | `.,:;=+` | `#8c4f38` / `#3d231b` | `#65372b` | `#3d271f` | tunics, hats |
+| Ochre | `.,:;=+` | `#a68a4a` / `#504127` | `#8b6a42` | `#4d4b39` | tunics, hats |
+| Moss | `.,:;=+` | `#66704a` / `#323828` | `#494834` | `#2e3429` | tunics, hoods, leggings |
+| Slate | `.,:;=+` | `#5c6878` / `#2d3441` | `#424355` | `#293142` | tunics, the watch's coats |
+| Umber | `.,:;=+` | `#6a5440` / `#2e251e` | `#4c3b32` | `#2e2a24` | leggings, hats |
+| Charcoal | `.,:;=+` | `#3e3d40` / `#1b1a1e` | `#2c2b32` | `#1b1e23` | leggings, the watch's coats |
+| Leather | `.-=#` | `#5a4230` / `#271d17` | `#412e25` | `#27211b` | boots, belts, the watch's leggings |
+| Iron | `:=#%` | `#6c6e72` / `#34373e` | `#4d4751` | `#30333f` | helmets, spearheads, lantern cages |
+
+Cloth darkens in the rain (wetness 0.7, skin 0.3, iron 0.5) and dries as the ground does.
+
+**Distance steps** (horizontal distance from the eye; section 6's rule holds throughout):
+
+| Distance | What is drawn |
+|---|---|
+| Near, under 14 m | every part: legs and feet, arms and hands, head, hair or hat, the tool and the light |
+| Middle, 14 to 40 m | the legs as one box (a little longer along the stride while walking), the arms within the body, the head and its hat or hair, the tool held at two cells |
+| Far, beyond 40 m | a silhouette two cells tall: the body in its clothes' colour, the head in its hat's or skin's, each held at a column wide and a row tall while its true size is at least that, then faded by how much of that it really is (as a torch's flame is); not drawn beyond 420 m or once under 6% |
+
+**Lights they carry:** a lantern's or torch's flame is held at two rows and faded by its true share, as the fixed torches' are, and lights the ground and walls round it as a moving point light: only the stripes it reaches pay for it, it never starts the shadow sweep (it casts no shadows of its own), and it adds to the fixed lights without changing them. Indoors nobody carries a light; the hearth lights the room.
+
+**Indoors and windows:** in a house one can enter, its one sleeper is found in bed at night and sitting or standing at the hearth while awake. In the others the people are absent, and the house's windows are lit while someone is awake inside after dark and dark once they sleep. With people off, windows keep their fixed lighting.
+
+**Greeting (E):** someone within about 2.3 m, in front of you and facing you (their head turned to you counts), says one line, shown with their name and role in the menu's quiet style for about five seconds, never in the tools' pictures. Lines are data (`lines.js`), 12 or more for each role, chosen by how many of their tags (the hour, the weather, the place, what they are doing) fit, never the same line twice running.
 
 ### Sky
 
