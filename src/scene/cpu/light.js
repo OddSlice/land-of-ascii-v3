@@ -170,6 +170,11 @@ export class Light {
     this.G = 65;
     this.step = world.N / (this.G - 1);
     this.cloud = new Float32Array(this.G * this.G);
+    // (phase 4a) which frame each grid point was last worked out for: they
+    // are worked out as they are first read, so a worker computes only the
+    // points its own stripe's view reaches
+    this.cloudStamp = new Int32Array(this.G * this.G);
+    this.cloudFrame = 0;
   }
 
   // Called once per frame with the frame's hour and clock (and, with shared
@@ -291,28 +296,31 @@ export class Light {
   // Cloud shadow on a coarse grid over the valley: large soft patches from a
   // low-frequency field that drifts with the wind, cast along the light so
   // they slide across slopes the right way. Fixed to the land, so walking
-  // never makes them crawl.
+  // never makes them crawl. (Phase 4a: the frame's drift is set here, and
+  // each grid point is worked out the first time this frame reads it.)
   updateClouds(t) {
-    const g = this.cloud;
     const L = this.isSun ? this.sun : this.moon;
     this.cloudsOn = L[1] > 0.08;
     if (!this.cloudsOn) return;
-    const H = this.world.terrain.levels[0].H, NN = this.NN, G = this.G, step = this.step;
-    const lift = 900;                       // height of the cloud layer
     const P = this.wp;
-    const ox = WIND[0] * t + P.drift, oz = WIND[1] * t;
+    this.cL = L;
+    this.cox = WIND[0] * t + P.drift; this.coz = WIND[1] * t;
     // more cloud, more of the land in its shadow (fair: from n = 0)
-    const a0 = P.fair ? 0 : P.clouds < 1 ? 0.3 * (1 - P.clouds) : -0.2 * (P.clouds - 1);
-    for (let gz = 0; gz < G; gz++) {
-      for (let gx = 0; gx < G; gx++) {
-        const x = gx * step, z = gz * step;
-        const y = H[Math.round(z) * NN + Math.round(x)];
-        const k = (lift - y) / L[1];
-        const cx = x + L[0] * k - ox + 1920, cz = z + L[2] * k - oz + 1740;
-        const n = fbm(cx / 105, cz / 85, SEED + 91, 3);
-        g[gz * G + gx] = smooth(a0, a0 + 0.11, n);
-      }
-    }
+    this.ca0 = P.fair ? 0 : P.clouds < 1 ? 0.3 * (1 - P.clouds) : -0.2 * (P.clouds - 1);
+    this.cloudFrame++;
+  }
+
+  // One grid point of the cloud shadow, for this frame.
+  cloudPoint(j) {
+    const G = this.G, gx = j % G, gz = (j - gx) / G, step = this.step, L = this.cL;
+    const lift = 900;                       // height of the cloud layer
+    const x = gx * step, z = gz * step;
+    const y = this.world.terrain.levels[0].H[Math.round(z) * this.NN + Math.round(x)];
+    const k = (lift - y) / L[1];
+    const cx = x + L[0] * k - this.cox + 1920, cz = z + L[2] * k - this.coz + 1740;
+    const n = fbm(cx / 105, cz / 85, SEED + 91, 3);
+    this.cloudStamp[j] = this.cloudFrame;
+    return (this.cloud[j] = smooth(this.ca0, this.ca0 + 0.11, n));
   }
 
   cloudAt(x, z) {
@@ -321,7 +329,11 @@ export class Light {
     const u = Math.max(0, Math.min(G - 1.001, x / this.step));
     const w = Math.max(0, Math.min(G - 1.001, z / this.step));
     const i0 = Math.floor(u), k0 = Math.floor(w), fx = u - i0, fz = w - k0;
-    const j = k0 * G + i0, g = this.cloud;
+    const j = k0 * G + i0, g = this.cloud, st = this.cloudStamp, f = this.cloudFrame;
+    if (st[j] !== f) this.cloudPoint(j);
+    if (st[j + 1] !== f) this.cloudPoint(j + 1);
+    if (st[j + G] !== f) this.cloudPoint(j + G);
+    if (st[j + G + 1] !== f) this.cloudPoint(j + G + 1);
     return g[j] + (g[j + 1] - g[j]) * fx + (g[j + G] - g[j]) * fz + (g[j] - g[j + 1] - g[j + G] + g[j + G + 1]) * fx * fz;
   }
 }

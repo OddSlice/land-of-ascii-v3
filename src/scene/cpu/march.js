@@ -198,22 +198,28 @@ export class Marcher {
   // Crossing number i of this plane, computed and cached on first use.
   // False once the plane has left the map (or the view distance).
   crossing(i) {
+    if (this.nc > i) return true;
+    // (phase 4a: the plane's and the world's constants read once, not per
+    // crossing; the arithmetic is the same)
+    const v = this.v, ex = v.ex, ez = v.ez, dx = this.dx, dz = this.dz, N = this.N, view = this.world.viewDist, open = this.openEdge;
+    const lv = this.world.terrain.levels;
     while (this.nc <= i) {
       if (this.cEnded) return false;
       let d1;
       if (this.tMaxX < this.tMaxZ) { d1 = this.tMaxX; this.tMaxX += this.tDX; this.ix += this.stepX; }
       else { d1 = this.tMaxZ; this.tMaxZ += this.tDZ; this.iz += this.stepZ; }
-      const { v } = this;
-      const px = v.ex + this.dx * d1, pz = v.ez + this.dz * d1;
-      const N = this.N, L = this.cL;
+      const px = ex + dx * d1, pz = ez + dz * d1;
+      const L = this.cL;
       const beta = L + 1 < LEVELS ? smooth(this.dEnd[L] * 0.6, this.dEnd[L], d1) : 0;
       if (this.nc >= this.cd.length) this.growCache();
       const k = this.nc++;
-      this.cd[k] = d1; this.ch[k] = this.height(L, px, pz, beta); this.cl[k] = L; this.cb[k] = beta;
+      let h = bil(lv[L], px, pz);
+      if (beta > 0) h += (bil(lv[L + 1], px, pz) - h) * beta;
+      this.cd[k] = d1; this.ch[k] = h; this.cl[k] = L; this.cb[k] = beta;
       // the generated world has no wrapping and no wall at its edge: past it
       // the edge's own heights run on (the sea to the south and west, high
       // ground to the north and east) as far as the view distance
-      let out = this.openEdge ? d1 > this.world.viewDist : px < 0 || pz < 0 || px > N || pz > N || d1 > this.world.viewDist;
+      let out = open ? d1 > view : px < 0 || pz < 0 || px > N || pz > N || d1 > view;
       if (!out && this.bdD < Infinity && (px > N || pz > N)) out = stopsAt(this.world.backdrop, px, pz);
       if (out) { this.cEnded = true; this.lastOut = k; }
       else if (L + 1 < LEVELS && d1 >= this.dEnd[L]) { this.cL = L + 1; this.initDDA(d1); }
@@ -315,7 +321,7 @@ export class Marcher {
     const sTop = (h1 - ey) / d1;
     let r = rs.find(first);
     if (r >= n || sig[off + r] > sTop) return;
-    const k = (h1 - h0) / (d1 - d0);
+    const k = (h1 - h0) / (d1 - d0), depth = this.rays.depth, ord = rs.ord, nxt = rs.nxt;
     while (r < n) {
       const s = sig[off + r];
       if (s > sTop) break;
@@ -328,10 +334,10 @@ export class Marcher {
       let D = s - k !== 0 ? (h0 - ey - k * d0) / (s - k) : d1;
       if (!(D >= lo)) D = lo; else if (D > d1) D = d1;
       // (phase 3a: a building already nearer on this row keeps the cell)
-      const ci = rs.ord[off + r];
-      if (act === null && D >= this.rays.depth[ci]) { rs.nxt[r] = r + 1; r = rs.find(r + 1); continue; }
+      const ci = ord[off + r];
+      if (act === null && D >= depth[ci]) { nxt[r] = r + 1; r = rs.find(r + 1); continue; }
       this.ground(rs, r, ci, D, s, L, beta);
-      rs.nxt[r] = r + 1;
+      nxt[r] = r + 1;
       r = rs.find(r + 1);
     }
   }

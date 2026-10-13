@@ -423,13 +423,24 @@ export class SkyPass {
         let whole = 1;
         if (need > edgeW) { if (need > 0.6) { whole = 0.6 / need; edgeW = 0.6; } else edgeW = need; }
         const hx = lox + ldx * t0, hy = loy + ldy * t0, hz = loz + ldz * t0;
-        let lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
-          + vnoise(hx * 6.1 - hz * 2.9, hy * 6.1 + hz * 4.3 + k * 3, SEED + 82) * 0.2;
-        // a bank's edge breaks into streaks along it: noise slow along the
-        // band and quick across it, fixed to the cloud
-        if (streak > 0) lumps += streak * (vnoise(hx * 1.1 + c.seed * 3.1 + k, hy * 4.2 + hz * 3.4, SEED + 84) - 0.15);
-        const cover = ((eps + lumps * Math.min(0.45, 2.2 * edgeW)) / edgeW + jitter * 0.35) * whole;
-        if (cover < 0.15) continue;
+        // (phase 4a) the lumps' noise lies between -0.8 - 1.15 streak and
+        // 0.8 + 0.85 streak, and the cover rises with it: where even the
+        // least lumps make it whole (deep inside a puff), or the most leave
+        // it under the cut (well outside), the noise is not needed, and every
+        // use of the cover past 1 is clamped to 1, so the result is the same
+        const fl = Math.min(0.45, 2.2 * edgeW), jt = jitter * 0.35;
+        if (((eps + (0.8 + 0.85 * streak) * fl) / edgeW + jt) * whole < 0.15) continue;
+        let cover;
+        if (((eps + (-0.8 - 1.15 * streak) * fl) / edgeW + jt) * whole >= 1) cover = 1;
+        else {
+          let lumps = vnoise(hx * 3.1 + hz * 1.7 + c.seed * 7.3 + k, hy * 3.1 - hz * 2.3, SEED + 81) * 0.6
+            + vnoise(hx * 6.1 - hz * 2.9, hy * 6.1 + hz * 4.3 + k * 3, SEED + 82) * 0.2;
+          // a bank's edge breaks into streaks along it: noise slow along the
+          // band and quick across it, fixed to the cloud
+          if (streak > 0) lumps += streak * (vnoise(hx * 1.1 + c.seed * 3.1 + k, hy * 4.2 + hz * 3.4, SEED + 84) - 0.15);
+          cover = ((eps + lumps * fl) / edgeW + jt) * whole;
+          if (cover < 0.15) continue;
+        }
         // a puff's dissolving edge in front of another puff's body is not a
         // hole: remember how solid the cloud behind is
         if (t0 >= cBest) { if (cover > behind) behind = cover; continue; }

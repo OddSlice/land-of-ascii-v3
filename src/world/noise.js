@@ -13,12 +13,19 @@ export function hash1(x, seed) {
 }
 
 // Smooth value noise, -1..1.
+// (Phase 4a: the four corners' hashes share their parts, the same integers
+// hash2 would make, so the result is identical; Firefox ran it slowly.)
 export function vnoise(x, y, seed) {
   const xi = Math.floor(x), yi = Math.floor(y);
   const fx = x - xi, fy = y - yi;
   const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
-  const a = hash2(xi, yi, seed), b = hash2(xi + 1, yi, seed);
-  const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
+  const hs = Math.imul(seed | 0, 1442695041);
+  const x0 = Math.imul(xi | 0, 374761393), x1 = Math.imul((xi + 1) | 0, 374761393);
+  const y0 = Math.imul(yi | 0, 668265263) ^ hs, y1 = Math.imul((yi + 1) | 0, 668265263) ^ hs;
+  let h = x0 ^ y0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const a = (h >>> 0) / 4294967296;
+  h = x1 ^ y0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const b = (h >>> 0) / 4294967296;
+  h = x0 ^ y1; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const c = (h >>> 0) / 4294967296;
+  h = x1 ^ y1; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const d = (h >>> 0) / 4294967296;
   return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1;
 }
 
