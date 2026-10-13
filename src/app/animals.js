@@ -13,7 +13,7 @@ import { FS, S, POSE } from '../world/people/figure.js';
 // (the kinds you cannot walk through: the rest are too small to stop you)
 // (meetings are worked out within this of you: past it a small overlap
 // cannot be seen; measured as |dx| + |dz|)
-const SETTLE_R = 160;
+const SETTLE_R = 100;
 const BODY = new Set([KIND.SHEEP, KIND.COW, KIND.DEER, KIND.DOG]);
 
 export class Animals {

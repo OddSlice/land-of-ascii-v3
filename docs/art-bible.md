@@ -453,7 +453,7 @@ All of it is held at two cells and faded by its true share beyond that (`PF.FADE
 
 - An animal lifts its head first (the alert band, half at its alert distance). Further in, it moves away along the clearest of five directions, over a band of distance (`SPEC.flight`), so standing at the band's edge gives a steady picture, never a flip.
 - The band narrows by up to 30% and widens again with the clock (over about four game hours) (`bold`), so a group that fled comes back later if you stay outside its narrower band, and is back where it was as soon as you leave.
-- Meetings (with each other, with people, with you, with any shape) move an animal aside by its overlap. Like people's meetings this is worked out from the moment alone, and done only within 160 m of you.
+- Meetings (with each other, with people, with you, with any shape) move an animal aside by its overlap. Like people's meetings this is worked out from the moment alone, and done only within 100 m of you.
 
 | Kind | Where and when | Alert / flight (m) |
 |---|---|---|

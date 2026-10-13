@@ -190,7 +190,7 @@ Sizes are before each animal's own scale (0.9 to 1.1). They are in `SPEC` (`src/
 | Gulls | 3 beaches, 3 to 6 each, at least 220 m apart, circling 16 m out and 14 m up; 3 on a jetty | |
 | Crows | 4 on the fort's merlons, 5 on village ridges | Circle 9 m round their perch when up. |
 | Reactions | alert and flight bands as in the art bible; a deer runs up to 45 m, a hare 32 m, a duck 8 m | The band narrows by up to 30% and widens again over about 4 game hours. |
-| Meetings | worked out within 160 m of you (as \|dx\| + \|dz\|) | A sheep, cow, deer or dog near you is a body you cannot walk through. |
+| Meetings | worked out within 100 m of you (as \|dx\| + \|dz\|) | A sheep, cow, deer or dog near you is a body you cannot walk through. |
 
 | Wild ground detail | Size | Where |
 |---|---|---|
