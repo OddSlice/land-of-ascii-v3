@@ -59,6 +59,11 @@ const WORLD = [
   // house, a bridge, by day; the centres, the house and the bridge at night
   ...[12, 13, 14, 15, 16, 17, 18, 19].map((cam) => ({ cam, t: 'day' })),
   { cam: 13, t: 'night' }, { cam: 15, t: 'night' }, { cam: 17, t: 'night' }, { cam: 18, t: 'night' }, { cam: 19, t: 'night' }, { cam: 12, t: 'dusk' },
+  // (phase 4a) views full of people: each village's green or street at
+  // midday, at dusk (lanterns) and at dawn, the wall walk at night from the
+  // courtyard (torches), a traveller on the road at their own hour
+  ...[20, 21, 22].map((cam) => ({ cam, t: 'own' })), { cam: 20, t: 'dusk' }, { cam: 21, t: 6.6 }, { cam: 22, t: 19.2 },
+  { cam: 23, t: 'own' }, { cam: 24, t: 'own' },
 ];
 // (phase 3a) the building yard: every piece near, the yard middle and far,
 // at night, the passage and the wall walk; the gate, the keep, the torches
@@ -69,6 +74,8 @@ const YARD = [
   // (phase 3b) the village pieces by day, the cottage inside and the pieces at night
   ...Array.from({ length: 15 }, (_, k) => ({ cam: 14 + k, t: k === 13 || k === 14 ? 'night' : 'day' })),
   { cam: 14, t: 'night' }, { cam: 20, t: 'night' }, { cam: 26, t: 'night' },
+  // (phase 4a) the figures: near, middle, far, very far, at night, asleep, on the bench
+  ...Array.from({ length: 7 }, (_, k) => ({ cam: 29 + k, t: 'own' })),
 ];
 const WEATHERS = a.weather === 'all' ? ['clear', 'fair', 'overcast', 'rain', 'mist'] : a.weather ? String(a.weather).split(',') : ['fair'];
 // (phase 2b) where the mist lies: over the lake and along the river at dawn
@@ -119,7 +126,7 @@ try {
             if (v.site === 'river') L.setCamera({ x: riv.x, z: riv.z, yaw: riv.yaw + 70, pitch: -35 });
             if (v.site === 'shoreL' || v.site === 'shoreR') L.setCamera({ x: coast.x, z: coast.z, yaw: coast.yaw + (v.site === 'shoreL' ? -90 : 90), pitch: -14 });
           } else L.camera(v.cam);
-          L.freeze(v.t, 12.5, v.day || 0);
+          L.freeze(v.t === 'own' ? L.cameras[v.cam].time : v.t, 12.5, v.day || 0);
           await L.whenIdle();
           return L.cellHash();
         }, { v, look, weather });

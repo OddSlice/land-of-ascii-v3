@@ -262,7 +262,7 @@ export function yardFigures() {
   // asleep in the cottage one can go into (square to the grid)
   const cz = VROW0 + 13 * VROWS, F = frame(VCOL0, cz, 0), wt = SCALE.kit.cottage.wallT;
   const fs = furnitureSpots(F, 3.2 - wt, 2.5 - wt, G0 + 0.3 + 0.02, 1);
-  put(fs.bed.x, fs.bed.z, fs.bed.yaw, POSE.SLEEP, { top: MAT.LINEN, bottom: MAT.RUSSET, hatK: HATK.BARE, feet: fs.floor, aux: fs.bed.top - fs.floor, room: 0 });
+  put(fs.bed.x, fs.bed.z, fs.bed.yaw, POSE.SLEEP, { top: MAT.LINEN, bottom: MAT.RUSSET, hatK: HATK.BARE, feet: fs.floor, aux: fs.bed.top - fs.floor });
   return Float32Array.from(out);
 }
 
@@ -280,7 +280,7 @@ export function yardPeopleCameras() {
   // in through the door of the cottage one can go into, to the sleeper
   const cz = VROW0 + 13 * VROWS, F = frame(VCOL0, cz, 0), wt = SCALE.kit.cottage.wallT;
   const bed = furnitureSpots(F, 3.2 - wt, 2.5 - wt, G0 + 0.32, 1).bed, [ix, iz] = F.at(-0.2, 0.1);
-  cams.push({ name: 'someone asleep', x: ix, z: iz, yaw: look(ix, iz, bed.x, bed.z), pitch: -30, time: 'night', y: G0 + 0.32 + 1.43 });
+  cams.push({ name: 'someone asleep', x: ix, z: iz, yaw: look(ix, iz, bed.x, bed.z), pitch: -36, time: 'night', y: G0 + 0.32 + 1.7 });
   cams.push({ name: 'someone on the bench', x: bx + 1.5, z: bz + 3.5, yaw: look(bx + 1.5, bz + 3.5, bx, bz), pitch: -6, time: 'day' });
   return cams;
 }

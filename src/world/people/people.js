@@ -461,6 +461,12 @@ function linkOf(P, id) {
     const way = latticeWay(move, [pl.ax, pl.az], [net.x[k], net.z[k]], pl.ft, 10, 5000);
     if (way) { pl.node = k; return (pl.link = way); }
   }
+  // (the nearest nodes can lie across a stream or behind a wall: further
+  // ones, with a wider search)
+  for (const k of net.nearby(pl.ax, pl.az, 90).slice(0, 12)) {
+    const way = latticeWay(move, [pl.ax, pl.az], [net.x[k], net.z[k]], pl.ft, 16, 20000);
+    if (way) { pl.node = k; return (pl.link = way); }
+  }
   P.bad.push({ place: id, to: 'network' });
   pl.node = near[0] !== undefined ? near[0] : 0;
   return (pl.link = [[pl.ax, pl.az], [net.x[pl.node], net.z[pl.node]]]);

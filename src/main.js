@@ -10,6 +10,8 @@ import { CELL_STRIDE } from './contract.js';
 import { buildWorld } from './world/world.js';
 import { buildStressWorld } from './world/stress.js';
 import { buildYard, yardFigures } from './world/yard.js';
+import { FS, S } from './world/people/figure.js';
+import { roomAt } from './world/kit.js';
 import { START, EYE } from './world/layout.js';
 import { generateWorld, DEFAULT_SEED } from './world/gen/world.js';
 import { People } from './app/people.js';
@@ -170,6 +172,8 @@ if (people && params.get('people') === '0') people.on = false;
 if (people) world.cameras.push(...peopleCameras(world, people.P));
 // (in the building yard: a line of figures standing still, in every pose)
 const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
+// (each in the room the kit says they stand in, as the world's people are)
+if (yardFolk) for (let o = 0; o < yardFolk.st.length; o += FS) yardFolk.st[o + S.ROOM] = roomAt(world.kit, yardFolk.st[o + S.X], yardFolk.st[o + S.Z], yardFolk.st[o + S.FEET] + 0.02);
 const canvas = $('view');
 const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
