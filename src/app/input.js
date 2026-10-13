@@ -29,7 +29,7 @@ export class Input {
     this.filter = new MoveFilter();
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' || e.key === 'Escape') { if (!e.repeat && actions.escape) actions.escape(e); return; }
-      if (this.blocked()) return;
+      if (this.blocked()) { if (actions.blockedKey) actions.blockedKey(e); return; }
       if (e.repeat && !e.code.startsWith('Arrow') && !e.code.startsWith('Key')) return;
       this.keys[e.code] = true;
       if (!e.repeat) this.press(e);
@@ -78,7 +78,10 @@ export class Input {
       case 'KeyR': a.toggleRef(); break;
       case 'KeyH': a.toggleHud(); break;
       case 'KeyX': a.toggleScene(); break;
-      case 'KeyL': a.toggleLook(); break;
+      // (phase 5a) L: the lantern in the world (Shift L, or L elsewhere: the look panel)
+      case 'KeyL': if (e.shiftKey || !a.lantern || !a.lantern()) a.toggleLook(); break;
+      case 'KeyJ': if (a.journal) a.journal(); break;
+      case 'KeyK': if (a.sketch) a.sketch(); break;
       case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
       case 'KeyM': if (a.toggleMap) a.toggleMap(); break;
       case 'KeyE': if (a.greet) a.greet(); break;

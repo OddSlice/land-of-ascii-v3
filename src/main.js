@@ -41,6 +41,12 @@ import { Menu } from './app/menu.js';
 import { BenchRun, browserName } from './app/benchrun.js';
 import { loadDisplay, saveDisplay, seenCard, markCardSeen } from './app/settings.js';
 import { moonLit } from './world/sky.js';
+// (phase 5a) wayfaring: discovery, the journal, sketches, favours, saving
+import { Wayfaring, clockOf } from './app/wayfaring.js';
+import { toJSON as progressJSON, fromJSON as progressFrom, F as FAVOUR } from './game/progress.js';
+import { Journal } from './app/journal.js';
+import { Talk } from './app/talk.js';
+import { START_LINE, CHOICE } from './game/words.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -180,6 +186,11 @@ const animals = people && GEN.animals ? new Animals(world, people.P) : null;
 // (and the cameras that look at them: a pasture with its flock, deer at a
 // forest edge at dawn, gulls on the coast, crows on the wall walk)
 if (animals) world.cameras.push(...animalCameras(world, animals.A));
+// (phase 5a) the player's progress in this world: what is found, met,
+// sketched and done. The tools run with it off (progress cleared, nothing
+// drawn or tracked), unless they ask for it (self.LAND_PROGRESS, or
+// lab.progress.enable()).
+const way = people ? new Wayfaring(world, people, { on: !QUIET || !!self.LAND_PROGRESS }) : null;
 // (in the building yard: a line of figures standing still, in every pose)
 const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
 // (phase 4b) and every animal in every pose, standing still
@@ -260,6 +271,11 @@ const input = new Input(canvas, {
   toggleFly: () => { if (WORLD || YARD) player.toggleFly(); },
   toggleMap: () => { if (map) map.toggle(); },
   greet: () => greet(),
+  journal: () => toggleJournal(),
+  // (J closes the journal, which otherwise holds the keys)
+  blockedKey: (e) => { if (journal.open && e.code === 'KeyJ' && !e.repeat && journal.viewing === null) { e.preventDefault(); closeJournal(false); } },
+  sketch: () => sketch(),
+  lantern: () => (WORLD ? lantern() : false),
   toggleHud: () => hud.toggle(),
   toggleLook: () => lookPanel.toggle(),
   cycleLook: (name) => { state.look = nextOption(state.look, name); },
@@ -269,7 +285,7 @@ const input = new Input(canvas, {
 });
 input.sensitivity = display.sensitivity;
 input.invert = display.invert;
-input.blocked = () => menu.open || card.up;
+input.blocked = () => menu.open || card.up || journal.open;
 
 relayout();
 
@@ -303,25 +319,71 @@ function makeFrame() {
     lab.mainMs = (people && people.on ? people.updateMs : 0) + (performance.now() - t0);
   } else if (people && people.on) lab.mainMs = people.updateMs;
   if (yardBeasts && yardBeasts.on) f.animals = yardBeasts.st;
+  // (phase 5a) what you carry, your lantern, and the lost things
+  if (youNow) f.you = youNow;
   return f;
 }
+let youNow;
 
 // (phase 4a) Greeting whoever is in front of you (E): their line, a few seconds.
-let sayTimer = 0;
+// (phase 5a) Or, if they have a favour to ask or you bring them what they
+// asked for, an exchange of a few lines with a choice; E again goes on.
+let sayTimer = 0, greetCount = 0;
 function greet() {
-  if (!people || !people.on || QUIET || menu.open) return;
+  if (talk.open) { talk.go(); return; }
+  if (!people || !people.on || QUIET || menu.open || journal.open) return;
   const i = people.greetable({ x: player.x, z: player.z, feet: player.feet, yaw: player.yaw });
   if (i < 0) return;
+  const ex = way && way.on ? way.greet(i, { day: state.day, hour: state.hour }) : null;
+  if (ex) { hideSay(); talk.show(ex, i); lab.lastSaid = { name: ex.who.name, role: ex.who.role, text: ex.pages[0].lines.join(' '), exchange: true }; return; }
   const said = people.say(i, state.day, state.hour, weatherNow());
+  const hail = way ? way.hail(i, greetCount++) : '';
+  if (hail) said.text = `${hail} ${said.text}`;
+  showSay(said.name, said.role, said.text);
+  lab.lastSaid = said;
+}
+function showSay(name, role, text) {
   const el = $('say');
   el.querySelector('.who').innerHTML = '';
-  const b = document.createElement('b'); b.textContent = said.name;
-  el.querySelector('.who').append(b, document.createTextNode(` · ${said.role}`));
-  el.querySelector('.line').textContent = said.text;
+  if (name) { const b = document.createElement('b'); b.textContent = name; el.querySelector('.who').append(b, document.createTextNode(` · ${role}`)); }
+  el.querySelector('.line').textContent = text;
   el.classList.add('on');
   clearTimeout(sayTimer);
   sayTimer = setTimeout(() => el.classList.remove('on'), 5200);
-  lab.lastSaid = said;
+}
+function hideSay() { clearTimeout(sayTimer); $('say').classList.remove('on'); }
+
+// (phase 5a) The exchange's box, and what answering does.
+const talk = new Talk($('talk'), {
+  answer: (id, yes) => way.answer(id, yes, { day: state.day, hour: state.hour }),
+  gift: (kind) => { if (kind === 'lantern') showNote('The lantern is yours now. L lights it or puts it away.', 'L', 9000); },
+  words: { yes: CHOICE.yes, no: CHOICE.no, on: 'go on', bye: 'farewell' },
+});
+// A quiet note low on the screen (a place found, a key for a new thing).
+let noteTimer = 0;
+function showNote(text, key = null, ms = 4200) {
+  if (QUIET) return;
+  hideHint();
+  const el = $('note');
+  el.replaceChildren();
+  if (key) { const k = document.createElement('kbd'); k.textContent = key; el.append(k); }
+  el.append(document.createTextNode(text));
+  el.classList.add('on');
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => el.classList.remove('on'), ms);
+}
+// K: the view in front of you, kept in the journal.
+function sketch() {
+  if (!way || !way.on || menu.open || journal.open || card.up || (map && map.on) || !full) return;
+  way.sketch(full.slice(), grid.cols, grid.rows, { x: player.x, z: player.z, feet: player.feet, day: state.day, hour: state.hour, weather: weatherName() })
+    .then((rec) => { if (rec && rec.full) showNote('The journal has no room for more sketches.'); lab.lastSketch = rec; });
+}
+// L: the lantern, once you have it (the look panel is Shift L in the world).
+function lantern() {
+  if (!way || !way.on) return false;
+  if (!way.progress.lantern) { if (!QUIET) showNote('You have no lantern yet.'); return true; }
+  way.toggleLantern();
+  return true;
 }
 
 // The frame's weather (src/weather.js): a pure function of the seed, the day
@@ -409,7 +471,7 @@ function tick(now) {
   const R = pacer.refresh / 1000, raw = Math.max(0, (now - last) / 1000);
   const dt = Math.min(0.1, raw > 0 ? R * Math.max(1, Math.round(raw / R)) : 0);
   last = now;
-  const look = menu.open ? { yaw: 0, pitch: 0 } : input.takeLook(dt);
+  const look = menu.open || journal.open ? { yaw: 0, pitch: 0 } : input.takeLook(dt);
   if (look.yaw || look.pitch) {
     player.yaw += look.yaw;
     player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, player.pitch + look.pitch));
@@ -417,9 +479,21 @@ function tick(now) {
   // an eye placed at a height by lab.setCamera stays there until a walk key
   const k = input.keys;
   if (state.held && (k.KeyW || k.KeyA || k.KeyS || k.KeyD)) state.held = false;
-  // (while the menu is open the clocks and movement stand still)
-  const paused = menu.open;
+  // (while the menu or the journal is open the clocks and movement stand still)
+  const paused = menu.open || journal.open;
   if (!state.held && !paused) player.update(dt, k);
+  // (phase 5a) what you see and find, the lantern and what you carry
+  if (way && way.on && started) {
+    const aspect = grid.cols / (2 * grid.rows), hfov = 2 * Math.atan(Math.tan(LOOK.fovY * DEG / 2) * aspect);
+    youNow = way.update(player, state.day, state.hour, hfov, people && people.on ? people.st : null);
+    lab.wayMs = way.ms;
+    for (const n of way.takeNotes()) { if (n.kind === 'say') showSay('', '', n.text); else showNote(n.text, 'J'); }
+    // (walking away from an exchange ends it: another time)
+    if (talk.open && talk.person >= 0 && people) {
+      const o = talk.person * FS;
+      if (Math.hypot(people.st[o + S.X] - player.x, people.st[o + S.Z] - player.z) > 4.5) talk.later();
+    }
+  } else youNow = undefined;
   if (!state.frozen && !paused) {
     state.t += dt;
     if (state.running) {
@@ -484,7 +558,7 @@ const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => (shadows ? 
 
 // M: the overhead map, drawn in the same cells, instead of the view
 function presentMap() {
-  const cells = map.render(grid.cols, grid.rows, player);
+  const cells = map.render(grid.cols, grid.rows, player, way && way.on ? way.fog() : null);
   full = cells;
   presenter.upload(0, grid.cols, cells);
   presenter.draw();
@@ -567,6 +641,11 @@ const game = {
   get people() { return people ? lab.people : null; },
   // (phase 4b) the animals, for the menu's counts and its camera buttons
   get animals() { return animals ? lab.animals : null; },
+  // (phase 5a) what is saved for this world, for the menu's World section
+  get progress() {
+    if (!way || !way.on) return null;
+    return { line: () => way.saveLine(), note: () => way.store.note, backup: () => way.backup(), restore: (t) => way.restore(t), clear: () => way.clear(), open: (seed) => this.newWorld(seed) };
+  },
   workersLine() {
     if (!THREADS) return 'everything on the page, no workers';
     if (!WORLD) return `${THREADS} workers, each building its own copy of the scene`;
@@ -657,8 +736,82 @@ lab.animals = {
     return true;
   },
 };
+// (phase 5a) the progress, for the tools: on or off, read, set, clear;
+// the journal, the exchange, sketches and the lantern, driven as a player would
+lab.progress = {
+  get on() { return !!(way && way.on); },
+  // turn it on in a tool (it starts cleared; `store: false` keeps nothing)
+  enable(opts = {}) { if (!way) return false; way.enable({ meet: false, ...opts }); return true; },
+  get() { return way && way.on ? JSON.parse(progressJSON(way.progress)) : null; },
+  set(json) {
+    if (!way || !way.on) return false;
+    const p = progressFrom(typeof json === 'string' ? json : JSON.stringify(json), SEED, world.N);
+    if (!p) return false;
+    way.progress = p; way.afterReset();
+    return true;
+  },
+  clear() { if (way && way.on) way.clear(); },
+  save() { if (way && way.on) way.save(true); },
+  stored() { try { return localStorage.getItem(`land-of-ascii-v3.progress.${SEED}`); } catch { return null; } },
+  note() { return way ? way.store.note : ''; },
+  get ms() { return way ? way.ms : 0; },
+  get saveMs() { return way ? way.saveMs || 0 : 0; },
+  get saves() { return way ? way.saves || 0 : 0; },
+  get buildMs() { return way ? way.buildMs : 0; },
+  places() { return way && way.on ? way.places.list.map((p) => ({ id: p.id, kind: p.kind, title: p.title, where: p.where, x: p.x, z: p.z, D: p.D, at: p.at })) : []; },
+  favours() {
+    if (!way || !way.on) return [];
+    return way.fav.list.map((f) => ({ id: f.id, kind: f.kind, giver: f.giver, giverName: people.P.persons[f.giver].name, dest: f.dest, destName: f.dest !== undefined ? people.P.persons[f.dest].name : null,
+      spot: f.spot ? { x: f.spot.x, z: f.spot.z, ft: f.spot.ft, kind: f.spot.kind, lost: f.spot.lost } : null, len: f.len, parent: f.parent, first: !!f.first, shape: f.shape,
+      ask: f.ask, state: way.stateOf(f), words: way.journal().favours.find((x) => x.id === f.id)?.words || null,
+      usual: { giver: way.fav.usual.get(f.giver) ? { place: way.fav.usual.get(f.giver).place } : null, dest: f.dest !== undefined && way.fav.usual.get(f.dest) ? { place: way.fav.usual.get(f.dest).place } : null } }));
+  },
+  // a favour's state set directly (0 new .. 4 done)
+  setFavour(id, st) { const f = way.fav.list.find((x) => x.id === id); if (!f) return false; way.setState(f, st, state.day, state.hour); return true; },
+  meet() { const m = way && way.fav && way.fav.meet; return m ? { person: m.person, name: people.P.persons[m.person].name, dep: m.dep, arrive: m.arrive, leave: m.leave, back: m.back, spot: { x: m.spot.x, z: m.spot.z, yaw: m.spot.yaw }, on: way.meetOn, town: m.town } : null; },
+  journal: {
+    open(tab) { return openJournal(tab); }, close() { closeJournal(); }, read() { return journal.read(); },
+    tab(id) { journal.select(id, true); }, view(id) { return journal.view(id); }, page(d) { journal.page(d); }, shut() { return journal.shutViewer(); },
+    data() { return way && way.on ? way.journal() : null; },
+  },
+  talk: { read() { return talk.read(); }, go() { talk.go(); }, choose(yes) { talk.choose(yes); }, later() { talk.later(); } },
+  async sketch() { sketch(); await new Promise((r) => setTimeout(r, 50)); for (let k = 0; k < 40 && !lab.lastSketch; k++) await new Promise((r) => setTimeout(r, 25)); const r2 = lab.lastSketch; lab.lastSketch = null; return r2; },
+  async sketchHash(id) { const c = await way.sketchCells(id); if (!c) return null; let h = 0x811c9dc5; for (let i = 0; i < c.length; i++) { h ^= c[i]; h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); },
+  async sketchText(id) { const s = way.progress.sketches.find((x) => x.id === id); const c = await way.sketchCells(id); const { sketchText } = await import('./app/journal.js'); return c ? sketchText(c, s.cols, s.rows) : null; },
+  lantern() { return lantern(); },
+  setLit(on) { if (!way || !way.on) return false; if (on && !way.progress.lantern) way.progress.lantern = true; way.progress.lit = !!on; way.touch(true); return true; },
+  backup() { return way.backup(); },
+  restore(text) { return way.restore(text); },
+  you() { return youNow ? { ...youNow, lost: youNow.lost.slice() } : null; },
+  FAVOUR,
+};
 const menu = new Menu($('menu'), game);
 let menuNext = 0, menuOpenedAt = 0, releasing = false;
+
+// (phase 5a) The journal (J): over the world, which stands still under it.
+const journal = new Journal($('journal'), {
+  data: () => way.journal(),
+  cells: (id) => way.sketchCells(id),
+  copy: (text) => game.copyText(text),
+  close: () => closeJournal(),
+});
+function toggleJournal() { if (journal.open) closeJournal(); else openJournal(); }
+function openJournal(tab) {
+  if (!way || !way.on || QUIET || state.failed || card.up || menu.open || journal.open) return false;
+  input.clear();
+  talk.close();
+  journal.show(tab);
+  journalOpenedAt = performance.now();
+  if (document.pointerLockElement) { releasing = true; document.exitPointerLock(); }
+  return true;
+}
+function closeJournal(recapture = false) {
+  if (!journal.open) return;
+  journal.hide();
+  input.clear();
+  if (recapture) input.capture();
+}
+let journalOpenedAt = 0;
 
 function openMenu() {
   if (QUIET || state.failed || card.up || menu.open) return false;
@@ -682,6 +835,13 @@ function closeMenu(recapture = false) {
 }
 function onEscape() {
   if (card.up) { card.dismiss(false); return; }
+  // (phase 5a) an exchange: another time; the journal: its sketch, then itself
+  if (talk.open) { talk.later(); return; }
+  if (journal.open) {
+    if (performance.now() - journalOpenedAt < 350) return;
+    if (!journal.shutViewer()) closeJournal(false);
+    return;
+  }
   if (menu.open) {
     // (the browser may deliver the Escape that freed the mouse after the
     // menu has already opened for it)
@@ -693,6 +853,9 @@ function onEscape() {
 // left): open the menu then too, so one press always works.
 function onUnlocked() {
   if (releasing) { releasing = false; return; }
+  // (the Escape that freed the mouse during an exchange answers it)
+  if (talk.open) { talk.later(); return; }
+  if (journal.open) return;
   openMenu();
 }
 
@@ -704,6 +867,8 @@ const card = {
   show() {
     if (QUIET || !WORLD || state.failed || seenCard()) return false;
     this.up = true;
+    // (phase 5a) in a first session, only this: someone is waiting on the road
+    if (way && way.meetOn) { this.el.querySelector('.go').textContent = START_LINE; this.el.querySelector('.sub').hidden = false; }
     this.el.classList.add('on');
     requestAnimationFrame(() => this.el.classList.add('shown'));
     this.el.focus({ preventScroll: true });

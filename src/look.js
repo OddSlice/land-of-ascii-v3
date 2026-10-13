@@ -461,6 +461,9 @@ export const LOOK = {
     you: '#ffb060',           // the player and their heading
     markBg: '#1c1d22',        // behind a mark, so it reads on any ground
     frame: '#0d0e12',         // round the map
+    // (phase 5a) land not yet seen: a plain dark a step above the frame,
+    // with a faint dot every few cells so it reads as paper not yet drawn on
+    unknown: '#17181d', unknownInk: '#24252c', unknownGlyph: '.', unknownEvery: 4,
   },
 
   // Keyframes. Every material has `lit` (full sun) and `shade` (no direct

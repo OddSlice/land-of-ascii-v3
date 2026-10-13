@@ -38,11 +38,16 @@ function keyGroups(scene) {
       [['Shift'], 'run, while held'],
       [['Space'], world ? 'jump; rise, while flying' : 'jump'],
       world && [['F'], 'fly on or off'],
-      world && [['E'], 'greet whoever is close, in front and facing you'],
+      world && [['E'], 'greet someone; say yes to a favour'],
+    ]],
+    world && ['wayfaring', 'book', [
+      [['J'], 'your journal'],
+      [['K'], 'sketch the view'],
+      [['L'], 'your lantern, once you have one'],
     ]],
     ['looking', 'eye', [
-      [['mouse'], 'look round: click the picture to take the mouse, Esc gives it back'],
-      [['drag'], 'look round where the browser will not give the mouse over'],
+      [['mouse'], 'look round (click the picture; Esc frees the mouse)'],
+      [['drag'], 'look round where the mouse cannot be held'],
       [['arrows'], 'look round'],
     ]],
     ['time', 'clock', [
@@ -58,11 +63,11 @@ function keyGroups(scene) {
     ]],
     ['views', 'camera', [
       [['C'], 'the next fixed camera'],
-      [['L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
+      [world ? ['Shift', 'L'] : ['L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
       [['H'], 'full statistics on or off'],
       [['Esc'], 'this menu'],
     ]],
-  ].map(([name, ic, rows]) => [name, ic, rows.filter(Boolean)]);
+  ].filter(Boolean).map(([name, ic, rows]) => [name, ic, rows.filter(Boolean)]);
 }
 
 const TABS = [
@@ -178,6 +183,7 @@ export class Menu {
         this.row('another world', 'the same seed always builds the same world', h('div', { class: 'inline' }, field,
           h('button', { type: 'button', onclick: openSeed }, icon('arrow', 15), h('span', {}, 'open this seed')),
           h('button', { type: 'button', onclick: () => g.newWorld() }, icon('dice', 15), h('span', {}, 'a new world'))), { wide: true }));
+      worldRows.push(this.progressPart());
     }
     page('world', worldRows);
 
@@ -203,6 +209,39 @@ export class Menu {
     this.pane.append(...TABS.map(([id]) => sections[id]));
     this.sections = sections;
     this.select(this.tab, false);
+  }
+
+  // (phase 5a) What is saved for this world: a line saying what, a backup
+  // to copy as text, a box to paste one back, and clearing it all (asked
+  // first). Each world (seed) keeps its own.
+  progressPart() {
+    const g = this.game;
+    if (!g.progress) return [];
+    const line = h('p', { class: 'words saveline' }), note = h('p', { class: 'words' });
+    const said = h('span', { class: 'note', 'aria-live': 'polite' });
+    const tell = (t) => { said.textContent = t; clearTimeout(this.saidT); this.saidT = setTimeout(() => { said.textContent = ''; }, 3500); };
+    this.refresh.push(() => { const P = g.progress; if (!P) return; line.textContent = P.line(); note.textContent = P.note(); });
+    const copyBtn = h('button', { type: 'button', onclick: async () => { const t = await g.progress.backup(); tell((await g.copyText(t)) ? 'backup copied: keep it somewhere safe' : 'could not copy'); } }, icon('copy', 15), h('span', {}, 'copy a backup as text'));
+    const box = h('textarea', { rows: '4', spellcheck: 'false', 'aria-label': 'paste a backup here', placeholder: 'paste a backup here' });
+    const restoreBtn = h('button', { type: 'button', onclick: async () => {
+      const r = await g.progress.restore(box.value);
+      if (!r.ok) { tell(r.error); return; }
+      box.value = '';
+      if (r.other) { tell(`restored for seed ${r.seed}`); otherBtn.hidden = false; otherBtn.onclick = () => g.progress.open(r.seed); otherBtn.querySelector('span').textContent = `open seed ${r.seed}`; } else tell('restored');
+      this.update();
+    } }, icon('paste', 15), h('span', {}, 'restore from this text'));
+    const otherBtn = h('button', { type: 'button', hidden: true }, icon('arrow', 15), h('span', {}, 'open that world'));
+    const ask = h('div', { class: 'inline ask', hidden: true },
+      h('span', {}, 'Clear everything saved for this world? It cannot be undone.'),
+      h('button', { type: 'button', class: 'danger', onclick: () => { g.progress.clear(); ask.hidden = true; clearBtn.hidden = false; tell('cleared'); this.update(); clearBtn.focus(); } }, h('span', {}, 'clear it')),
+      h('button', { type: 'button', onclick: () => { ask.hidden = true; clearBtn.hidden = false; clearBtn.focus(); } }, h('span', {}, 'keep it')));
+    const clearBtn = h('button', { type: 'button', onclick: () => { ask.hidden = false; clearBtn.hidden = true; ask.querySelector('.danger').focus(); } }, icon('trash', 15), h('span', {}, 'clear progress'));
+    return [
+      h('h3', { class: 'part' }, 'your progress in this world'),
+      this.row('saved', h('div', {}, line, note), h('div', { class: 'inline' }, copyBtn), { wide: true }),
+      this.row('restore', 'paste a backup copied here before, then restore it', h('div', { class: 'restore' }, box, h('div', { class: 'inline' }, restoreBtn, otherBtn, said)), { wide: true }),
+      this.row('start again', 'only this world: other seeds keep theirs', h('div', { class: 'inline' }, clearBtn, ask), { wide: true }),
+    ];
   }
 
   // (phase 4a) Everyone in the world: name, role and what they are doing
@@ -390,7 +429,7 @@ export class Menu {
   }
 
   focusables() {
-    return [...this.panel.querySelectorAll('button, input')].filter((el) => !el.disabled && el.tabIndex >= 0 && el.offsetParent !== null);
+    return [...this.panel.querySelectorAll('button, input, textarea')].filter((el) => !el.disabled && el.tabIndex >= 0 && el.offsetParent !== null);
   }
 
   // For the tools (lab.menu): what the menu shows.

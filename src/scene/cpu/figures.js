@@ -21,6 +21,7 @@ import { P as KP, P_STRIDE, PT, PF, ZONE_OUT, ZONE_YARD, roomBit } from '../../w
 import { MAT, MAT_FAINT, HIT_STRIDE, REC, H_SHADOW } from '../../contract.js';
 import { torchPower } from './light.js';
 import { Plane } from './build.js';
+import { LYING, HELD, LANTERN, LANTERN_FLAME_Y, HANDS } from '../../world/things.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
@@ -41,14 +42,14 @@ const methods = {
 
   // The frame's figures as shapes: the same in every worker.
   prepareFigures(v, frame) {
-    const st = frame.people, sa = frame.animals, items = this.figItems;
+    const st = frame.people, sa = frame.animals, you = frame.you, items = this.figItems;
     items.length = 0;
     this.figAnimals = sa || null;
-    const n = st ? st.length / FS : 0, na = sa ? sa.length / AS : 0;
-    if (!n && !na) return;
+    const n = st ? st.length / FS : 0, na = sa ? sa.length / AS : 0, ny = you ? 2 + (you.lost ? you.lost.length : 0) : 0;
+    if (!n && !na && !ny) return;
     const wk = this.world.kit;
-    if (!this.figKit || this.figKit.cap < (n + na) * MAXP) {
-      const cap = Math.max(256, (n + na) * MAXP);
+    if (!this.figKit || this.figKit.cap < (n + na + ny) * MAXP) {
+      const cap = Math.max(256, (n + na + ny) * MAXP);
       this.figKit = { cap, prims: new Float64Array(cap * P_STRIDE), holes: new Float64Array(0), cover: new Float32Array(cap), flame: new Uint8Array(cap),
         rooms: wk ? wk.rooms : [], roomBits: wk ? wk.roomBits : [], yards: wk ? wk.yards : [], np: 0 };
     }
@@ -73,7 +74,52 @@ const methods = {
       const k = animalParts(sa, o, dist, v.colAngle, v.rowAngle, frame.t, this.figParts, 0, v.ex, v.ez);
       if (k) np = this.figItem(v, np, k, 100000 + i, x, z, dist, sa[o + AN.ROOM], 50000 + sa[o + AN.ID], ANEAR_D, true);
     }
+    // (phase 5a) what the player carries, and the lost things on the ground
+    if (you) np = this.prepareYou(v, frame, you, np);
     this.figKit.np = np;
+  },
+
+  // (phase 5a) The player's hands, from the eye of this frame: the lantern,
+  // lit, in the right, the thing carried in the left, swaying with the
+  // stride; and each lost thing where it lies until it is found. They are
+  // drawn as people are (thin parts held at two cells and faded far off).
+  prepareYou(v, frame, you, np) {
+    const buf = this.figParts, c = frame.cam;
+    const push = (parts, X, Z, Y, yaw, k0) => {
+      const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      let k = k0;
+      for (const [u, w, hx, hz, y0, y1, mat, flags] of parts) {
+        const q = k * PART;
+        buf[q] = X + rx * u + fx * w; buf[q + 1] = Z + rz * u + fz * w; buf[q + 2] = -yaw;
+        buf[q + 3] = hx; buf[q + 4] = hz; buf[q + 5] = Y + y0; buf[q + 6] = Y + y1;
+        buf[q + 7] = mat; buf[q + 8] = flags || 0; buf[q + 9] = 1;
+        k++;
+      }
+      return k;
+    };
+    const hand = (side) => {
+      const ph = (you.walk || 0) / HANDS.stride * Math.PI * 2;
+      const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
+      const r = side + HANDS.sway * 0.5 * Math.sin(ph), f = HANDS.fwd;
+      return { x: c.x + fx * f + rx * r, z: c.z + fz * f + rz * r, y: c.y - HANDS.down + HANDS.sway * Math.abs(Math.cos(ph)) };
+    };
+    const room = you.room ?? -1;
+    if (you.lantern) {
+      const hp = hand(HANDS.right), k = push(LANTERN, hp.x, hp.z, hp.y, c.yaw, 0);
+      np = this.figItem(v, np, k, 200000, hp.x, hp.z, HANDS.fwd, room, 70000, NEAR_D);
+    }
+    if (you.carry && HELD[you.carry]) {
+      const hp = hand(HANDS.left), k = push(HELD[you.carry], hp.x, hp.z, hp.y, c.yaw, 0);
+      np = this.figItem(v, np, k, 200001, hp.x, hp.z, HANDS.fwd, room, 70001, NEAR_D);
+    }
+    (you.lost || []).forEach(([x, z, y, shape, yaw], j) => {
+      const dist = Math.hypot(x - v.ex, z - v.ez), parts = LYING[shape];
+      if (!parts || dist > 160) return;
+      // (every part may be held to two cells, and fades far off)
+      const k = push(parts.map((p) => { const q = p.slice(); q[7] = 1; return q; }), x, z, y, yaw, 0);
+      np = this.figItem(v, np, k, 200002 + j, x, z, dist, -1, 70002 + j, NEAR_D);
+    });
+    return np;
   },
 
   // One figure's parts (in this.figParts) into the kit's prims, and its item.
@@ -146,7 +192,7 @@ const methods = {
     const tanE = L[1] / hh, ax = -L[0] / hh, az = -L[2] / hh;
     const { v, rays, m } = this, H = m.hits, sw = rays.sw, jlo = rays.jlo, c0 = rays.c0, bb = this.bb;
     for (const it of this.figItems) {
-      if (it.pi < 100000 || it.dist > W.far) continue;
+      if (it.pi < 100000 || it.pi >= 200000 || it.dist > W.far) continue;
       const o = (it.pi - 100000) * AS, pose = sa[o + AN.POSE];
       if (pose === APOSE.FLY || pose === APOSE.PERCH || pose === APOSE.SWIM || pose === APOSE.HIDDEN) continue;
       const sp = SPEC[sa[o + AN.KIND]], sc = sa[o + AN.SCALE] || 1, y = sa[o + AN.Y], x = sa[o + AN.X], z = sa[o + AN.Z];
@@ -254,6 +300,17 @@ export function installFigures(cls) { Object.assign(cls.prototype, methods); }
 // and which zones it lights (outdoors, the yard; or the room it is in).
 export function moversOf(frame, kit) {
   const st = frame.people, out = [];
+  // (phase 5a) the player's lantern, lit: the people's own lantern light,
+  // from its flame in the right hand
+  const you = frame.you;
+  if (you && you.lantern) {
+    const c = frame.cam, ph = (you.walk || 0) / HANDS.stride * Math.PI * 2;
+    const r = HANDS.right + HANDS.sway * 0.5 * Math.sin(ph), f = HANDS.fwd;
+    const x = c.x + Math.sin(c.yaw) * f + Math.cos(c.yaw) * r, z = c.z + Math.cos(c.yaw) * f - Math.sin(c.yaw) * r;
+    const y = c.y - HANDS.down + HANDS.sway * Math.abs(Math.cos(ph)) + LANTERN_FLAME_Y;
+    const room = you.room ?? -1;
+    out.push({ x, y, z, power: torchPower(frame.t + 70000 * 1.7), light: 0.7, mask: room >= 0 && kit ? roomBit(kit, room) : ZONE_OUT | ZONE_YARD });
+  }
   if (!st || !st.length) return out;
   for (let i = 0, n = st.length / FS; i < n; i++) {
     const o = i * FS, L = lightOf(st, o);

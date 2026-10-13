@@ -69,7 +69,7 @@
   .menu ::selection { background: rgba(255, 176, 96, .32); color: var(--head); }
   .menu .back { position: absolute; inset: 0; background: rgba(8, 9, 12, .55); opacity: 0; transition: opacity 200ms ease; }
   .menu .panel { position: relative; display: grid; grid-template-columns: 216px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; width: min(920px, calc(100vw - 32px));
-    height: min(620px, calc(100vh - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+    height: min(680px, calc(100vh - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
     opacity: 0; transform: translateY(8px); transition: opacity 200ms var(--ease), transform 260ms var(--ease); }
   .menu.shown .back, .menu.shown .panel { opacity: 1; transform: none; }
 
@@ -144,7 +144,15 @@
   .menu .switch[aria-checked="true"] .track { background: var(--press); border-color: var(--accent); }
   .menu .switch[aria-checked="true"] .knob { transform: translateX(16px); background: var(--accent); }
   .menu input[type="text"] { width: 12ch; padding: 4px 8px; background: var(--well); border: 1px solid var(--line); border-radius: 4px; caret-color: var(--accent); }
-  .menu input[type="text"]::placeholder { color: #8d887e; }
+  .menu input[type="text"]::placeholder, .menu textarea::placeholder { color: #8d887e; }
+  /* (phase 5a) the progress: the save line, the backup box, clearing */
+  .menu textarea { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 6px 8px; font: 11px/1.4 var(--mono); color: var(--ink);
+    background: var(--well); border: 1px solid var(--line); border-radius: 4px; resize: vertical; caret-color: var(--accent); }
+  .menu textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .menu .saveline { color: var(--ink); }
+  .menu [hidden] { display: none !important; }
+  .menu .ask > span { color: var(--head); }
+  .menu button.danger { color: #ffd2bf; border-color: #7a4a3a; } .menu button.danger:hover { background: #3a231c; border-color: #a5644d; }
   .menu input[type="range"] { width: min(240px, 50vw); margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
   .menu .value { min-width: 6ch; color: var(--head); font-variant-numeric: tabular-nums; }
   .menu .inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
@@ -186,6 +194,69 @@
   @media (prefers-reduced-motion: reduce) {
     .menu .panel { transform: none; } .menu [role="tabpanel"]:not([hidden]) { animation: none; } .menu .switch .knob { transition: none; }
   }
+
+  /* (phase 5a) a quiet note low on the screen: a place the journal notes,
+     a key for something new */
+  #note { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 12px; font: 12px/1.4 var(--mono); color: var(--ink);
+    background: rgba(13, 14, 18, .72); border: 1px solid var(--line); border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity 300ms ease; white-space: nowrap; }
+  #note.on { opacity: 1; }
+  #note kbd { display: inline-block; min-width: 1.9em; padding: 0 5px; margin-right: 8px; font: 600 11px/1.6 var(--mono); color: var(--head); text-align: center;
+    background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
+  /* an exchange: who, two or three lines, and the choice */
+  #talk { position: fixed; left: 50%; bottom: 54px; z-index: 4; transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); padding: 11px 18px 12px;
+    font: 13px/1.55 var(--mono); color: var(--ink); background: rgba(13, 14, 18, .86); border: 1px solid var(--line); border-radius: 6px;
+    opacity: 0; transition: opacity 260ms ease; }
+  #talk.on { opacity: 1; }
+  #talk .who { font-size: 11px; color: var(--quiet); letter-spacing: .02em; margin-bottom: 5px; }
+  #talk .who b { color: var(--head); font-weight: 600; }
+  #talk .lines p { margin: 0 0 4px; }
+  #talk .choice { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 9px; }
+  #talk button { display: inline-flex; align-items: center; gap: 8px; padding: 4px 11px 4px 5px; font: inherit; font-size: 12px; color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 4px; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  #talk button:hover { background: var(--hover); border-color: #5a5650; }
+  #talk button.yes { color: var(--head); border-color: var(--press-line); background: var(--press); }
+  #talk button.yes:hover { border-color: var(--accent); }
+  #talk button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #talk kbd { display: inline-block; min-width: 2.4em; padding: 0 4px; font: 600 10.5px/1.6 var(--mono); color: var(--head); text-align: center;
+    background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
+  #card .sub { margin: -10px 0 16px; color: var(--quiet); font-size: 12px; }
+
+  /* the journal (J): the menu's panel, rail and tabs; its own lists */
+  .journal .carry { margin-top: auto; padding: 0 10px; }
+  .journal .carry h3 { margin-bottom: 4px; font-weight: 400; color: var(--quiet); }
+  .journal .carried { margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; color: var(--ink); max-height: 132px; overflow: auto; }
+  .journal .carried li { padding: 1px 0; } .journal .carried li.none { color: var(--quiet); }
+  .journal .rows { margin: 4px 0 0; padding: 0; list-style: none; }
+  .journal .row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: baseline; gap: 4px 12px; padding: 6px 0; border-top: 1px solid var(--line-soft); }
+  .journal .row:first-child { border-top: 0; }
+  .journal .row .ic { align-self: center; color: var(--quiet); }
+  .journal .row.found .ic { color: var(--accent); }
+  .journal .row b { display: block; font-weight: 600; color: var(--quiet); }
+  .journal .row.found b { color: var(--head); }
+  .journal .sub { display: block; font-size: 12px; color: var(--quiet); }
+  .journal .when { font-size: 12px; color: var(--quiet); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .journal .group h3.part { margin-top: 18px; }
+  .journal button.link { padding: 2px 8px; font-size: 12px; color: var(--accent); }
+  .journal .sketches { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; margin-top: 8px; }
+  .journal .card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 6px; text-align: left; }
+  .journal .card .thumb { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; image-rendering: pixelated; background: var(--well); border-radius: 3px; }
+  .journal .card .cap b { display: block; font-weight: 600; color: var(--head); font-size: 12px; }
+  .journal .favs { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .journal .fav { padding: 10px 12px; background: var(--well); border: 1px solid var(--line-soft); border-radius: 6px; }
+  .journal .fav .head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .journal .fav .head b { color: var(--head); font-weight: 600; }
+  .journal .fav p { margin: 2px 0 0; }
+  .journal .fav.done p { color: var(--quiet); }
+  .journal .note { margin-top: 18px; }
+  /* the full-screen sketch, and its page-through */
+  .journal .viewer { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    padding: 16px 24px; background: rgba(8, 9, 12, .96); }
+  .journal .viewer[hidden] { display: none; }
+  .journal .viewer .frame { display: flex; align-items: center; justify-content: center; min-height: 0; }
+  .journal .viewer canvas { display: block; max-width: calc(100vw - 48px); max-height: calc(100vh - 110px); image-rendering: pixelated; border: 1px solid var(--line); }
+  .journal .viewer .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; width: min(100%, 1100px); }
+  .journal .viewer .caption { margin: 0; color: var(--ink); }
+  .journal.viewing .panel, .journal.viewing .back { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -202,20 +273,25 @@
 <div id="look" style="display:none"></div>
 <div id="hint" aria-hidden="true"><kbd>Esc</kbd>menu and controls</div>
 <div id="say" role="status" aria-live="polite"><div class="who"></div><div class="line"></div></div>
+<div id="note" role="status" aria-live="polite"></div>
+<div id="talk" role="dialog" aria-live="polite" aria-label="talking" hidden></div>
 <div id="card" role="dialog" aria-labelledby="card-title" tabindex="-1">
   <div class="box">
     <h1 id="card-title">Land of Ascii</h1>
     <p class="go">click to explore</p>
+    <p class="sub" hidden>click to begin</p>
     <dl>
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>walk (Shift runs)</dd>
       <dt><kbd>mouse</kbd></dt><dd>look</dd>
       <dt><kbd>F</kbd></dt><dd>fly</dd>
       <dt><kbd>E</kbd></dt><dd>greet someone</dd>
+      <dt><kbd>J</kbd></dt><dd>your journal</dd>
       <dt><kbd>Esc</kbd></dt><dd>menu: every control and option</dd>
     </dl>
   </div>
 </div>
 <div id="menu" class="menu" aria-hidden="true"></div>
+<div id="journal" class="menu journal" aria-hidden="true"></div>
 <div id="error"></div>
 <script type="module" src="/src/main.js"></script>
 </body>

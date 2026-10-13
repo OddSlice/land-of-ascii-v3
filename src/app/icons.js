@@ -37,6 +37,21 @@ const PATHS = {
   gauge: '<path d="M4.2 17.5a8.5 8.5 0 1 1 15.6 0"/><path d="M12 13.5l4-4.5"/><circle cx="12" cy="13.5" r="1.4"/>',
   stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="1.75"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+  // (phase 5a) the journal: places (a signpost), people, sketches (a framed
+  // view), favours (a tied bundle); a tick, an empty mark, the arrows, close,
+  // the lantern, a book, paste and clear
+  signpost: '<path d="M12 21V3M12 5.5h6.5l2 2-2 2H12M12 12.5H5.5l-2-2 2-2H12"/>',
+  people: '<circle cx="8.5" cy="8" r="3"/><path d="M3 19.5a5.5 5.5 0 0 1 11 0"/><circle cx="16.5" cy="9" r="2.5"/><path d="M15 14.2a4.6 4.6 0 0 1 6 4.3"/>',
+  sketch: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="M5.5 16.5 10 11l3 3.5 2-2 3.5 4"/><circle cx="16" cy="8.5" r="1.4"/>',
+  bundle: '<path d="M5 9.5h14l-1.5 10h-11z"/><path d="M9 9.5 12 5l3 4.5M12 5v4.5"/>',
+  tick: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  open: '<circle cx="12" cy="12" r="6"/>',
+  left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  lantern: '<path d="M9 5.5h6M10 3.5h4M8.5 7.5h7v10h-7zM8 19.5h8"/><path d="M12 10.5v4"/>',
+  book: '<path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4"/>',
+  paste: '<rect x="5" y="4.5" width="14" height="16" rx="1.75"/><path d="M9 4.5V3h6v1.5M9 10h6M9 13.5h6M9 17h4"/>',
+  trash: '<path d="M4.5 6.5h15M9.5 6.5V4h5v2.5M6.5 6.5l1 13.5h9l1-13.5"/>',
 };
 
 export function icon(name, size = 16) {

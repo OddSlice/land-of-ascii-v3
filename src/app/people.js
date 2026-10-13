@@ -25,6 +25,10 @@ export class People {
     this.updateMs = 0;
     this.last = new Map();             // the line each person said last
     this.planned = -1;
+    // (phase 5a) the first meeting, in a first session: one person's state
+    // replaced, for a while, by their walk out to the road and back (a pure
+    // function of the day and hour; see src/app/wayfaring.js)
+    this.meet = null;
     this.buildMs = performance.now() - t0;
   }
 
@@ -47,6 +51,7 @@ export class People {
       const seg = stateAt(P, i, day, hour, st, i * FS);
       this.segs[i] = seg; this.along[i] = alongOf(P, i, seg, hour);
     }
+    if (this.meet) this.meet.apply(day, hour, st, this.segs, this.along);
     adjust(st, this.n, this.segs, this.along, you, P.p);
     litGroups(P, day, hour, this.lit);
     // the people near you, as bodies

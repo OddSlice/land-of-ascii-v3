@@ -11,6 +11,7 @@ import { makePalette, resolveStripe } from '../resolve.js';
 import { MAP_GLYPH } from '../glyphs.js';
 import { sunDir } from '../world/sky.js';
 import { bil1, bilU8, bilD } from '../scene/cpu/sample.js';
+import { GLYPHS } from '../glyphs.js';
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const M = LOOK.map;
@@ -29,10 +30,15 @@ export class MapView {
   toggle() { this.on = !this.on; }
 
   // The map for a grid of cols x rows cells, with the player marked.
-  render(cols, rows, player) {
+  // (phase 5a) `fog`: what you have seen ({ seen, sn, walked, wn, found }),
+  // or null for the whole map as before: then only the land you have seen
+  // is drawn, the roads only where you have walked them, and the sites
+  // only once found.
+  render(cols, rows, player, fog = null) {
     const key = `${cols}x${rows}`;
     if (key !== this.key) this.build(cols, rows);
     const cells = this.base.slice();
+    if (fog) this.cover(cells, cols, fog);
     const mark = (wx, wz, glyph, colour) => {
       const c = this.cellOf(wx, wz);
       if (!c) return;
@@ -41,13 +47,13 @@ export class MapView {
     };
     const s = this.world.sites, mk = hex(M.mark), you = hex(M.you);
     // the fort: its walls, all the way round
-    const poly = s.fort.poly;
+    const poly = fog && !fog.found.fort ? [] : s.fort.poly;
     poly.forEach((a, i) => {
       const b = poly[(i + 1) % poly.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (this.mw / 2)));
       for (let k = 0; k <= n; k++) mark(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, MAP_GLYPH.fort, mk);
     });
-    for (const v of s.villages) mark(v.x, v.z, MAP_GLYPH.village, mk);
-    for (const v of s.viewpoints) mark(v.x, v.z, MAP_GLYPH.viewpoint, mk);
+    s.villages.forEach((v, q) => { if (!fog || fog.found[`village${q}`]) mark(v.x, v.z, MAP_GLYPH.village, mk); });
+    s.viewpoints.forEach((v, q) => { if (!fog || fog.found[`view${q}`]) mark(v.x, v.z, MAP_GLYPH.viewpoint, mk); });
     mark(s.spawn.x, s.spawn.z, MAP_GLYPH.spawn, mk);
     // the heading: two cells ahead, in the glyph nearest its direction
     // (a cell is mw metres wide and twice as tall, and twice as tall on
@@ -77,6 +83,7 @@ export class MapView {
     this.x0 = Math.floor((cols - this.w) / 2); this.y0 = Math.floor((rows - this.h) / 2);
     const hits = new Uint8Array(cols * rows * HIT_STRIDE);
     for (let i = 0; i < cols * rows; i++) { hits[i * HIT_STRIDE + REC] = MAT_NONE; hits[i * HIT_STRIDE + 2 * REC] = MAT_NONE; }
+    const hits2 = new Uint8Array(cols * rows * HIT_STRIDE), roads = [];
     const sun = sunDir(LOOK.hours.day);
     const surf = { ground: T.levels[0].H, N, NN };
     const w8 = (o, mat, light, tone, dist) => {
@@ -114,18 +121,28 @@ export class MapView {
         for (let q = -1; q <= 1 && !road; q++) for (let r = -1; r <= 1 && !road; r++) if (bilU8(T.wRoad, x + q * this.mw / 3, z + r * this.mh / 3, N, NN) > 0.5) road = true;
         const ti = Math.min(this.tn - 1, Math.floor(z / 8)) * this.tn + Math.min(this.tn - 1, Math.floor(x / 8));
         let mat;
-        if (road) mat = MAT.DIRT;
-        else if (this.trees[ti] || bilU8(T.wFloor, x, z, N, NN) > 0.6) mat = MAT.CONIFER;
+        if (this.trees[ti] || bilU8(T.wFloor, x, z, N, NN) > 0.6) mat = MAT.CONIFER;
         else if (bilU8(T.wSnow, x, z, N, NN) > 0.5) mat = MAT.SNOW;
         else if (bilU8(T.wRock, x, z, N, NN) > 0.5) mat = MAT.ROCK;
         else if (bilU8(T.wSand, x, z, N, NN) > 0.5) mat = MAT.SAND;
         else mat = MAT.GRASS;
+        // (phase 5a: the land under a road too, for a road not yet walked)
+        if (road) { roads.push(cy * this.w + cx); w8(o, mat, lam, tone, 1); hits2.set(hits.subarray(o, o + HIT_STRIDE), o); w8(o, MAT.DIRT, lam, tone, 1); continue; }
         w8(o, mat, lam, tone, 1);
       }
     }
     const look = { cloud: 'B', meadow: 0, shallows: 'blue' };
     const cells = new Uint8Array(cols * rows * CELL_STRIDE);
     resolveStripe(makePalette(LOOK.hours.day), hits, cells, cols, rows, 0, look);
+    // (phase 5a) the roads' cells drawn as the land under them, for the map
+    // of what you have seen
+    const plain = new Uint8Array(cols * rows * CELL_STRIDE);
+    for (const r of roads) {
+      const cx = r % this.w, cy = (r - cx) / this.w, o = ((this.y0 + cy) * cols + this.x0 + cx) * HIT_STRIDE;
+      hits.set(hits2.subarray(o, o + HIT_STRIDE), o);
+    }
+    resolveStripe(makePalette(LOOK.hours.day), hits, plain, cols, rows, 0, look);
+    this.plain = plain; this.roadCells = roads;
     // round the map: plain frame colour
     const fr = hex(M.frame);
     for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
@@ -135,5 +152,38 @@ export class MapView {
     }
     this.base = cells;
     this.markBg = Uint8Array.from(hex(M.markBg));
+    this.unknownBg = Uint8Array.from(hex(M.unknown)); this.unknownInk = Uint8Array.from(hex(M.unknownInk));
+    this.unknownGlyph = GLYPHS.indexOf(M.unknownGlyph);
+  }
+
+  // (phase 5a) Over the whole map: land not yet seen as plain paper, roads
+  // not yet walked as the land under them.
+  cover(cells, cols, fog) {
+    const { seen, sn, walked, wn } = fog, mw = this.mw, mh = this.mh, N = this.world.N, E = M.unknownEvery;
+    if (!this.dark || this.dark.length !== this.w * this.h) this.dark = new Uint8Array(this.w * this.h);
+    for (let cy = 0; cy < this.h; cy++) for (let cx = 0; cx < this.w; cx++) {
+      const x = (cx + 0.5) * mw, z = N - (cy + 0.5) * mh;
+      const g = Math.min(sn - 1, Math.floor(z / 16)) * sn + Math.min(sn - 1, Math.floor(x / 16));
+      const o = ((this.y0 + cy) * cols + this.x0 + cx) * CELL_STRIDE;
+      this.dark[cy * this.w + cx] = 0;
+      if (!((seen[g >> 3] >> (g & 7)) & 1)) {
+        this.dark[cy * this.w + cx] = 1;
+        cells.set(this.unknownBg, o);
+        cells[o + 3] = cx % E === 0 && cy % 2 === 0 ? this.unknownGlyph : 0;
+        cells.set(this.unknownInk, o + 4);
+      }
+    }
+    // a road's cell keeps its road only where one of the 8 m squares it
+    // covers has been walked
+    for (const r of this.roadCells) {
+      const cx = r % this.w, cy = (r - cx) / this.w, o = ((this.y0 + cy) * cols + this.x0 + cx) * CELL_STRIDE;
+      if (this.dark[r]) continue;
+      const x0 = cx * mw, x1 = (cx + 1) * mw, z1 = N - cy * mh, z0 = N - (cy + 1) * mh;
+      let walkedHere = false;
+      for (let gz = Math.max(0, Math.floor(z0 / 8)); gz <= Math.min(wn - 1, Math.floor(z1 / 8)) && !walkedHere; gz++) {
+        for (let gx = Math.max(0, Math.floor(x0 / 8)); gx <= Math.min(wn - 1, Math.floor(x1 / 8)); gx++) { const k = gz * wn + gx; if ((walked[k >> 3] >> (k & 7)) & 1) { walkedHere = true; break; } }
+      }
+      if (!walkedHere) cells.set(this.plain.subarray(o, o + CELL_STRIDE), o);
+    }
   }
 }
