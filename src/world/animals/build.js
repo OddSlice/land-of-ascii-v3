@@ -132,7 +132,9 @@ export function buildAnimals(world, P) {
       if (fl < 1e-4) continue;
       const ix = fx / fl, iz = fz / fl;
       const edge = [x - ix * 11, z - iz * 11], day = [x + ix * 20, z + iz * 20], bed = [x + ix * 30 - iz * 8, z + iz * 30 + ix * 8];
-      if (!free(...edge) || !free(...day) || !free(...bed) || roadNear(...edge) || trunks(...edge, 6) > 0 || forest(...day) < 0.3 || forest(...bed) < 0.3) continue;
+      // (dry for 6 m round each: the group spreads round its spot)
+      const dry = ([px, pz]) => { for (let k = 0; k < 16; k++) for (const d of [2, 4, 6]) if (water(px + Math.cos(k * TAU / 16) * d, pz + Math.sin(k * TAU / 16) * d)) return false; return true; };
+      if (!free(...edge) || !free(...day) || !free(...bed) || roadNear(...edge) || trunks(...edge, 6) > 0 || forest(...day) < 0.3 || forest(...bed) < 0.3 || !dry(edge) || !dry(day) || !dry(bed)) continue;
       const ways = { bedEdge: way(bed, edge), edgeDay: way(edge, day), dayEdge: way(day, edge), edgeBed: way(edge, bed) };
       if (!ways.bedEdge || !ways.edgeDay || !ways.dayEdge || !ways.edgeBed) continue;
       const n = C.deerN[0] + Math.floor(r(Math.round(x), Math.round(z), 24) * (C.deerN[1] - C.deerN[0] + 1));
@@ -180,7 +182,8 @@ export function buildAnimals(world, P) {
       if (!bank) continue;
       // room to paddle: water all round within the circle
       let ok = true;
-      for (let a = 0; a < 8 && ok; a++) { const px = x + Math.cos(a * TAU / 8) * C.duckLoop, pz = z + Math.sin(a * TAU / 8) * C.duckLoop; if (!water(px, pz) || surf(px, pz) - G(px, pz) < 0.15) ok = false; }
+      // (finely: their loop and their spread reach 3.3 m out)
+      for (let a = 0; a < 24 && ok; a++) for (const rr of [1.2, 2.4, C.duckLoop + 0.4]) { const px = x + Math.cos(a * TAU / 24) * rr, pz = z + Math.sin(a * TAU / 24) * rr; if (!water(px, pz) || surf(px, pz) - G(px, pz) < 0.15) ok = false; }
       if (!ok) continue;
       cands.push([x, z, r(gx, gz, 43), bank, surf(x, z)]);
     }
@@ -260,7 +263,15 @@ export function buildAnimals(world, P) {
   }
   // small birds: flocks that fly copse to copse
   {
-    const cps = (world.sites.copses || []).slice();
+    // (only copses whose crowns are clear of every building shape: the birds
+    // perch up to 5 m round the middle, 7 to 11 m up)
+    const crownClear = ([x, z]) => {
+      if (!world.kit) return true;
+      const y = G(x, z) + 9;
+      for (let k = 0; k < 9; k++) { const a = k * TAU / 8, d = k === 8 ? 0 : 5.5, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d; if (bodyBlocked(world.kit, px, pz, y - 2.2, y + 2.2, 0.3)) return false; }
+      return true;
+    };
+    const cps = (world.sites.copses || []).filter(crownClear);
     if (cps.length >= 2) {
       for (let f = 0; f < C.finchFlocks; f++) {
         const order = cps.map((c, i) => [r(f, i, 71), c]).sort((a, b) => a[0] - b[0]).map((e) => e[1]).slice(0, 5);

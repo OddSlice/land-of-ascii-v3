@@ -449,7 +449,9 @@ function birdsFinches(A, g, minutes, hour, night, put) {
     const bow = Math.sin(q * Math.PI);
     const ox = 4 * Math.sin(minutes * 1.7 + k * 2.1) + Math.cos(k * 2.39996) * 3 * Math.sqrt(k + 1) * 0.6, oz = 4 * Math.cos(minutes * 1.3 + k * 1.3) + Math.sin(k * 2.39996) * 3 * Math.sqrt(k + 1) * 0.6;
     const x = a[0] + dx * e - dz / L * bow * 25 + ox * bow, z = a[1] + dz * e + dx / L * bow * 25 + oz * bow;
-    const y = a[2] + (b[2] - a[2]) * e + bow * (18 + 3 * Math.sin(k)) + 1.5 * Math.sin(minutes * 2 + k);
+    let y = a[2] + (b[2] - a[2]) * e + bow * (18 + 3 * Math.sin(k)) + 1.5 * Math.sin(minutes * 2 + k);
+    // (over a rise between the copses they keep clear of the ground)
+    y = Math.max(y, groundAt(A.world.terrain, x, z) + 4 + 8 * bow);
     put(m, x, z, y, Math.atan2(dx, dz), APOSE.FLY, (minutes * 40 + k * 0.37) % 1, 1, 1);
   }
 }

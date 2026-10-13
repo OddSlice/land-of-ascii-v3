@@ -73,8 +73,10 @@ export function settle(st, n, walkers, p, focus = null) {
     const sp = SPEC[st[o + A.KIND]], s = st[o + A.SCALE] || 1, h = Math.max(0, sp.len * s / 2 - sp.r * s * 0.8);
     const fx = Math.sin(st[o + A.YAW]) * h, fz = Math.cos(st[o + A.YAW]) * h, y = st[o + A.Y];
     const lo = y + 0.12, hi = y + Math.max(0.15, sp.back * s * (st[o + A.POSE] === APOSE.LIE ? 0.5 : 0.9)), r = sp.r * s * 0.6;
-    const body = (bx, bz) => !p.blocked(bx, bz, y) && !(p.kit && bodyBlocked(p.kit, bx, bz, lo, hi, r));
-    return body(x, z) && (h < 0.05 || (body(x + fx, z + fz) && body(x - fx, z - fz)));
+    // (and, but for ducks, out of water deeper than a puddle)
+    const T = p.world.terrain, wet = (bx, bz) => { const j = Math.round(bz) * T.NN + Math.round(bx); return T.wWater[j] > 127 && T.levels[0].H[j] - T.ground[j] > 0.15; };
+    const body = (bx, bz) => !p.blocked(bx, bz, y) && !(p.kit && bodyBlocked(p.kit, bx, bz, lo, hi, r)) && (st[o + A.KIND] === KIND.DUCK || !wet(bx, bz));
+    return body(x, z) && (h <= 0 || (body(x + fx, z + fz) && body(x - fx, z - fz)));
   };
   const tryMove = (o, dx, dz) => {
     const x = Math.fround(st[o + A.X] + dx), z = Math.fround(st[o + A.Z] + dz);

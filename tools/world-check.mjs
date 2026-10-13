@@ -919,7 +919,7 @@ function animalChecks(w) {
       // in water
       if (!fly && !perch && kind !== AK.DUCK) {
         const depth = groundAt(surface, x, z) - groundAt(T, x, z);
-        if (wet(x, z) && depth > 0.15 && y < groundAt(surface, x, z) - 0.05) { bad.water++; note(`${KIND_NAMES[kind]} ${ids[i]} in ${depth.toFixed(2)} m of water at ${x.toFixed(1)},${z.toFixed(1)}`); }
+        if (wet(x, z) && depth > 0.15 && y < groundAt(surface, x, z) - 0.05) { bad.water++; note(`${KIND_NAMES[kind]} ${ids[i]} in ${depth.toFixed(2)} m of water at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)} pose ${pose}`); }
       }
       if (!habitat(g, o, st, d)) { bad.outside++; note(`${KIND_NAMES[kind]} ${ids[i]} (${g.type}) out of its place at ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)} pose ${pose}`); }
       if (g.type === 'flock' && (hour >= 21.5 || hour < 5)) { nightChecks++; if (!inRect(g.F, x, z, 0.05)) { bad.unfolded++; note(`a sheep of flock ${g.id} out of its fold at night, ${x.toFixed(1)},${z.toFixed(1)} day ${d} ${hour.toFixed(2)}`); } }
