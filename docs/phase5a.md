@@ -334,7 +334,7 @@ Wayfaring's own cost per frame, measured over 30 s:
 
 ### Size
 
-`index.html` is 935 KB (822 KB in phase 4b): wayfaring adds about 113 KB.
+`index.html` is 913 KB (822 KB in phase 4b): wayfaring adds about 91 KB.
 
 ### The video (kept out of git, `shots/walks/`)
 
