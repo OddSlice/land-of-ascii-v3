@@ -514,6 +514,40 @@ Hens, dogs and small birds wear colours the people's cloth already has (russet, 
 
 The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort's walls (all the way round, phase 3a), `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
 
+(Phase 5a) In play the map shows only what you have seen (`docs/design.md`, section 3). Land not yet seen is plain dark paper a step above the frame (`map.unknown` `#17181d`), with a faint dot (`map.unknownInk`) every fourth column of every other row, so it reads as paper not yet drawn on rather than a hole. A road not yet walked is drawn as the land under it. A site's mark appears once found. The tools see the whole map, as before.
+
+### Words and pages (phase 5a)
+
+**The voice.** Everything on screen is said as the greetings are (phase 4a): plain, warm, unhurried words of the land itself. Never an exclamation mark, never modern phrasing, never quests, points, levels, rewards or markers. Favours are favours, standing is how the land knows you, and directions are a villager's: a village, a compass point, a landmark, an hour. All of it is data in one file, `src/game/words.js`.
+
+**The journal (J)** is the menu's own panel, rail and tabs (`src/app/journal.js`, `.menu.journal`), so the two read as one book:
+- **The rail:** the title, your standing and favours done, the four pages with their icons (a signpost, two people, a framed view, a tied bundle; drawn in the menu's one stroke weight, never emoji), what you carry, and "Back to the road" (J).
+- **The pages:** each a quiet list, with a ticked row (accent tick, head colour) for what is found or done and an open ring (quiet colour) for what is not, and the day and part of the day it happened on the right.
+- **Favours** sit in the same dark wells as the menu's clock.
+- **Every control:**
+  - works by mouse and by keyboard (the arrow keys between pages; Tab stays inside);
+  - shows a pointer;
+  - changes on hover;
+  - is outlined in the accent when focused.
+- **At 1024 × 640** everything is readable, at least 11 px, with no sideways scrolling.
+
+**An exchange** (someone with a favour) is the greeting's box grown a little:
+- the name and role, then two or three lines;
+- the choice as two keycapped buttons, **E** "I will do it" (pressed, in the accent's well) and **Esc** "Another time";
+- with nothing to choose, one button, "go on" or "farewell".
+
+It never stops the world, and walking away ends it.
+
+**Notes** (a place the journal notes, a key for something new) are the hint's quiet box, one line, gone after a few seconds.
+
+**Sketches.** A sketch is the frame's own cells, the glyph and both colours of each, and never anything drawn over them. Full screen it is drawn by the game's own glyph atlas at the largest whole cell size that fits, on the viewer's near-black, with its place, day, hour and weather beneath, and before, after, copy as text and close. A small picture is each cell's background, a pixel wide and two tall. As text it is the glyphs alone.
+
+**Things in the hand and on the ground** (`src/world/things.js`) are a few exact boxes in the kit's system, made only of materials the people already wear and carry: linen, ochre, russet, umber, timber, iron, leather. No new colour.
+- **In the hand** a thing is drawn a little under true size, at the foot of the view, 0.8 m ahead, 0.5 m below the eye and 0.36 m to the left. It sways with the stride, never with the clock.
+- **On the ground** a lost thing is drawn as people are: thin parts held at two cells and faded past 14 m, nothing past 160 m.
+
+**The lantern** is the people's lantern in the right hand: an iron base, four thin posts, a roof and its cap round the flame. Its flame and light are theirs exactly (section 7, People): held at two rows and faded by its true share, lighting only what is near, never starting the shadow sweep, mirrored in water.
+
 ---
 
 ## 8. Never do this

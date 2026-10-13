@@ -201,3 +201,19 @@ Sizes are before each animal's own scale (0.9 to 1.1). They are in `SPEC` (`src/
 | Reed beds | 1.1 to 2.6 m across, 1.25 to 1.8 m tall | Water 0.03 to 0.55 m deep, slow, within 3 m of the edge. |
 | Flower drifts | patterns about 46 m across | About 2% of the land. |
 | Kept clear | 1.2 m off paths, fields, villages and yards; 3 m off roads; 1.5 m from a door, gate, bridge or jetty end | |
+
+## Wayfaring (phase 5a)
+
+The numbers of play. They are in `src/game/words.js` (`FOUND_AT`, `NOTABLE_AT`), `src/game/discovery.js`, `src/game/favours.js`, `src/app/wayfaring.js` and `src/world/things.js`. The rules are in `docs/design.md`.
+
+| | | |
+|---|---|---|
+| Seeing the land | rays over the 16 m squares, out to 480 m; 24 m round the feet; 8 m squares walked | The map's squares: about 18 m × 9 m a cell at the default size, so a seen square shows as a cell or two. |
+| A viewpoint's view | 700 m round it, standing within 8 m of its top | |
+| Finding a place | the fort 150 m, a village 110 m, a viewpoint 30 m, the lake 90 m, the coast 90 m, a bridge 50 m, a river's head 50 m, the mountains' foot 70 m; with a clear line over the land from the eye | |
+| Picking up a lost thing | within 1.8 m, the feet within 1.5 m of its height | A step or two from it. |
+| A notable view | within 30 m of a viewpoint's top; on the fort's wall walk, within 2.5 m of a beat | |
+| A favour's walk | four to twelve minutes at 4.5 m/s: a carry 1,250 to 2,900 m there; a tell 640 to 1,450 m each way; a find 1,200 to 2,850 m there and back | Chosen by distances over the road network, then walked in full. Seed 3's 15 favours take 5.0 to 10.6 minutes from their words. |
+| The first meeting | 26 m along the spawn's road, 1.7 m off its middle; arriving a minute after the start; waiting about 110 minutes | The road is 4 m wide, so 3.2 m of it stays clear. |
+| In the hand | 0.8 m ahead of the eye, 0.5 m below it, 0.36 m to the side; a thing at 0.72 of its size; swaying 1.8 cm with each 1.3 m stride | At the foot of the view at pitch 0 (the vertical field of view is 60 degrees). |
+| Saving | every change within 4 s; a favour, a sketch or the lantern at once | A record of a few hundred characters to a few kilobytes; up to 60 sketches a world. |
