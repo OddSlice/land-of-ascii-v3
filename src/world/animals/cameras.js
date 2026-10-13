@@ -54,8 +54,8 @@ export function animalCameras(world, An) {
     const s = from(c, 22, Math.atan2(c.x - gu.centre[0], c.z - gu.centre[1]));
     if (s) { const lk = look(s, { x: (c.x + gu.centre[0]) / 2, z: (c.z + gu.centre[1]) / 2, y: c.y + 6 }); cams.push({ name: 'gulls on the coast', x: s.x, z: s.z, ...lk, time: 14 }); }
   }
-  // crows on the fort's wall walk, from along the walk (past their alert
-  // distance, so they stay)
+  // crows on the fort's wall walk, from along the walk (past their flight
+  // distance, so they stay: heads up)
   const cr = An.groups.find((g) => g.type === 'crow' && g.perch.at === 'fort');
   if (cr && P.fort) {
     const pc = cr.perch;
@@ -63,7 +63,7 @@ export function animalCameras(world, An) {
     for (const pl of P.places) {
       if (pl.kind !== 'walk') continue;
       const d = Math.hypot(pl.x - pc.x, pl.z - pc.z);
-      if (d > 24 && d < bd) { bd = d; best = pl; }
+      if (d > 15 && d < bd) { bd = d; best = pl; }
     }
     if (best && bd < 45) {
       const s = { x: best.x, z: best.z, ft: best.ft };

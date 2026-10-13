@@ -237,7 +237,7 @@ export const LOOK = {
     outcrop: { band: 0.32 },
     bark: { groove: 0.07 },
     rings: 0.035,
-    reed: { stem: 0.24, jag: 0.25, tip: 0.4, part: [0.45, 1.5, 0.3] },
+    reed: { stem: 0.24, wave: 0.6, jag: 0.3, tip: 0.4, part: [0.45, 1.5, 0.3] },
   },
 
   water: {

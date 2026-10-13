@@ -67,6 +67,7 @@ if (String(a.phase) === '2b') { await phase2b(); process.exit(0); }
 if (String(a.phase) === '3a') { await phase3a(); process.exit(0); }
 if (String(a.phase) === '3b') { await phase3b(); process.exit(0); }
 if (String(a.phase) === '4a') { await phase4a(); process.exit(0); }
+if (String(a.phase) === '4b') { await phase4b(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -1314,6 +1315,306 @@ async function phase4a() {
       console.log(lines.join('\n'));
     }
     console.log(fs.readdirSync(OUT).map((f) => `shots/phase4a/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    now.server.close();
+  }
+}
+
+// ---- phase 4b: animals and wild ground detail --------------------------------
+// docs/phase4b.md (shots/phase4b/): each animal near, middle and far in the
+// building yard; a flock leaving its fold at dawn and coming back at dusk;
+// deer at a forest edge at dawn, and the same spot after walking up; ducks
+// and their reflections; gulls on the coast; crows on the wall walk; small
+// birds crossing; each kind of ground detail in place and from a viewpoint;
+// the overhead maps of five seeds with pastures, folds and where each kind
+// lives; and the counts.
+async function phase4b() {
+  const OUT = path.join(ROOT, 'shots', 'phase4b');
+  fs.mkdirSync(OUT, { recursive: true });
+  const seed = Number(a.seed || 3);
+  const only = a.only ? String(a.only).split(',') : ['yard', 'flock', 'deer', 'water', 'birds', 'ground', 'maps'];
+  const { generateWorld } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const PP = await import('../src/world/people/people.js');
+  const AB = await import('../src/world/animals/build.js');
+  const AST = await import('../src/world/animals/state.js');
+  const AK = await import('../src/world/animals/kinds.js');
+  const { groundAt } = await import('../src/world/objects.js');
+  const { solidAt } = await import('../src/world/kit.js');
+  const build = (s) => { const g = generateWorld(s); let r; while (!(r = g.next()).done); return unpackWorld(packWorld(r.value)); };
+  const w = build(seed), P = PP.buildPeople(w), An = AB.buildAnimals(w, P);
+  const now = await serve();
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  const deg = (x) => x * 180 / Math.PI;
+  const hm = (h) => { const H = Math.floor(h + 1e-6), M = Math.round((h - H) * 60); return `${String(H % 24).padStart(2, '0')}:${String(M === 60 ? 0 : M).padStart(2, '0')}`; };
+  // where group g's members are at an hour (nobody near), their middle
+  const middle = (g, hour) => {
+    const st = new Float32Array(g.members.length * AK.AS), ids = new Int32Array(g.members.length);
+    const n = AST.animalsAt(An, 0, hour, [], st, ids, [g]);
+    let x = 0, z = 0, y = 0; for (let i = 0; i < n; i++) { x += st[i * AK.AS]; z += st[i * AK.AS + 1]; y += st[i * AK.AS + 2]; }
+    return { x: x / n, z: z / n, y: y / n };
+  };
+  // a free camera `d` metres from c (first toward direction a), `up` metres above the ground, looking at c
+  const T = w.terrain;
+  const view = (c, d, a0, up = 0, aim = 0.5) => {
+    for (let k = 0; k < 24; k++) {
+      const b = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 12, x = c.x + Math.sin(b) * d, z = c.z + Math.cos(b) * d;
+      if (x < 2 || z < 2 || x > w.N - 2 || z > w.N - 2 || T.wWater[Math.round(z) * w.NN + Math.round(x)] > 127) continue;
+      const ft = P.p.supportAt(x, z, groundAt(T, x, z) + 0.3);
+      if (P.p.blocked(x, z, ft)) continue;
+      const y = ft + 1.7 + up;
+      // (a clear line to what it looks at: no wall, roof or hill between)
+      let clear = true;
+      for (let q = 1; q < 48 && clear; q++) {
+        const f = q / 48, px = x + (c.x - x) * f, pz = z + (c.z - z) * f, py = y + (c.y + aim - y) * f;
+        if ((w.kit && solidAt(w.kit, px, py, pz)) || py < groundAt(T, px, pz)) clear = false;
+      }
+      if (!clear) continue;
+      return { x, z, y, yaw: deg(Math.atan2(c.x - x, c.z - z)), pitch: deg(Math.atan2(c.y + aim - y, Math.hypot(c.x - x, c.z - z))) };
+    }
+    return null;
+  };
+  try {
+    const bench = await workbench(browser);
+    const compose = (srcs, labels, title, per, scale = 1) => bench.evaluate(async ({ srcs, labels, title, per, scale }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const pad = 12, top = 30, w2 = Math.round(ims[0].width * scale), h = Math.round(ims[0].height * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w2 + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w2 + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, x, y, w2, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.86);
+    }, { srcs, labels, title, per, scale });
+    const frame = async (lab, set) => {
+      await lab.page.evaluate(async (set) => {
+        const L = window.lab;
+        L.setWeather(set.weather || 'fair');
+        if (set.free) L.setCamera(set.free); else if (set.cam !== undefined) L.camera(set.cam);
+        L.freeze(set.hour, 12.5, set.day || 0);
+        await L.whenIdle(); await L.whenIdle();
+      }, set);
+      await lab.check();
+      if (set.zoom) {
+        const el = await lab.page.$('#view'), bb = await el.boundingBox(), cw = bb.width / set.zoom, ch = bb.height / set.zoom;
+        return `data:image/png;base64,${(await lab.page.screenshot({ clip: { x: bb.x + (bb.width - cw) / 2, y: bb.y + (bb.height - ch) / 2, width: cw, height: ch } })).toString('base64')}`;
+      }
+      return shot(lab.page);
+    };
+    const world = async () => {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      return lab;
+    };
+
+    // 1. every kind near, middle and far in the building yard, side on, 14:00
+    if (only.includes('yard')) {
+      const Y = await import('../src/world/yard.js');
+      const st = Y.yardAnimals(), rowsK = new Map();
+      for (let o = 0; o < st.length; o += AK.AS) { const k = st[o + AK.A.KIND], e = rowsK.get(k) || { x: 0, z: 0, y: 0, n: 0 }; e.x += st[o]; e.z += st[o + 1]; e.y += st[o + 2]; e.n++; rowsK.set(k, e); }
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'yard' });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      const srcs = [], labels = [];
+      for (const [k, e] of rowsK) {
+        const c = { x: e.x / e.n, z: e.z / e.n, y: Y.YARD_GROUND }, flying = k >= AK.KIND.GULL;
+        for (const [d, nm] of [[k === AK.KIND.HEN || k === AK.KIND.DUCK || k === AK.KIND.FINCH || k === AK.KIND.HARE ? 5 : 9, 'near'], [25, 'middle'], [70, 'far']]) {
+          // (side on, from whichever side has fewer rows between, a little
+          // to one side and up, so the rows between pass under the view)
+          const sd = k < 5 ? -1 : 1, x = c.x + d * 0.2, z = c.z + sd * d, y = c.y + 1.7 + d * 0.08;
+          srcs.push(await frame(lab, { hour: 14, free: { x, z, y, yaw: deg(Math.atan2(c.x - x, c.z - z)), pitch: deg(Math.atan2(c.y + (flying ? 1.4 : 0.5) - y, Math.hypot(c.x - x, c.z - z))) }, zoom: d >= 70 ? 3 : d >= 25 ? 1.5 : 0 }));
+          labels.push(`${AK.KIND_NAMES[k]}, ${nm}: ${d} m${d >= 25 ? ` (the middle, ${d >= 70 ? 3 : 1.5} times over)` : ''}`);
+        }
+      }
+      writeDataURL(path.join(OUT, 'yard.jpg'), await compose(srcs, labels, 'Each kind in every pose in the building yard (?yard=1), near, middle and far, 14:00', 3, 0.22));
+      // the ground detail in the yard
+      const cams = await lab.page.evaluate(() => window.lab.cameras.map((c, i) => ({ name: c.name, time: c.time, i })));
+      const s2 = [], l2 = [];
+      for (const c of cams.filter((q) => q.name.startsWith('wild') || q.name.startsWith('a log'))) { s2.push(await frame(lab, { cam: c.i, hour: 14 })); l2.push(`${c.i + 1} ${c.name}`); }
+      writeDataURL(path.join(OUT, 'yard-ground.jpg'), await compose(s2, l2, 'Wild ground detail in the building yard: three sizes of boulder, an outcrop, a log, two stumps, reed beds in a pond', 3, 0.25));
+      await lab.ctx.close();
+    }
+
+    // 2. a flock leaving its fold at dawn and coming back at dusk
+    if (only.includes('flock')) {
+      const g = An.groups.find((q) => q.type === 'flock'), plan = PP.planOf(P, g.shepherd, 0);
+      const so = plan.find((sg) => sg.lead === 'out' && sg.t0 > 5), si = [...plan].reverse().find((sg) => sg.lead === 'in' && sg.t0 > 12);
+      const F = g.F, gate = P.places[F.gate];
+      const ox = gate.x - F.x, oz = gate.z - F.z, ol = Math.hypot(ox, oz) || 1;
+      // (out past the gate, a little up, looking back at the fold: the flock
+      // comes out toward the camera and goes back in away from it)
+      const c = { x: F.x, z: F.z, y: groundAt(T, F.x, F.z) };
+      const v = view(c, 22, Math.atan2(ox, oz), 5, 0.3);
+      const lab = await world();
+      const srcs = [], labels = [];
+      const vf = view(c, 18, Math.atan2(ox, oz), 8, 0);
+      const follow = (h) => { const m = middle(g, h); return view(m, 14, Math.atan2(m.x - F.x, m.z - F.z) + Math.PI / 2, 3, 0.3); };
+      const shots = [['fold', so.t0 - 0.15, 'in the fold'], ['follow', so.t0 + (so.t1 - so.t0) * 0.35, 'going out behind the shepherd'], ['follow', so.t1 + 0.1, 'out on the way to the pasture'],
+        ['follow', 10.5, 'grazing on the pasture'], ['follow', 14.5, 'grazing on the pasture'],
+        ['follow', si.t0 + (si.t1 - si.t0) * 0.5, 'coming in'], ['follow', si.t1 - 0.02, 'at the gate'], ['fold', si.t1 + 0.3, 'folded for the night']];
+      for (const [kind, h, what] of shots) { const vv = kind === 'fold' ? vf : follow(h); if (!vv) continue; srcs.push(await frame(lab, { hour: h, free: vv })); labels.push(`${hm(h)} ${what}`); }
+      writeDataURL(path.join(OUT, 'flock.jpg'), await compose(srcs, labels, `A flock of ${g.members.length} and its shepherd: out of the fold after dawn, on the pasture, back in at dusk (seed ${seed}, day 0, village ${g.village + 1})`, 2, 0.32));
+      await lab.ctx.close();
+    }
+
+    // 3. deer at a forest edge at dawn, and the same spot after walking up
+    if (only.includes('deer')) {
+      const g = An.groups.find((q) => q.type === 'deer'), c = middle(g, 6.4);
+      const out = Math.atan2(g.edge[0] - g.into[0], g.edge[1] - g.into[1]);
+      const lab = await world();
+      const srcs = [], labels = [];
+      for (const d of [45, 30, 17]) {
+        const v = view(c, d, out, 0, 0.8);
+        if (!v) continue;
+        srcs.push(await frame(lab, { hour: 6.4, free: v, zoom: d > 30 ? 2 : 0 })); labels.push(`06:24, from ${d} m${d > 40 ? ' (grazing; the middle, twice over)' : d > 25 ? ' (heads up)' : ' (they run for the trees)'}`);
+      }
+      // and back off again later: they are back
+      const v = view(c, 45, out, 0, 0.8);
+      srcs.push(await frame(lab, { hour: 6.9, free: v, zoom: 2 })); labels.push('06:54, from 45 m again: back at the edge (the middle, twice over)');
+      writeDataURL(path.join(OUT, 'deer.jpg'), await compose(srcs, labels, `Deer at a forest edge at dawn, walking up to them (seed ${seed}, group of ${g.members.length})`, 2, 0.32));
+      await lab.ctx.close();
+    }
+
+    // 4. ducks and their reflections; gulls on the coast
+    if (only.includes('water')) {
+      const lab = await world();
+      const srcs = [], labels = [];
+      const dk = An.groups.find((q) => q.type === 'ducks');
+      const c = middle(dk, 10);
+      for (const [h, d] of [[10, 9], [10, 22], [21.2, 9]]) { const cc = h > 20 ? middle(dk, h) : c; const v = view(cc, d, Math.atan2(dk.bank[0] - dk.at[0], dk.bank[1] - dk.at[1]), 0.5, 0.1); if (v) { srcs.push(await frame(lab, { hour: h, free: v })); labels.push(`ducks, ${hm(h)}, ${d} m${h > 20 ? ', tucked on the bank' : ''}`); } }
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c2) => c2.name));
+      const gi = names.indexOf('gulls on the coast');
+      for (const [h, z] of [[14, 0], [14, 2.5], [23, 2.5]]) { srcs.push(await frame(lab, { cam: gi, hour: h, zoom: z })); labels.push(`gulls on the coast, ${hm(h)}${z ? ', the middle 2.5 times over' : ''}`); }
+      writeDataURL(path.join(OUT, 'water.jpg'), await compose(srcs, labels, 'Ducks on a lake with their reflections, and on the bank at night; gulls over the coast and on the beach', 3, 0.25));
+      await lab.ctx.close();
+    }
+
+    // 5. crows on the wall walk; small birds crossing; the large birds
+    if (only.includes('birds')) {
+      const lab = await world();
+      const srcs = [], labels = [];
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c2) => c2.name));
+      const ci = names.indexOf('crows on the wall walk');
+      srcs.push(await frame(lab, { cam: ci, hour: 10 })); labels.push('crows on the wall walk, 10:00, from 15 m and more along it (heads up)');
+      srcs.push(await frame(lab, { cam: ci, hour: 10, zoom: 3 })); labels.push('the same, the middle three times over: a crow on the parapet at eye height, 25 m');
+      // small birds: in the air between copses, the camera under their way
+      const fg = An.groups.find((q) => q.type === 'finches');
+      let fly = null;
+      for (let m = 9 * 60; m < 17 * 60; m += 0.1) {
+        const st = new Float32Array(fg.members.length * AK.AS), ids = new Int32Array(fg.members.length);
+        const n = AST.animalsAt(An, 0, m / 60, [], st, ids, [fg]);
+        let k = 0, x = 0, z = 0, y = 0;
+        for (let i = 0; i < n; i++) if (st[i * AK.AS + AK.A.POSE] === AK.APOSE.FLY) { k++; x += st[i * AK.AS]; z += st[i * AK.AS + 1]; y += st[i * AK.AS + 2]; }
+        // (the moment the flock is highest over the ground: mid-crossing)
+        if (k > n / 2) { const up = y / k - groundAt(T, x / k, z / k); if (!fly || up > fly.up) fly = { hour: m / 60, x: x / k, z: z / k, y: y / k, up }; else if (fly && up < fly.up - 3) break; }
+      }
+      if (fly) {
+        const ft = P.p.supportAt(fly.x + 30, fly.z + 30, groundAt(T, fly.x + 30, fly.z + 30) + 0.3);
+        const v = { x: fly.x + 30, z: fly.z + 30, y: ft + 1.7, yaw: deg(Math.atan2(-30, -30)), pitch: deg(Math.atan2(fly.y - ft - 1.7, 42)) };
+        srcs.push(await frame(lab, { hour: fly.hour, free: v })); labels.push(`a flock of small birds crossing, ${hm(fly.hour)}, 40 m off`);
+        srcs.push(await frame(lab, { hour: fly.hour, free: v, zoom: 3 })); labels.push('the same, the middle three times over: marks of their own glyphs');
+      }
+      const kg = An.groups.find((q) => q.type === 'kites');
+      if (kg) { const ft = groundAt(T, kg.centre[0] + 160, kg.centre[1]); const v = { x: kg.centre[0] + 160, z: kg.centre[1], y: ft + 1.7, yaw: -90, pitch: 30 }; srcs.push(await frame(lab, { hour: 12, free: v })); labels.push('the pair of large birds over the mountains, 12:00, looking up'); }
+      writeDataURL(path.join(OUT, 'birds.jpg'), await compose(srcs, labels, 'Crows on the fort\'s wall walk, small birds crossing the sky (marks far off), the large birds soaring', 2, 0.32));
+      await lab.ctx.close();
+    }
+
+    // 6. each kind of ground detail in place, and from a viewpoint
+    if (only.includes('ground')) {
+      const pieces = w.kitDesc.pieces, lab = await world();
+      const srcs = [], labels = [];
+      const near = (kind, pick) => {
+        const ps = pieces.filter((q) => q.kind === kind);
+        let best = null;
+        for (const q of ps) { const k = pick ? pick(q, ps) : 0; if (!best || k > best.k) best = { q, k }; }
+        return best && best.q;
+      };
+      const cluster = (q, ps) => ps.filter((o) => Math.hypot(o.at[0] - q.at[0], o.at[1] - q.at[1]) < 20).length;
+      const sets = [
+        ['boulder', 'a boulder field', (q, ps) => cluster(q, ps), 14],
+        ['boulder', 'a large boulder', (q) => q.h, 7],
+        ['outcrop', 'an outcrop on steep meadow', (q) => q.r, 10],
+        ['log', 'a fallen log at a forest edge', (q) => q.len, 7],
+        ['stump', 'stumps among the trees', (q, ps) => cluster(q, ps), 7],
+        ['reeds', 'a reed bed at a lake\'s edge', (q) => q.r, 10],
+      ];
+      for (const [kind, label, pick, d] of sets) {
+        const q = near(kind, pick); if (!q) continue;
+        const c = { x: q.at[0], z: q.at[1], y: groundAt(T, q.at[0], q.at[1]) };
+        const v = view(c, d, 0.7, 0.6, 0.2);
+        if (v) { srcs.push(await frame(lab, { hour: 14, free: v })); labels.push(`${label}, ${d} m`); }
+      }
+      // a flower drift: the cell of most weight within reach of a road, from 12 m
+      let fl = null; const FW = T.wFlower;
+      for (let k = 64; k < w.N - 64 && FW; k += 8) for (let i = 64; i < w.N - 64; i += 8) { const j = k * w.NN + i; if (FW[j] > 200 && (!fl || FW[j] > fl.w)) fl = { w: FW[j], x: i, z: k }; }
+      if (fl) { const c = { x: fl.x, z: fl.z, y: groundAt(T, fl.x, fl.z) }; const v = view(c, 12, 0.4, 0.3, 0); if (v) { srcs.push(await frame(lab, { hour: 14, free: v })); labels.push('a drift of flowers in the meadow, 12 m'); } }
+      // from the viewpoints: the vista and the spawn
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c2) => c2.name));
+      for (const nm of ['the ridge-top vista', 'spawn']) { const ci = names.findIndex((n) => n.includes(nm)); if (ci >= 0) { srcs.push(await frame(lab, { cam: ci, hour: 14 })); labels.push(`${names[ci]}, 14:00`); } }
+      writeDataURL(path.join(OUT, 'ground.jpg'), await compose(srcs, labels, `Wild ground detail in place (seed ${seed}, 14:00): boulders, an outcrop, a log, stumps, reeds, flowers, and from the viewpoints`, 3, 0.25));
+      await lab.ctx.close();
+    }
+
+    // 7. the overhead maps of five seeds: water, forest, roads, fields and
+    // pastures, folds, and where each kind of animal lives
+    if (only.includes('maps')) {
+      const seeds = String(a.seeds || '3,1,2,4,5').split(',').map(Number);
+      const rows = [];
+      for (const s of seeds) {
+        const ws = s === seed ? w : build(s), Ps = s === seed ? P : PP.buildPeople(ws), As = s === seed ? An : AB.buildAnimals(ws, Ps), Ts = ws.terrain;
+        const S = 512, f = ws.N / S, cls = new Uint8Array(S * S);
+        // 0 meadow, 1 water, 2 road, 3 field, 4 pasture, 5 forest, 6 flowers, 7 rock, 8 sand, 9 snow
+        const tc = new Uint16Array(S * S); for (const t of ws.objects.trees) { const i = Math.min(S - 1, Math.floor(t.x / f)), k = Math.min(S - 1, Math.floor(t.z / f)); tc[k * S + i]++; }
+        for (let k = 0; k < S; k++) for (let i = 0; i < S; i++) {
+          const j = Math.round(k * f) * ws.NN + Math.round(i * f);
+          cls[k * S + i] = Ts.wWater[j] > 127 ? 1 : Ts.wRoad[j] > 127 ? 2 : Ts.fieldId && Ts.fieldId[j] ? (Ts.fieldKind[j] === 4 ? 4 : 3) : tc[k * S + i] >= 2 ? 5 : Ts.wFlower && Ts.wFlower[j] > 127 ? 6 : Ts.wSnow[j] > 127 ? 9 : Ts.wRock[j] > 127 ? 7 : Ts.wSand[j] > 127 ? 8 : 0;
+        }
+        const marks = [];
+        for (const V of Ps.villages) for (const F of V.folds) marks.push({ t: 'fold', x: F.x / f, z: F.z / f });
+        for (const g of As.groups) marks.push({ t: g.type, x: g.home[0] / f, z: g.home[1] / f });
+        for (const p of ws.kitDesc.pieces) if (p.kind === 'boulder' || p.kind === 'reeds' || p.kind === 'log') marks.push({ t: p.kind, x: p.at[0] / f, z: p.at[1] / f });
+        rows.push({ seed: s, S, cls: Array.from(cls), marks, counts: As.count });
+      }
+      const png = await bench.evaluate(async ({ rows }) => {
+        const COL = ['#5d7040', '#4f6f93', '#a08a62', '#9c8a4c', '#8aa05a', '#26402c', '#a9a35a', '#7a7672', '#b9a77c', '#dcdcd6'];
+        const MK = { fold: ['#f2e6c8', 3, 's'], flock: ['#ffffff', 3, 'c'], herd: ['#7a4a32', 4, 'c'], hens: ['#c25a2e', 2, 'c'], dog: ['#3a2a20', 2, 'c'], deer: ['#d08a3c', 4, 'c'], hare: ['#e0c090', 2, 'c'], ducks: ['#2f6a3a', 3, 'c'], gulls: ['#ffffff', 3, 't'], crow: ['#111111', 3, 't'], finches: ['#c8a040', 3, 't'], kites: ['#ff3020', 5, 't'], boulder: ['#cfcac2', 1, 'p'], reeds: ['#d4d080', 1, 'p'], log: ['#6a4a30', 1, 'p'] };
+        const W = 512, pad = 14, top = 30, cap = 70;
+        const c = document.createElement('canvas'); c.width = pad + rows.length * (W + pad); c.height = top + W + cap;
+        const g = c.getContext('2d'); g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+        g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText('Overhead maps: fields (ochre) and pastures (light green), folds (squares), and where each kind lives (dots and triangles)', pad, 21);
+        rows.forEach((r, n) => {
+          const x0 = pad + n * (W + pad), img = g.createImageData(r.S, r.S);
+          for (let k = 0; k < r.S * r.S; k++) { const h = COL[r.cls[k]]; img.data[k * 4] = parseInt(h.slice(1, 3), 16); img.data[k * 4 + 1] = parseInt(h.slice(3, 5), 16); img.data[k * 4 + 2] = parseInt(h.slice(5, 7), 16); img.data[k * 4 + 3] = 255; }
+          g.putImageData(img, x0, top);
+          for (const m of r.marks) {
+            const [col, sz, shp] = MK[m.t] || ['#f0f', 2, 'c']; g.fillStyle = col; g.strokeStyle = '#000'; g.lineWidth = 0.6;
+            const x = x0 + m.x, y = top + m.z;
+            if (shp === 'p') { g.fillRect(x, y, 1, 1); continue; }
+            g.beginPath();
+            if (shp === 's') g.rect(x - sz, y - sz, sz * 2, sz * 2); else if (shp === 't') { g.moveTo(x, y - sz); g.lineTo(x + sz, y + sz); g.lineTo(x - sz, y + sz); g.closePath(); } else g.arc(x, y, sz, 0, Math.PI * 2);
+            g.fill(); g.stroke();
+          }
+          g.fillStyle = '#e8e2d4'; g.font = '12px Menlo, monospace';
+          g.fillText(`seed ${r.seed}`, x0, top + W + 16);
+          const names = ['sheep', 'cattle', 'hens', 'dogs', 'deer', 'hares', 'ducks', 'gulls', 'crows', 'small birds', 'large birds'];
+          const txt = names.map((nm, k) => `${r.counts[k] || 0} ${nm}`);
+          g.fillStyle = '#b8b2a4'; g.fillText(txt.slice(0, 6).join(', '), x0, top + W + 32); g.fillText(txt.slice(6).join(', '), x0, top + W + 48);
+        });
+        return c.toDataURL('image/jpeg', 0.88);
+      }, { rows });
+      writeDataURL(path.join(OUT, 'maps.jpg'), png);
+    }
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase4b/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
   } finally {
     await browser.close();
     now.server.close();

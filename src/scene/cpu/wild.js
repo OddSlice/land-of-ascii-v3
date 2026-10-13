@@ -87,9 +87,9 @@ const methods = {
       kp.tA = (-b - sq) / a; kp.tB = (-b + sq) / a; kp.fA = 4;
       kp.ex = R; kp.cy = y0; kp.ery = h;
       // the stems' ragged top, while their difference is a couple of rows
-      // and each stem a few columns across (narrower, each cell would land
-      // on a stem of its own and the top would sparkle as you move)
-      kp.jag = W.reed.jag * smooth(1.5, 3, W.reed.jag * h / rowH) * smooth(2.5, 5, W.reed.stem / minR);
+      // and each wave of it a few columns across (narrower, each cell would
+      // land on a height of its own and the top would sparkle as you move)
+      kp.jag = W.reed.jag * smooth(1.5, 3, W.reed.jag * h / rowH) * smooth(2.5, 5, W.reed.wave / minR);
       // a walker near: the bed parts round the eye
       const ox = this.v.ex - S[q + P.CX], oz = this.v.ez - S[q + P.CZ];
       kp.part = ox * ox + oz * oz < (R + W.reed.part[1] + 0.2) * (R + W.reed.part[1] + 0.2);
@@ -166,8 +166,8 @@ const methods = {
           // a ray there would take one, then the other)
           // (eased from one sector's height to the next, so the top's edge
           // has no steps for a moving eye to catch)
-          const ang = (Math.atan2(z - cz, x - cx) + Math.PI) * R / W.reed.stem, i = Math.floor(ang), f = ang - i, e = f * f * (3 - 2 * f);
-          const nS = Math.max(1, Math.round(2 * Math.PI * R / W.reed.stem)), a0 = hashU(((i % nS) + nS) % nS, seed), a1 = hashU((((i + 1) % nS) + nS) % nS, seed);
+          const ang = (Math.atan2(z - cz, x - cx) + Math.PI) * R / W.reed.wave, i = Math.floor(ang), f = ang - i, e = f * f * (3 - 2 * f);
+          const nS = Math.max(1, Math.round(2 * Math.PI * R / W.reed.wave)), a0 = hashU(((i % nS) + nS) % nS, seed), a1 = hashU((((i + 1) % nS) + nS) % nS, seed);
           k = 1 - kp.jag * (a0 + (a1 - a0) * e);
         }
         if (kp.part) { const d = Math.hypot(x - vx, z - vz); k *= P2[2] + (1 - P2[2]) * smooth(P2[0], P2[1], d); }
