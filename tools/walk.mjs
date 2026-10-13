@@ -221,9 +221,11 @@ async function walkFort(page, seed, night = 0) {
     await follow(page, road.slice(0, cut + 1), 4, 260);
     await page.keyboard.up('ShiftLeft');
   }
-  await follow(page, road.slice(cut), 2.5, 60);
-  await follow(page, inside, 1.5, 120);
-  if (night) await follow(page, [...inside].reverse().slice(0, inside.length - 5), 1.5, 60);
+  // (at night the stages are capped so the whole walk fits its time: the
+  // watch on the wall walk can hold a walker up)
+  await follow(page, road.slice(cut), 2.5, night ? 20 : 60);
+  await follow(page, inside, 1.5, night ? 55 : 120);
+  if (night) await follow(page, [...inside].reverse().slice(0, inside.length - 5), 1.5, 30);
   await page.keyboard.up('KeyW');
   if (night) {
     // a slow look round the courtyard from the wall walk till the time is up
