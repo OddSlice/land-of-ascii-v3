@@ -747,6 +747,10 @@ function guardPlan(P, per, day) {
 // night there sitting up.
 function travellerPlan(P, per, day, fc) {
   const T = P.towns, n = T.length, h = (k) => hash2(per.id * 131 + k, day, P.seed + 4901);
+  // (two legs a day round the towns by the main roads: in the morning to the
+  // next town, resting by its well through the middle of the day, in the
+  // afternoon on to the one after, where the night is spent; so a traveller
+  // is round every town in two days, and the next day sets off from there)
   const at = (d) => T[((per.traveller * 2 + d) % n + n) % n];
   const restOf = (tw, k) => {
     if (tw.fort) return P.fort.yard[(per.traveller + k) % P.fort.yard.length];
@@ -754,17 +758,18 @@ function travellerPlan(P, per, day, fc) {
     const list = V.benches.length ? V.benches : V.wells.length ? V.wells : [V.houses[0].step];
     return list[(per.traveller + k) % list.length];
   };
-  const seatPose = (pl) => (P.places[pl].kind === 'bench' ? POSE.SIT : POSE.STAND);
-  const A = restOf(at(day), 0), B = restOf(at(day + 1), 0), Bw = at(day + 1).fort ? P.fort.yard[(per.traveller + 2) % P.fort.yard.length] : (P.villages[at(day + 1).village].wells[1] ?? B);
-  const v = [];
-  v.push({ at: A, from: 0, to: 8.3 + 0.9 * h(1), pose: seatPose(A), act: 'resting' });
-  let leave = v[0].to;
-  // a traveller waits out heavy rain before setting off
-  for (const [f0, f1, k] of fc) if (k === 'rain' && f0 <= leave + 0.3 && f1 > leave) leave = f1 + 0.2;
-  // (by the well by day; a bench only from the evening, when the village's
+  // (by a well by day; a bench only from the evening, when the village's
   // own sitters have gone in)
-  v.push({ at: Bw, from: leave + 0.1, to: 19.2 + 0.5 * h(2), pose: POSE.STAND, act: 'resting' });
-  v.push({ at: B, from: 19.8 + 0.4 * h(3), to: 24, pose: seatPose(B), act: 'resting' });
+  const wellOf = (tw) => (tw.fort ? P.fort.yard[(per.traveller + 2) % P.fort.yard.length] : (P.villages[tw.village].wells[1] ?? P.villages[tw.village].wells[0] ?? restOf(tw, 0)));
+  const seatPose = (pl) => (P.places[pl].kind === 'bench' ? POSE.SIT : POSE.STAND);
+  // a traveller waits out heavy rain before setting off (but not past late afternoon)
+  const after = (t, last) => { for (const [f0, f1, k] of fc) if (k === 'rain' && f0 <= t + 0.3 && f1 > t) t = Math.min(last, f1 + 0.2); return t; };
+  const d0 = day * 2, A = restOf(at(d0), 0), Bw = wellOf(at(d0 + 1)), Cw = wellOf(at(d0 + 2)), C = restOf(at(d0 + 2), 0);
+  const v = [];
+  v.push({ at: A, from: 0, to: after(7.6 + 0.8 * h(1), 11), pose: seatPose(A), act: 'resting' });
+  v.push({ at: Bw, from: v[0].to + 0.1, to: after(12.6 + 0.8 * h(2), 16.5), pose: POSE.STAND, act: 'resting' });
+  v.push({ at: Cw, from: v[1].to + 0.1, to: 19.2 + 0.5 * h(3), pose: POSE.STAND, act: 'resting' });
+  v.push({ at: C, from: 19.8 + 0.4 * h(4), to: 24, pose: seatPose(C), act: 'resting' });
   return v;
 }
 

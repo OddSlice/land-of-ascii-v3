@@ -46,6 +46,13 @@
 //       timber and a stone bridge from the road and from the bank (day,
 //       night, rain); the fort's approach on each seed, from the road and
 //       from above
+//   node tools/lookbook.mjs --phase 4a [--seed 3] [--built] [--only yard,distance,villages,moments,table]
+//       docs/phase4a.md (shots/phase4a/): the figures in the building yard at
+//       every distance and pose; one person near, middle and far by day, and
+//       with a lantern at night; each village's centre at dawn, midday, dusk
+//       and midnight; the wall walk at night, a traveller on the road,
+//       someone asleep, a greeting on screen; and three people's day as a
+//       table (shots/phase4a/day.md)
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -59,6 +66,7 @@ if (String(a.phase) === '2a') { await phase2a(); process.exit(0); }
 if (String(a.phase) === '2b') { await phase2b(); process.exit(0); }
 if (String(a.phase) === '3a') { await phase3a(); process.exit(0); }
 if (String(a.phase) === '3b') { await phase3b(); process.exit(0); }
+if (String(a.phase) === '4a') { await phase4a(); process.exit(0); }
 if (a.phase === '0c') { await phase0c(); process.exit(0); }
 const SHOTS = path.join(ROOT, 'shots');
 const PHASE = a.phase === '0b' ? '0b' : '0a';
@@ -772,6 +780,7 @@ async function phase3a() {
       });
       return c.toDataURL('image/jpeg', 0.86);
     }, { srcs, labels, title, per, scale, notes });
+    // (`zoom`: the middle of the view, that many times over, for a figure far off)
     const frame = async (lab, set) => {
       await lab.page.evaluate(async (set) => {
         const L = window.lab;
@@ -1094,6 +1103,214 @@ async function phase3b() {
       writeDataURL(path.join(OUT, 'fort-approach.jpg'), await compose(srcs, labels, "The fort's new approach on each seed: the winding road", 3, 0.2));
     }
     console.log(fs.readdirSync(OUT).map((f) => `shots/phase3b/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
+  } finally {
+    await browser.close();
+    now.server.close();
+  }
+}
+
+// ---- phase 4a: people -----------------------------------------------------------
+async function phase4a() {
+  const OUT = path.join(ROOT, 'shots', 'phase4a');
+  fs.mkdirSync(OUT, { recursive: true });
+  const seed = Number(a.seed || 3);
+  const only = a.only ? String(a.only).split(',') : ['yard', 'distance', 'villages', 'moments', 'table'];
+  const { generateWorld } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const PP = await import('../src/world/people/people.js');
+  const { POSE } = await import('../src/world/people/figure.js');
+  const g = generateWorld(seed); let r; while (!(r = g.next()).done);
+  const w = unpackWorld(packWorld(r.value)), P = PP.buildPeople(w);
+  const now = await serve();
+  const browser = await launch('chromium');
+  const shot = async (page) => `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
+  const hourOf = { day: 14, dusk: 19.2, night: 23, dawn: 6.6, noon: 12.2 };
+  const deg = (x) => x * 180 / Math.PI;
+  const hm = (h) => { const H = Math.floor(h + 1e-6), M = Math.round((h - H) * 60); return `${String(H % 24).padStart(2, '0')}:${String(M === 60 ? 0 : M).padStart(2, '0')}`; };
+  try {
+    const bench = await workbench(browser);
+    const compose = (srcs, labels, title, per, scale = 1) => bench.evaluate(async ({ srcs, labels, title, per, scale }) => {
+      const ims = await Promise.all(srcs.map(loadImage));
+      const pad = 12, top = 30, w = Math.round(ims[0].width * scale), h = Math.round(ims[0].height * scale);
+      const rows = Math.ceil(ims.length / per);
+      const c = document.createElement('canvas');
+      c.width = pad + per * (w + pad); c.height = top + rows * (h + 26 + pad);
+      const g = c.getContext('2d');
+      g.fillStyle = '#121316'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#e8e2d4'; g.font = 'bold 15px Menlo, monospace'; g.fillText(title, pad, 21);
+      g.font = '12px Menlo, monospace'; g.fillStyle = '#b8b2a4';
+      g.imageSmoothingQuality = 'high';
+      ims.forEach((im, k) => {
+        const x = pad + (k % per) * (w + pad), y = top + Math.floor(k / per) * (h + 26 + pad);
+        g.drawImage(im, x, y, w, h);
+        g.fillText(labels[k], x, y + h + 17);
+      });
+      return c.toDataURL('image/jpeg', 0.86);
+    }, { srcs, labels, title, per, scale });
+    // a view: a camera, a free camera, or beside person `who` `dist` metres off; every clock frozen
+    const frame = async (lab, set) => {
+      await lab.page.evaluate(async (set) => {
+        const L = window.lab;
+        L.setWeather(set.weather || 'fair');
+        L.freeze(set.hour, 12.5, set.day || 0);
+        if (set.free) L.setCamera(set.free); else if (set.cam !== undefined) L.camera(set.cam);
+        await L.whenIdle();
+        if (set.who !== undefined) { L.people.goTo(set.who, set.dist); await L.whenIdle(); }
+        await L.whenIdle();
+      }, set);
+      await lab.check();
+      if (set.zoom) {
+        const el = await lab.page.$('#view'), bb = await el.boundingBox(), cw = bb.width / set.zoom, ch = bb.height / set.zoom;
+        return `data:image/png;base64,${(await lab.page.screenshot({ clip: { x: bb.x + (bb.width - cw) / 2, y: bb.y + (bb.height - ch) / 2, width: cw, height: ch } })).toString('base64')}`;
+      }
+      return shot(lab.page);
+    };
+    const world = async () => {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      return lab;
+    };
+    // (a view of person i at an hour from `d` metres: round them from the
+    // way they face, the first spot one could stand on, out of the water,
+    // with a clear line to their chest; `front`: within 40 degrees of their
+    // facing, so they face the camera)
+    const { solidAt } = await import('../src/world/kit.js');
+    const { groundAt } = await import('../src/world/objects.js');
+    const MT = await import('../src/world/people/meet.js');
+    const stateOf = (day, hour) => {
+      const n = P.persons.length, st = new Float32Array(n * 18), segs = [], along = new Float64Array(n);
+      for (let i = 0; i < n; i++) { segs[i] = PP.stateAt(P, i, day, hour, st, i * 18); along[i] = PP.alongOf(P, i, segs[i], hour); }
+      MT.adjust(st, n, segs, along, null, P.p);
+      return st;
+    };
+    const viewOf = (i, day, hour, d, front = false) => {
+      const st = stateOf(day, hour), o = i * 18, px = st[o], pz = st[o + 1], pf = st[o + 2], yaw = st[o + 3];
+      const ty = pf + 1.15, T = w.terrain;
+      for (const k of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9]) {
+        if (front && Math.abs(k) > 2) break;
+        const th = yaw + k * 0.35, cx = px + Math.sin(th) * d, cz = pz + Math.cos(th) * d;
+        if (cx < 2 || cz < 2 || cx > w.N - 2 || cz > w.N - 2) continue;
+        const j = Math.round(cz) * T.NN + Math.round(cx);
+        if (T.wWater && T.wWater[j] > 127) continue;
+        const ft = P.p.supportAt(cx, cz, groundAt(T, cx, cz) + 0.3);
+        if (P.p.blocked(cx, cz, ft)) continue;
+        const eye = ft + 1.7;
+        let clear = true;
+        for (const tyq of [pf + 0.4, ty, pf + 1.6]) for (let q = 1; q < 40 && clear; q++) {
+          const f = q / 40, x = cx + (px - cx) * f, z = cz + (pz - cz) * f, y = eye + (tyq - eye) * f;
+          if (solidAt(w.kit, x, y, z) || y < groundAt(T, x, z) + 0.05) clear = false;
+        }
+        if (clear) return { x: cx, z: cz, y: eye, yaw: deg(Math.atan2(px - cx, pz - cz)), pitch: deg(Math.atan2(ty - eye, d)) };
+      }
+      return null;
+    };
+    const atHour = (hour, ok) => { const st = new Float32Array(P.persons.length * 18), out = []; for (let i = 0; i < P.persons.length; i++) { const sg = PP.stateAt(P, i, 0, hour, st, i * 18); if (ok(sg, i, st[i * 18 + 5])) out.push(i); } return out; };
+
+    // 1. the figure in the building yard: every pose, near to very far, at night, asleep, on a bench
+    if (only.includes('yard')) {
+      const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'yard' });
+      await lab.page.evaluate(() => window.lab.setHud(false));
+      const cams = await lab.page.evaluate(() => window.lab.cameras.map((c, i) => ({ name: c.name, time: c.time, i })));
+      const mine = cams.filter((c) => c.name.startsWith('people') || c.name.startsWith('someone'));
+      const srcs = [], labels = [];
+      for (const c of mine) { srcs.push(await frame(lab, { cam: c.i, hour: hourOf[c.time] })); labels.push(`${c.i + 1} ${c.name}`); }
+      writeDataURL(path.join(OUT, 'yard.jpg'), await compose(srcs, labels, 'Figures in the building yard (?yard=1): standing with a hoe, walking with a lantern, at work, fishing, sweeping, a guard with spear and torch, a traveller, bare-headed; seated; asleep', 3, 0.2));
+      await lab.ctx.close();
+    }
+
+    // 2. one person near, middle and far by day; a walker with a lantern at night
+    if (only.includes('distance')) {
+      const lab = await world();
+      // (someone at work in a field mid-morning: open ground all round)
+      const dh = 10.0, day = atHour(dh, (sg) => sg.kind === 'stay' && sg.act === 'working the field')[0];
+      // (someone out walking after dusk, a lantern in hand, for a while yet)
+      let night, nh;
+      for (let h = 18.6; h < 22.5 && night === undefined; h += 0.05) {
+        const found = atHour(h, (sg, i, pose) => sg.kind === 'walk' && pose === POSE.WALK && P.persons[i].village !== undefined);
+        // (halfway along the walk: home from the fields takes a minute or two)
+        if (found.length) { night = found[0]; const sg = PP.segmentAt(PP.planOf(P, night, 0), h); nh = (sg.t0 + sg.t1) / 2; }
+      }
+      const srcs = [], labels = [];
+      const zl = (d) => (d >= 50 ? ' (the middle, three times over)' : '');
+      for (const d of [3, 25, 55]) { const v = viewOf(day, 0, dh, d); if (!v) continue; srcs.push(await frame(lab, { hour: dh, free: v, zoom: d >= 50 ? 3 : 0 })); labels.push(`${P.persons[day].name}, ${P.persons[day].label}, at work: ${d} m, ${hm(dh)}${zl(d)}`); }
+      if (night !== undefined) for (const d of [3, 25, 55]) { const v = viewOf(night, 0, nh, d); if (!v) continue; srcs.push(await frame(lab, { hour: nh, free: v, zoom: d >= 50 ? 3 : 0 })); labels.push(`${P.persons[night].name}, ${P.persons[night].label}, with a lantern: ${d} m, ${hm(nh)}${zl(d)}`); }
+      writeDataURL(path.join(OUT, 'distance.jpg'), await compose(srcs, labels, 'Near (all parts), middle (limbs merged) and far (a two-cell silhouette), by day and at night', 3, 0.2));
+      await lab.ctx.close();
+    }
+
+    // 3. each village's centre at dawn, midday, dusk and midnight
+    if (only.includes('villages')) {
+      const lab = await world();
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c) => c.name));
+      const srcs = [], labels = [];
+      for (const [q, v] of w.sites.villages.entries()) {
+        const cam = names.indexOf(`village ${q + 1} (${v.plan.pattern}), its centre`);
+        for (const [t, h] of [['dawn', 6.6], ['midday', 12.2], ['dusk', 19.2], ['midnight', 0.0]]) { srcs.push(await frame(lab, { cam, hour: h })); labels.push(`village ${q + 1} (${v.plan.pattern}), ${t} (${hm(h)})`); }
+      }
+      const gi = names.findIndex((n) => n.endsWith('at midday'));
+      for (const [t, h] of [['dawn', 6.6], ['midday', 12.2], ['dusk', 19.2], ['midnight', 0.0]]) { srcs.push(await frame(lab, { cam: gi, hour: h })); labels.push(`${names[gi].replace(', at midday', '')}, the green, ${t} (${hm(h)})`); }
+      writeDataURL(path.join(OUT, 'villages.jpg'), await compose(srcs, labels, `Each village's centre, and the green, at dawn, midday, dusk and midnight (seed ${seed}, day 0, fair)`, 4, 0.16));
+      await lab.ctx.close();
+    }
+
+    // 4. the wall walk at night, a traveller on the road, someone asleep, a greeting on screen
+    if (only.includes('moments')) {
+      const lab = await world();
+      const names = await lab.page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, time: c.time })));
+      const srcs = [], labels = [];
+      const wi = names.findIndex((c) => c.name.startsWith('the wall walk at night'));
+      srcs.push(await frame(lab, { cam: wi, hour: 23 })); labels.push('the wall walk at 23:00, from the courtyard: the watch with torches');
+      const ti = names.findIndex((c) => c.name === 'a traveller on the road');
+      if (ti >= 0) { srcs.push(await frame(lab, { cam: ti, hour: names[ti].time })); labels.push(`a traveller on the road, ${hm(names[ti].time)}`); }
+      // asleep: the first who sleeps in a house one can go into, from just inside its door
+      const sl = P.persons.find((q) => q.village !== undefined && P.villages[q.village].houses[q.home].enter);
+      if (sl) {
+        const H = P.villages[sl.village].houses[sl.home], ins = P.places[H.inside], bed = P.places[H.bed];
+        const y = ins.ft + 1.7, d = Math.hypot(bed.x - ins.x, bed.z - ins.z);
+        srcs.push(await frame(lab, { hour: 2.0, free: { x: ins.x, z: ins.z, y, yaw: deg(Math.atan2(bed.x - ins.x, bed.z - ins.z)), pitch: deg(Math.atan2(bed.top + 0.2 - y, d)) } }));
+        labels.push(`${sl.name} asleep at 02:00, from inside the door`);
+      }
+      // the greeting: beside someone on the green at midday, E
+      const gi = atHour(12.2, (sg) => sg.kind === 'stay' && sg.act === 'talking')[0] ?? atHour(12.2, (sg) => sg.kind === 'stay')[0];
+      await frame(lab, { hour: 12.2, free: viewOf(gi, 0, 12.2, 1.6, true) });
+      const said = await lab.page.evaluate(async () => { const L = window.lab; L.setQuiet(false); L.setHud(false); const s = L.people.greet(); await new Promise((q) => setTimeout(q, 400)); return s; });
+      srcs.push(`data:image/png;base64,${(await lab.page.screenshot()).toString('base64')}`);
+      labels.push(said ? `pressing E beside ${said.name}: "${said.text}"` : 'pressing E: nobody to greet');
+      await lab.page.evaluate(() => window.lab.setQuiet(true));
+      writeDataURL(path.join(OUT, 'moments.jpg'), await compose(srcs, labels, 'The watch at night, a traveller, someone asleep, a greeting', 2, 0.3));
+      await lab.ctx.close();
+    }
+
+    // 5. three people's day (day 0, the forecast's weather), from their plans:
+    // a row wherever one of them starts something, in bold for whoever did
+    if (only.includes('table')) {
+      const pick = [P.persons.find((q) => q.role === 'farmer'), P.persons.find((q) => q.role === 'guard'), P.persons.find((q) => q.role === 'traveller')].filter(Boolean);
+      const plans = pick.map((q) => PP.planOf(P, q.id, 0));
+      const WHERE = { bed: 'in bed', sit: 'by the hearth, seated', hearth: 'at the hearth', in: 'indoors', closed: 'indoors', door: 'at the door', field: 'on a strip of the field', fieldgate: 'at the field gate',
+        well: 'at the well', green: 'on the green', bench: 'on a bench', shelter: 'under the market shelter', chapel: 'at the chapel door', jetty: 'on the jetty', barn: 'in the barn',
+        post: 'at the gate', walk: 'on the wall walk', yard: 'in the yard', hallspot: 'in the keep\'s hall', hall: 'in the keep\'s hall', inner: 'inside the gate', keepdoor: 'at the keep door' };
+      const TO = { bed: 'to bed', sit: 'home', hearth: 'home', in: 'home', closed: 'home', door: 'home', field: 'to the field', fieldgate: 'to the field gate', well: 'to the well', green: 'to the green',
+        bench: 'to a bench', shelter: 'to the market shelter', chapel: 'to the chapel', jetty: 'to the jetty', barn: 'to the barn', post: 'to the gate', walk: 'up to the wall walk', yard: 'to the yard',
+        hallspot: 'to the keep\'s hall', hall: 'to the keep\'s hall', inner: 'to the gate', keepdoor: 'to the keep' };
+      const vill = (pl) => (pl.q !== undefined ? ` (village ${pl.q + 1})` : '');
+      const what = (sg) => {
+        if (sg.kind === 'walk') { const t = P.places[sg.to]; return `walking ${TO[t.kind] || `to the ${t.kind}`}${vill(t)}`; }
+        const pl = P.places[sg.at]; return `${sg.act}, ${WHERE[pl.kind] || pl.kind}${vill(pl)}`;
+      };
+      // a row wherever any of the three starts something
+      const times = [...new Set(plans.flatMap((pl) => pl.map((sg) => +sg.t0.toFixed(4))))].sort((x, y) => x - y);
+      const lines = ['| from | ' + pick.map((q) => `${q.name}, ${q.label}`).join(' | ') + ' |', '|---|' + pick.map(() => '---|').join('')];
+      let prev = null;
+      for (const t of times) {
+        const cells = plans.map((pl) => { const sg = PP.segmentAt(pl, t + 1e-4); return sg.t0 > t - 1e-3 ? `**${what(sg)}**` : what(sg); });
+        const key = cells.join('|').replace(/\*\*/g, '');
+        if (key === prev) continue; prev = key;
+        lines.push(`| ${hm(t)} | ${cells.join(' | ')} |`);
+      }
+      fs.writeFileSync(path.join(OUT, 'day.md'), lines.join('\n') + '\n');
+      console.log(lines.join('\n'));
+    }
+    console.log(fs.readdirSync(OUT).map((f) => `shots/phase4a/${f} ${(fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0)} KB`).join('\n'));
   } finally {
     await browser.close();
     now.server.close();
