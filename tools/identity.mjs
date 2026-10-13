@@ -59,11 +59,12 @@ const WORLD = [
   // house, a bridge, by day; the centres, the house and the bridge at night
   ...[12, 13, 14, 15, 16, 17, 18, 19].map((cam) => ({ cam, t: 'day' })),
   { cam: 13, t: 'night' }, { cam: 15, t: 'night' }, { cam: 17, t: 'night' }, { cam: 18, t: 'night' }, { cam: 19, t: 'night' }, { cam: 12, t: 'dusk' },
-  // (phase 4a) views full of people: each village's green or street at
-  // midday, at dusk (lanterns) and at dawn, the wall walk at night from the
-  // courtyard (torches), a traveller on the road at their own hour
-  ...[20, 21, 22].map((cam) => ({ cam, t: 'own' })), { cam: 20, t: 'dusk' }, { cam: 21, t: 6.6 }, { cam: 22, t: 19.2 },
-  { cam: 23, t: 'own' }, { cam: 24, t: 'own' },
+  // (phase 4a) views full of people: the green at midday, at dawn and at
+  // dusk (lanterns), the wall walk at night from the courtyard (torches), a
+  // traveller on the road at their own hour; each village's centre at
+  // midday, and one in the evening
+  ...[20, 21, 22].map((cam) => ({ cam, t: 'own' })), { cam: 20, t: 6.6 }, { cam: 20, t: 19.2 },
+  { cam: 13, t: 'noon' }, { cam: 15, t: 'noon' }, { cam: 17, t: 'noon' }, { cam: 17, t: 19.2 },
 ];
 // (phase 3a) the building yard: every piece near, the yard middle and far,
 // at night, the passage and the wall walk; the gate, the keep, the torches

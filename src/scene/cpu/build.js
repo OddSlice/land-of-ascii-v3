@@ -624,6 +624,11 @@ const methods = {
       // a frame, cannot blink, and the gaps' average darkness)
       const plank = ((Math.imul(row * 73856093 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
       tone = -0.12 + 0.3 * plank * smooth(4, 6, 0.22 / Math.max(1e-4, fp));
+    } else if (K === this.figKit) {
+      // (phase 4a) a person's clothes and skin: even, one tone to a part (a
+      // grain fixed to the world would cut across a body narrower than its
+      // squares, and its edges blink as one walks past)
+      tone = 0;
     } else {
       // plain: a faint grain fixed to the world
       tone = 0.15 * (((Math.imul(Math.floor(x * 1.7) * 73856093 ^ Math.floor(y * 1.7) * 19349663 ^ Math.floor(z * 1.7) * 83492791, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.15, 0.5, fp));
@@ -643,11 +648,24 @@ const methods = {
       if (mx * dx + mz * dz > 0) { mx = -mx; mz = -mz; }
       const k = smooth(1, 2.5, L * Math.abs(dx * nx + dz * nz) / Math.max(1e-3, D * v.colAngle));
       if (k < 1) { lx = k * nx + (1 - k) * mx; ly = k * ny; lz = k * nz + (1 - k) * mz; const l = Math.sqrt(lx * lx + ly * ly + lz * lz) || 1; lx /= l; ly /= l; lz /= l; }
+    } else if (K === this.figKit && ny > -0.5 && ny < 0.5) {
+      // (phase 4a) a side of a person's part seen nearly edge on is a sliver
+      // too: under about two and a half cells wide it takes the light of
+      // the face beside it, as a reveal does
+      const ca = S[q + P.CA], sa = S[q + P.SA], onU = Math.abs(nx * ca + nz * sa) > 0.7;
+      let mx = onU ? -sa : ca, mz = onU ? ca : sa;
+      const L = 2 * (onU ? S[q + P.HZ] : S[q + P.HX]);
+      if (mx * dx + mz * dz > 0) { mx = -mx; mz = -mz; }
+      const k = smooth(1, 2.5, L * Math.abs(dx * nx + dz * nz) / Math.max(1e-3, D * v.colAngle));
+      if (k < 1) { lx = k * nx + (1 - k) * mx; lz = k * nz + (1 - k) * mz; const l = Math.sqrt(lx * lx + ly * ly + lz * lz) || 1; lx /= l; ly /= l; lz /= l; }
     }
     const Ld = light.L;
     let lam = lx * Ld[0] + ly * Ld[1] + lz * Ld[2];
     if (lam < 0) lam = 0;
-    const shadow = light.shadowAt(x + lx * 0.6, y + ly * 0.6 + 0.05, z + lz * 0.6);
+    // (a person's part: its shadow taken once, at its middle, so a face is
+    // lit evenly and a soft shadow's edge cannot cross it and blink)
+    const fig = K === this.figKit, sx = fig ? S[q + P.CX] : x, sz = fig ? S[q + P.CZ] : z, sy = fig ? (S[q + P.Y0] + S[q + P.Y1]) / 2 : y;
+    const shadow = light.shadowAt(sx + lx * 0.6, sy + ly * 0.6 + 0.05, sz + lz * 0.6);
     const cloud = light.cloudAt(x, z);
     // which torches light it: those of its room, or of its side of the walls
     // (a doorway's or a window's sides are lit as the wall's face outside;

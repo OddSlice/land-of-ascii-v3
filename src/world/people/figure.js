@@ -37,6 +37,7 @@ export const FIG = {
 };
 
 const TAU = Math.PI * 2;
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // The parts of a figure, pushed to `out` as flat records of PART numbers:
 // x, z, angle, hx, hz, y0, y1, mat, flags (1: may grow to a cell, 2: a
@@ -98,8 +99,12 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
   const hip = (sit ? seat + 0.14 : FIG.hip * s - (pose === POSE.WORK ? 0.06 : 0)) + bob;
   const chestTop = hip + 0.58 * s;
   if (near) {
+    // (the gap between the legs closes as it gets under two columns, as a
+    // notch in a crown does: each leg widens inward over half of it)
+    const gap = 2 * 0.09 * s - 2 * FIG.leg * s * 0.87, shut = gap * (1 - smooth(1, 2, gap / minC)) / 2;
     for (const side of [-1, 1]) {
-      const u = side * 0.09 * s, lw = (pose === POSE.WALK ? side * swing * A : 0) + (pose === POSE.WORK ? side * 0.08 : 0);
+      const lw = (pose === POSE.WALK ? side * swing * A : 0) + (pose === POSE.WORK ? side * 0.08 : 0);
+      const u = side * (0.09 * s - shut / 2);
       if (sit) {
         // thighs forward along the seat, shins down to the floor
         box(u, 0.21 * s, FIG.leg * s, 0.21 * s, seat, seat + 0.15 * s, bottom);
@@ -107,9 +112,11 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
         box(u, 0.47 * s, 0.06 * s, 0.11 * s, 0, 0.08, MAT.LEATHER);
       } else {
         const lift = pose === POSE.WALK ? Math.max(0, side * Math.cos(ph)) * 0.05 : 0;
-        box(u, lw, 0.06 * s, 0.12 * s, lift, lift + 0.08, MAT.LEATHER);
-        box(u, lw * 0.9, FIG.leg * s * 0.87, 0.07 * s, lift + 0.06, hip * 0.53, bottom);
-        box(u, lw * 0.45, FIG.leg * s, 0.085 * s, hip * 0.51, hip + 0.02, bottom);
+        // (likewise a boot: under about a row and a half, the leg runs down)
+        const boot = 0.08 >= 1.5 * minR;
+        if (boot) box(u, lw, 0.06 * s, 0.12 * s, lift, lift + 0.08, MAT.LEATHER);
+        box(u, lw * 0.9, FIG.leg * s * 0.87 + shut / 2, 0.07 * s, lift + (boot ? 0.06 : 0), hip * 0.53, bottom);
+        box(u, lw * 0.45, FIG.leg * s + shut / 2, 0.085 * s, hip * 0.51, hip + 0.02, bottom);
       }
     }
   } else if (sit) {
@@ -136,8 +143,11 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
       const holding = light && side === 1 && pose !== POSE.FISH;
       const fw = sw + reach * s + (holding ? 0.06 : 0), up = raise * s + (holding ? 0.1 : 0);
       box(u, fw * 0.4, FIG.arm * s, 0.06 * s, chestTop - 0.3 * s, chestTop, top);
-      box(u, fw, FIG.arm * s * 0.9, 0.055 * s, chestTop - 0.6 * s + up, chestTop - 0.28 * s + up, top);
-      box(u, fw + 0.01, 0.045 * s, 0.045 * s, chestTop - 0.7 * s + up, chestTop - 0.6 * s + up, skin);
+      // (a hand under about a row and a half is the sleeve's end: a speck of
+      // skin one column wide would blink as one walks past)
+      const hand = 0.1 * s >= 1.5 * minR;
+      box(u, fw, FIG.arm * s * 0.9, 0.055 * s, chestTop - (hand ? 0.6 : 0.7) * s + up, chestTop - 0.28 * s + up, top);
+      if (hand) box(u, fw + 0.01, 0.045 * s, 0.045 * s, chestTop - 0.7 * s + up, chestTop - 0.6 * s + up, skin);
     }
   }
 
@@ -149,7 +159,7 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
     if (hatK === HATK.HAT) {
       box(0, 0, 0.17 * s, 0.17 * s, ht - 0.03, ht, hatM, 1, 1, ha);
       box(0, 0, 0.1 * s, 0.1 * s, ht - 0.01, ht + 0.09 * s, hatM, 1, 1, ha);
-    } else if (hatK === HATK.HOOD) box(0, -0.03, 0.12 * s, 0.1 * s, hy + 0.06, ht + 0.03, hatM, 1, 1, ha);
+    } else if (hatK === HATK.HOOD) box(0, -0.02, FIG.head[0] * s + 0.004, 0.12, hy, ht + 0.004, hatM, 1, 1, ha);   // (round the head's sides and back, a hair proud of it, to a centimetre short of the face: no sliver of skin beside the face, and no faces fighting)
     else if (hatK === HATK.HELMET) box(0, 0, 0.115 * s, 0.12 * s, ht - 0.1 * s, ht + 0.04, MAT.IRON, 1, 1, ha);
     else if (hatK === HATK.CAP) box(0, -0.01, 0.106 * s, 0.116 * s, ht - 0.07 * s, ht + 0.02, hatM, 1, 1, ha);
     else box(0, -0.02, 0.105 * s, 0.1 * s, ht - 0.08 * s, ht + 0.015, MAT.HAIR, 1, 1, ha);

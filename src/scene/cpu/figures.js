@@ -13,7 +13,7 @@
 // - The lights people carry are moving point lights (Marcher.setMovers):
 //   they light only surfaces near them, never start the shadow sweep, and
 //   leave the fixed lights as they were.
-import { figureParts, lightOf, FS, S, PART, POSE } from '../../world/people/figure.js';
+import { figureParts, lightOf, FS, S, PART, POSE, NEAR_D } from '../../world/people/figure.js';
 import { P as KP, P_STRIDE, PT, PF, ZONE_OUT, ZONE_YARD, roomBit } from '../../world/kit.js';
 import { MAT, MAT_FAINT, HIT_STRIDE, REC } from '../../contract.js';
 import { torchPower } from './light.js';
@@ -55,8 +55,9 @@ const methods = {
       if (!k) continue;
       const minC = v.colAngle * Math.max(dist, 0.5), minR = v.rowAngle * Math.max(dist, 0.5);
       let reach = 0, y0 = Infinity, y1 = -Infinity, flames = 0;
+      let kk = 0;
       for (let j = 0; j < k; j++) {
-        const b = j * PART, q = (np + j) * P_STRIDE;
+        const b = j * PART, q = (np + kk) * P_STRIDE;
         let hx = buf[b + 3], hz = buf[b + 4], ya = buf[b + 5], yb = buf[b + 6], cover = buf[b + 9];
         const flame = buf[b + 8] === 2;
         if (flame) {
@@ -65,6 +66,20 @@ const methods = {
           cover = Math.min(cover, (w * h) / (wm * hm));
           hx = hz = wm; const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm;
           flames++;
+        } else if (buf[b + 8] === 1) {
+          // a small part (a brim, a tool's shaft, a torch's stick): held at
+          // two rows tall and two columns across (its width across the view),
+          // and further off faded by how much of that it really is, so it
+          // cannot fall between rows or columns and blink
+          const h = (yb - ya) / 2, hm = Math.max(h, minR);
+          const vx = buf[b] - v.ex, vz = buf[b + 1] - v.ez, vl = Math.hypot(vx, vz) || 1, px = -vz / vl, pz = vx / vl;
+          const ca = Math.cos(buf[b + 2]), sa = Math.sin(buf[b + 2]);
+          const across = hx * Math.abs(ca * px + sa * pz) + hz * Math.abs(-sa * px + ca * pz);
+          if (hm > h) { const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm; }
+          // (faded only past the near detail: close by, the parts are whole
+          // and a faded one's blend with what lies behind would jump)
+          if (dist >= NEAR_D) cover = Math.min(cover, (h / hm) * Math.min(1, across / minC));
+          if (cover < 0.06) continue;
         }
         const ang = buf[b + 2];
         P[q + KP.TYPE] = PT.BOX; P[q + KP.CX] = buf[b]; P[q + KP.CZ] = buf[b + 1];
@@ -74,13 +89,14 @@ const methods = {
         P[q + KP.FLAGS] = buf[b + 8] === 1 ? PF.GROW : 0;
         P[q + KP.H0] = 0; P[q + KP.HN] = 0; P[q + KP.ROOM] = st[o + S.ROOM];
         P[q + KP.SEED] = st[o + S.ID] * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ya;
-        K.cover[np + j] = cover; K.flame[np + j] = flame ? 1 : 0;
+        K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; kk++;
         const dx = buf[b] - x, dz = buf[b + 1] - z, r = Math.sqrt(dx * dx + dz * dz) + Math.max(hx, hz) * 1.42;
         if (r > reach) reach = r;
         if (ya < y0) y0 = ya; if (yb > y1) y1 = yb;
       }
-      items.push({ kind: FIG, pi: i, p0: np, np: k, x, z, R: reach + 0.05, y0: y0 - 0.05, y1: y1 + 0.05, grow: 1.5, up: flames ? 1 : 0, id: st[o + S.ID], dist });
-      np += k;
+      if (!kk) continue;
+      items.push({ kind: FIG, pi: i, p0: np, np: kk, x, z, R: reach + 0.05, y0: y0 - 0.05, y1: y1 + 0.05, grow: 1.5, up: flames ? 1 : 0, id: st[o + S.ID], dist });
+      np += kk;
     }
     K.np = np;
   },

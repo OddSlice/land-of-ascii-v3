@@ -22,6 +22,9 @@
 //                                          (phase 3b: and the villages: walking into each, walking its
 //                                          street, turning on its green, crossing a bridge; --bymat
 //                                          sorts each run's blinks by material)
+//   node tools/flicker.mjs --people [--seed N]   (phase 4a; in Node) a busy green, a street walk past people
+//                                          and the wall walk from the courtyard at night: blinks on the
+//                                          people's own cells, still (clock frozen) and walking (camera still)
 //   --only forest,stand                    only the runs whose label contains one of these
 //   --built [--root DIR]                   the single-file build (in DIR: a copy, so the repository can change meanwhile)
 //   (phase 2b) the world set also counts glyph flips (a glyph that changes and changes back, whatever
@@ -251,6 +254,141 @@ async function buildings(seed) {
     console.log(`${run.label}: building cells ${(100 * bc / frN / n).toFixed(1)}% of the frame; on them glyph flips ${(100 * gf / Math.max(1, bc)).toFixed(3)}%, colour flips ${(100 * cf / Math.max(1, bc)).toFixed(3)}%`);
   }
   return out;
+}
+// ---- people (phase 4a), in Node ---------------------------------------------
+// Three views with people in them: turning on the busiest green at midday,
+// walking a street past people, and turning in the courtyard at night while
+// the watch walks the wall. First with every clock frozen (the people stand
+// still where the clock left them: walkers mid-stride), the camera moving:
+// blinks counted on the people's own cells (cells that show a person in any
+// of the three frames), beside the courtyard's building cells in the same
+// run. Then with the camera still and the clock running at one game second
+// a second (60 frames a second): the people walk, and what changes and
+// changes back on their cells is reported on its own.
+async function peopleSet(seed) {
+  const G = await import('../src/world/gen/world.js'), PK = await import('../src/world/pack.js');
+  const BE = await import('../src/scene/cpu/backend.js'), RS = await import('../src/resolve.js'), { LOOK } = await import('../src/look.js');
+  const CT = await import('../src/contract.js'), OB = await import('../src/world/objects.js');
+  const PP = await import('../src/world/people/people.js'), MT = await import('../src/world/people/meet.js'), FG = await import('../src/world/people/figure.js');
+  const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
+  const w = PK.unpackWorld(PK.packWorld(r.value));
+  const P = PP.buildPeople(w), np = P.persons.length, FS = FG.FS;
+  const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
+  const PPL = new Set([CT.MAT.SKIN, CT.MAT.SKIN2, CT.MAT.HAIR, CT.MAT.LINEN, CT.MAT.RUSSET, CT.MAT.OCHRE, CT.MAT.MOSS, CT.MAT.SLATE, CT.MAT.UMBER, CT.MAT.CHARCOAL, CT.MAT.LEATHER, CT.MAT.IRON]);
+  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
+  const pl = P.p, deg = (x) => x * 180 / Math.PI;
+  // (`only`: 'still' keeps those standing, sitting, working or asleep, and
+  // 'walking' only those walking; the rest are left out)
+  const stAt = (day, hour, only) => {
+    const st = new Float32Array(np * FS), segs = [], along = new Float64Array(np);
+    for (let i = 0; i < np; i++) { segs[i] = PP.stateAt(P, i, day, hour, st, i * FS); along[i] = PP.alongOf(P, i, segs[i], hour); }
+    MT.adjust(st, np, segs, along, null, pl);
+    if (only) for (let i = 0; i < np; i++) { const o = i * FS, w2 = st[o + FG.S.POSE] === FG.POSE.WALK; if (only === 'still' ? w2 : !w2) st[o + FG.S.POSE] = FG.POSE.HIDDEN; }
+    const lit = new Uint8Array(1 + 3 * 32 + 32); PP.litGroups(P, day, hour, lit);
+    return { st, lit };
+  };
+  // the busiest green (most people standing on it at midday), the street
+  const V = P.villages.filter((v) => v.greens.length);
+  const near = (x, z, R, s) => { let k = 0; for (let i = 0; i < np; i++) { const o = i * FS; if (s.st[o + FG.S.POSE] !== FG.POSE.HIDDEN && Math.hypot(s.st[o] - x, s.st[o + 1] - z) < R) k++; } return k; };
+  const noon = stAt(0, 12.2);
+  const RUNS = [];
+  const gv = V.map((v) => [v, w.sites.villages[v.q].plan.green]).sort((A, B) => near(B[1].x, B[1].z, B[1].r + 4, noon) - near(A[1].x, A[1].z, A[1].r + 4, noon))[0];
+  if (gv) {
+    const c = gv[1];
+    RUNS.push({ label: `village ${gv[0].q + 1}: turning on the green at midday (${near(c.x, c.z, c.r + 4, noon)} people on it)`, x: c.x + c.r * 0.2, z: c.z - c.r * 0.3, yaw: 0, pitch: 3, hour: 12.2, ...TURN });
+  }
+  // (the street: of the street village's road and lanes, the spot and the
+  // quarter hour with the most people from 3 to 25 m ahead)
+  const sv = w.sites.villages.findIndex((v) => v.plan.pattern === 'street');
+  if (sv >= 0) {
+    const rd = w.roads.find((q) => q.to === `village ${sv + 1}`), lines = [rd, ...(w.sites.villages[sv].plan.lanes || [])];
+    let best = null;
+    for (let hq = 6 * 4; hq <= 20 * 4; hq++) {
+      const s = stAt(0, hq / 4);
+      for (const L of lines) for (let i = 10; i < L.n - 10; i += 6) {
+        const fx = L.x[i - 10] - L.x[i], fz = L.z[i - 10] - L.z[i], fl = Math.hypot(fx, fz) || 1;
+        let k = 0, clear = true;
+        for (let j = 0; j < np; j++) {
+          const o = j * FS; if (s.st[o + FG.S.POSE] === FG.POSE.HIDDEN) continue;
+          const dx = s.st[o] - L.x[i], dz = s.st[o + 1] - L.z[i], d = Math.hypot(dx, dz);
+          if (d > 3 && d < 25 && (dx * fx + dz * fz) / fl > 0.75 * d) k++;
+          // (nobody on the walk itself: in the game one would step round, or they would)
+          const along = (dx * fx + dz * fz) / fl, lat = Math.abs(dx * fz - dz * fx) / fl;
+          if (along > -1 && along < F.step * frames + 1.5 && lat < 1.5) clear = false;
+        }
+        if (!clear) continue;
+        if (!best || k > best.k) best = { k, hour: hq / 4, x: L.x[i], z: L.z[i], yaw: deg(Math.atan2(fx, fz)) };
+      }
+    }
+    const hh = Math.floor(best.hour), mm = Math.round((best.hour - hh) * 60);
+    RUNS.push({ label: `village ${sv + 1}: walking its street at ${hh}:${String(mm).padStart(2, '0')}, past people (${best.k} ahead)`, x: best.x, z: best.z, yaw: best.yaw, pitch: 0, hour: best.hour, ...F });
+  }
+  const wc = (await import('../src/world/people/cameras.js')).peopleCameras(w, P).find((c) => c.name.startsWith('the wall walk'));
+  if (wc) RUNS.push({ label: 'the wall walk at 23:00, from the courtyard, turning', x: wc.x, z: wc.z, y: wc.y, yaw: wc.yaw, pitch: wc.pitch, hour: 23.0, step: 0, dir: 0, turn: 0.15 });
+  const out = [];
+  const render = (be, cam, hour, t, s) => {
+    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, look, people: s.st, lit: s.lit };
+    const hits = new Uint8Array(n * CT.HIT_STRIDE);
+    for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
+    const mat = new Uint8Array(n); for (let k = 0; k < n; k++) mat[k] = hits[k * CT.HIT_STRIDE];
+    const cells = new Uint8Array(n * 8);
+    RS.resolveStripe(RS.makePalette(hour, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+    return { cells, mat };
+  };
+  const byMat = {};
+  const count = (fr, sets) => {
+    const res = sets.map(() => ({ c: 0, g: 0, k: 0 }));
+    for (let i = 2; i < fr.length; i++) {
+      const A = fr[i - 2], B = fr[i - 1], C = fr[i];
+      for (let k = 0; k < n; k++) {
+        const q = k * 8;
+        const flipG = A.cells[q + 3] === C.cells[q + 3] && A.cells[q + 3] !== B.cells[q + 3];
+        const jump = Math.max(Math.abs(A.cells[q] - B.cells[q]), Math.abs(A.cells[q + 1] - B.cells[q + 1]), Math.abs(A.cells[q + 2] - B.cells[q + 2]));
+        const back = Math.max(Math.abs(A.cells[q] - C.cells[q]), Math.abs(A.cells[q + 1] - C.cells[q + 1]), Math.abs(A.cells[q + 2] - C.cells[q + 2]));
+        const flipC = jump > 6 && back <= jump / 4;
+        sets.forEach((S2, j) => { if (S2.has(A.mat[k]) || S2.has(B.mat[k]) || S2.has(C.mat[k])) { res[j].c++; if (flipG) res[j].g++; if (flipC) res[j].k++; if (a.bymat && j === 0) { const m = `${CT.MAT_NAMES[A.mat[k]]}>${CT.MAT_NAMES[B.mat[k]]}>${CT.MAT_NAMES[C.mat[k]]}`; if (flipG) byMat[m] = (byMat[m] || 0) + 1; if (flipC) byMat["c:" + m] = (byMat["c:" + m] || 0) + 1; } } });
+      }
+    }
+    const frN = fr.length - 2;
+    return res.map((x) => ({ share: 100 * x.c / frN / n, glyph: 100 * x.g / Math.max(1, x.c), colour: 100 * x.k / Math.max(1, x.c) }));
+  };
+  for (const run of (a.only ? RUNS.filter((q) => String(a.only).split(',').some((w2) => q.label.includes(w2))) : RUNS)) {
+    // the clock frozen, the camera moving: the still figures (standing,
+    // sitting, working), then the walkers caught mid-stride, each alone
+    const way = (run.yaw + run.dir) * Math.PI / 180;
+    const pass = (only) => {
+      const be2 = BE.createCpuBackend(w), out2 = [], s = stAt(0, run.hour, only);
+      for (let i = 0; i < frames + 1; i++) {
+        const x = run.x + Math.sin(way) * run.step * i, z = run.z + Math.cos(way) * run.step * i;
+        const y = run.y ?? pl.supportAt(x, z, OB.groundAt(w.terrain, x, z) + 3) + 1.7;
+        out2.push(render(be2, { x, z, y, yaw: (run.yaw + run.turn * i) * Math.PI / 180, pitch: run.pitch * Math.PI / 180 }, run.hour, 0, s));
+      }
+      return out2;
+    };
+    const [ps, bs] = count(pass('still'), [PPL, BLD]);
+    const [pw] = count(pass('walking'), [PPL]);
+    let be;
+    if (a.bymat) { console.log('   flips by material (before > during > after):', Object.entries(byMat).sort((x, y) => y[1] - x[1]).slice(0, a.bymat === 'all' ? 999 : 12).map(([m, c]) => `${m} ${c}`).join(', ')); for (const k in byMat) delete byMat[k]; }
+    // moving: the camera still, the clock running
+    be = BE.createCpuBackend(w); const fm = [];
+    const y0 = run.y ?? pl.supportAt(run.x, run.z, OB.groundAt(w.terrain, run.x, run.z) + 3) + 1.7;
+    for (let i = 0; i < frames + 1; i++) {
+      const hour = run.hour + i / 60 / 3600;
+      fm.push(render(be, { x: run.x, z: run.z, y: y0, yaw: run.yaw * Math.PI / 180, pitch: run.pitch * Math.PI / 180 }, run.hour, i / 60, stAt(0, hour)));
+    }
+    const [pm] = count(fm, [PPL]);
+    out.push({ label: run.label, ps, bs, pw, pm });
+    console.log(`${run.label}: still figures ${ps.share.toFixed(2)}% of the frame, glyph flips ${ps.glyph.toFixed(3)}%, colour ${ps.colour.toFixed(3)}%; walkers (frozen) ${pw.share.toFixed(2)}%, glyph ${pw.glyph.toFixed(3)}%, colour ${pw.colour.toFixed(3)}%; buildings glyph ${bs.glyph.toFixed(3)}%, colour ${bs.colour.toFixed(3)}%; walking, camera still: glyph ${pm.glyph.toFixed(3)}%, colour ${pm.colour.toFixed(3)}%`);
+  }
+  return out;
+}
+if (a.people) {
+  const seed = Number(a.seed || 3), list = await peopleSet(seed), f3 = (x) => `${x.toFixed(3)}%`;
+  console.log(`\npeople's own cells (seed ${seed}, Node, 360 x 112, ${frames} frames)\n`);
+  console.log('| run | still figures: share of the frame | still figures: glyph / colour flips | buildings in the same run: glyph / colour | walkers caught mid-stride, camera moving: share, glyph / colour | walkers walking, camera still: glyph / colour |');
+  console.log('|---|---|---|---|---|---|');
+  for (const v of list) console.log(`| ${v.label} | ${v.ps.share.toFixed(2)}% | ${f3(v.ps.glyph)} / ${f3(v.ps.colour)} | ${f3(v.bs.glyph)} / ${f3(v.bs.colour)} | ${v.pw.share.toFixed(2)}%, ${f3(v.pw.glyph)} / ${f3(v.pw.colour)} | ${f3(v.pm.glyph)} / ${f3(v.pm.colour)} |`);
+  process.exit(0);
 }
 if (a.buildings) {
   const seed = Number(a.seed || 3), list = await buildings(seed), f3 = (x) => `${x.toFixed(3)}%`;
