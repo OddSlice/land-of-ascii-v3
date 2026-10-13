@@ -38,6 +38,7 @@ function keyGroups(scene) {
       [['Shift'], 'run, while held'],
       [['Space'], world ? 'jump; rise, while flying' : 'jump'],
       world && [['F'], 'fly on or off'],
+      world && [['E'], 'greet whoever is close, in front and facing you'],
     ]],
     ['looking', 'eye', [
       [['mouse'], 'look round: click the picture to take the mouse, Esc gives it back'],

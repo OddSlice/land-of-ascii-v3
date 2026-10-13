@@ -575,6 +575,29 @@ game.bench = new BenchRun({
   }),
 });
 lab.bench = game.bench;   // (for the tools)
+// (phase 4a) people, for the tools and the menu (before the menu, which
+// lists them)
+lab.people = {
+  get count() { return people ? people.n : 0; },
+  get on() { return !!(people ? people.on : yardFolk && yardFolk.on); },
+  set(on) { if (people) people.setOn(on, player); if (yardFolk) yardFolk.on = !!on; },
+  list() { return people ? people.list() : []; },
+  get updateMs() { return people ? people.updateMs : 0; },
+  // which houses are lit, asleep or awake at home this frame (see litGroups)
+  get lit() { return people ? Array.from(people.lit) : []; },
+  get buildMs() { return people ? people.buildMs : 0; },
+  // the camera beside person i, `dist` metres off, looking at them
+  goTo(i, dist = 3) {
+    if (!people) return false;
+    const p = people.list()[i];
+    if (!p) return false;
+    const a = p.yaw + 0.6, x = p.x + Math.sin(a) * dist, z = p.z + Math.cos(a) * dist;
+    player.place(x, z, Math.atan2(p.x - x, p.z - z), -0.08);
+    state.held = false; state.camName = `with ${p.name}`;
+    return true;
+  },
+  greet() { greet(); return lab.lastSaid || null; },
+};
 const menu = new Menu($('menu'), game);
 let menuNext = 0, menuOpenedAt = 0, releasing = false;
 
@@ -652,28 +675,6 @@ function hideHint() { clearTimeout(hintTimer); $('hint').classList.remove('on');
 
 // ---- the debug handle ---------------------------------------------------------
 
-// (phase 4a) people, for the tools and the menu
-lab.people = {
-  get count() { return people ? people.n : 0; },
-  get on() { return !!(people ? people.on : yardFolk && yardFolk.on); },
-  set(on) { if (people) people.setOn(on, player); if (yardFolk) yardFolk.on = !!on; },
-  list() { return people ? people.list() : []; },
-  get updateMs() { return people ? people.updateMs : 0; },
-  // which houses are lit, asleep or awake at home this frame (see litGroups)
-  get lit() { return people ? Array.from(people.lit) : []; },
-  get buildMs() { return people ? people.buildMs : 0; },
-  // the camera beside person i, `dist` metres off, looking at them
-  goTo(i, dist = 3) {
-    if (!people) return false;
-    const p = people.list()[i];
-    if (!p) return false;
-    const a = p.yaw + 0.6, x = p.x + Math.sin(a) * dist, z = p.z + Math.cos(a) * dist;
-    player.place(x, z, Math.atan2(p.x - x, p.z - z), -0.08);
-    state.held = false; state.camName = `with ${p.name}`;
-    return true;
-  },
-  greet() { greet(); return lab.lastSaid || null; },
-};
 Object.assign(lab, {
   ready,
   threads: THREADS,
