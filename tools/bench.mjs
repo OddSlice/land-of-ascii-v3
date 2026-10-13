@@ -16,6 +16,9 @@
 // --weather rain (phase 2b) holds a kind of weather for every run (the
 // default is fair, the look before weather); --hour 6.6 times every camera at
 // that hour instead of its own (the mist lies only round dawn).
+// --lantern (phase 5a) turns progress on (nothing kept) and lights the
+// player's lantern for every camera: its cost, against the same run
+// without it.
 //
 // "worker" is the slowest stripe's march + resolve in a frame; "verdict" is
 // that plus the main thread's draw, per frame (the phase 0b decision rule).
@@ -74,6 +77,7 @@ try {
         const readyMs = Date.now() - t0;
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));
+        if (a.lantern) await page.evaluate(() => { window.lab.progress.enable({ store: false }); window.lab.progress.setLit(true); });
         const ncams = await page.evaluate(() => window.lab.cameras.length);
         const camNames = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
         const world = await page.evaluate(() => ({ buildMs: window.lab.world.buildMs, sweepMs: window.lab.world.sweepMs }));
@@ -115,7 +119,7 @@ try {
               worker: r2(med(t.map((x) => x.worker))), draw: r2(med(t.map((x) => x.draw))),
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
               isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
-              weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null,
+              weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null, lantern: !!a.lantern,
               ...(stress || scene === 'world' ? world : {}),
             };
             rows.push(row);

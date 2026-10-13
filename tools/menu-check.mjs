@@ -18,7 +18,16 @@
 //  8. opens with choices kept before the statistics were on by default and
 //     checks they show (the rest of the choices kept);
 //  9. opens full screen on 4K screens (at 100% and 150%) and checks the cell
-//     count stays near the detail level's promise.
+//     count stays near the detail level's promise;
+// 10. (phase 5a) at 1024 x 640, the journal (J): it opens and closes on J and
+//     Escape and holds the clock; the arrow keys move between its four
+//     pages and Tab walks every control and stays inside; each page fits
+//     with no sideways scrolling; buttons show a pointer and change on
+//     hover; the keyboard focus is visibly outlined; a sketch opens full
+//     screen, pages on with the arrow keys and copies as text; an exchange's
+//     buttons work by mouse and its keys by keyboard; the World section's
+//     save line, backup, restore box and clear (asked first) are reached
+//     by Tab; and nothing on any of them is an emoji.
 //   node tools/menu-check.mjs [--browser chromium]
 import { launch } from './lib/browser.mjs';
 import { serve, args, openLab } from './lib/serve.mjs';
@@ -270,6 +279,120 @@ try {
     await L.ctx.close();
   }
   check('a 4K screen full screen keeps about 40,000 cells (fine)', big.every((b) => b.cells > 34000 && b.cells < 46000), big.map((b) => `${b.screen}: ${b.cols} x ${b.rows} = ${b.cells} (${b.cw} px cells)`).join('; '));
+
+  // ---- (phase 5a) the journal and the new World controls, at 1024 x 640 ----
+  {
+    const J = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
+    const jp = J.page;
+    await jp.keyboard.press('Enter'); await jp.waitForTimeout(300);
+    // the first meeting: greet, and the exchange's buttons by mouse
+    const ex = await jp.evaluate(async () => {
+      const L = window.lab, m = L.progress.meet();
+      L.freeze(m.arrive + 0.02, 0, 0); await L.whenIdle(); await L.whenIdle();
+      const p = L.people.list()[m.person], a2 = p.yaw;
+      L.setCamera({ x: p.x + Math.sin(a2) * 1.6, z: p.z + Math.cos(a2) * 1.6, yaw: (a2 + Math.PI) * 180 / Math.PI, pitch: -8 });
+      await L.whenIdle(); await L.whenIdle();
+      L.people.greet(); await new Promise((r) => setTimeout(r, 300));
+      const b = [...document.querySelectorAll('#talk button')];
+      return { open: !!L.progress.talk.read(), buttons: b.length, cursor: b.map((x) => getComputedStyle(x).cursor), lines: L.progress.talk.read().lines.length };
+    });
+    check('an exchange: two or three lines, two buttons with a pointer', ex.open && ex.buttons === 2 && ex.lines >= 2 && ex.lines <= 3 && ex.cursor.every((c) => c === 'pointer'), JSON.stringify(ex));
+    const hb = await jp.evaluate(() => getComputedStyle(document.querySelectorAll('#talk button')[1]).backgroundColor);
+    await jp.hover('#talk button:nth-child(2)');
+    await jp.waitForTimeout(250);
+    const ha = await jp.evaluate(() => getComputedStyle(document.querySelectorAll('#talk button')[1]).backgroundColor);
+    check('an exchange\'s buttons change on hover', hb !== ha, `${hb} -> ${ha}`);
+    await jp.click('#talk button.yes');
+    await jp.waitForTimeout(250);
+    const took = await jp.evaluate(() => window.lab.progress.favours().find((f) => f.first).state);
+    check('clicking "I will do it" takes the favour', took === 2, `state ${took}`);
+    await jp.keyboard.press('KeyE'); await jp.waitForTimeout(200);
+    await jp.keyboard.press('KeyK'); await jp.waitForTimeout(500);
+    await jp.evaluate(async () => { const L = window.lab; L.camera(6); await L.whenIdle(); });
+    await jp.keyboard.press('KeyK'); await jp.waitForTimeout(500);
+    const nSk = await jp.evaluate(() => window.lab.progress.get().sketches.length);
+    check('K sketches the view (twice)', nSk === 2, `${nSk} sketches`);
+    // J opens the journal
+    const h0 = await jp.evaluate(() => window.lab.state());
+    await jp.evaluate(() => window.lab.runClock(true, 1 / 60));
+    await jp.keyboard.press('KeyJ'); await jp.waitForTimeout(400);
+    const j0 = await jp.evaluate(() => ({ r: window.lab.progress.journal.read(), focus: document.activeElement && document.activeElement.closest('#journal') ? document.activeElement.textContent : null, t: window.lab.state().t }));
+    await jp.waitForTimeout(500);
+    const t1 = await jp.evaluate(() => window.lab.state().t);
+    check('J opens the journal, with the focus in it', j0.r.open && !!j0.focus, j0.focus);
+    check('while the journal is open the clock stands still', t1 === j0.t, `${j0.t} -> ${t1}`);
+    // the arrow keys between the pages
+    const tabs = [];
+    for (let k = 0; k < 4; k++) { tabs.push(await jp.evaluate(() => window.lab.progress.journal.read().tab)); await jp.keyboard.press('ArrowDown'); await jp.waitForTimeout(120); }
+    check('the arrow keys move between the four pages, round again', tabs.join(' ') === 'places people sketches favours' && (await jp.evaluate(() => window.lab.progress.journal.read().tab)) === 'places', tabs.join(' '));
+    // each page: fits, Tab stays inside, focus outlined, pointer and hover
+    const pages = [];
+    for (const tab of ['places', 'people', 'sketches', 'favours']) {
+      await jp.evaluate((t) => window.lab.progress.journal.tab(t), tab);
+      await jp.waitForTimeout(150);
+      const info = await jp.evaluate(() => {
+        const pane = document.querySelector('#journal .pane'), panel = document.querySelector('#journal .panel'), r = panel.getBoundingClientRect();
+        const btns = [...document.querySelectorAll('#journal .panel button')].filter((b) => b.offsetParent !== null);
+        const small = [...document.querySelectorAll('#journal .panel *')].filter((e) => e.offsetParent !== null && e.childNodes.length && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => parseFloat(getComputedStyle(e).fontSize)).reduce((m, x) => Math.min(m, x), 99);
+        return { fits: pane.scrollWidth <= pane.clientWidth && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth,
+          pointer: btns.every((b) => getComputedStyle(b).cursor === 'pointer'), buttons: btns.length, smallest: small,
+          emoji: /\p{Extended_Pictographic}/u.test(panel.innerText) };
+      });
+      // Tab round the page's controls
+      let inside = true, seen = new Set();
+      for (let k = 0; k < info.buttons + 2; k++) {
+        await jp.keyboard.press('Tab');
+        const f = await jp.evaluate(() => { const e = document.activeElement; return e && e.closest('#journal') ? { t: e.textContent.trim().slice(0, 30), o: getComputedStyle(e).outlineStyle, w: getComputedStyle(e).outlineWidth } : null; });
+        if (!f) inside = false; else seen.add(`${f.t}|${f.o}|${f.w}`);
+      }
+      const outlined = [...seen].every((x) => !/\|none\|/.test(x));
+      const want = await jp.evaluate(() => [...document.querySelectorAll('#journal .panel button')].filter((b) => b.offsetParent !== null && !b.disabled && b.tabIndex >= 0).length);
+      pages.push({ tab, ...info, inside, outlined, reached: seen.size, want });
+    }
+    check('every journal page fits at 1024 x 640 with no sideways scrolling', pages.every((p) => p.fits), pages.map((p) => `${p.tab} ${p.fits}`).join(', '));
+    check('Tab walks each page\'s controls and stays inside the journal', pages.every((p) => p.inside && p.reached === p.want), pages.map((p) => `${p.tab} ${p.reached} of ${p.want}`).join(', '));
+    check('the keyboard focus is visibly outlined', pages.every((p) => p.outlined));
+    check('every journal button shows a pointer', pages.every((p) => p.pointer));
+    check('the journal\'s text is at least 11 px', pages.every((p) => p.smallest >= 11), pages.map((p) => p.smallest).join(', '));
+    check('no emoji anywhere in the journal', pages.every((p) => !p.emoji));
+    // hover feedback on a tab
+    await jp.evaluate(() => window.lab.progress.journal.tab('places'));
+    const tb = await jp.evaluate(() => getComputedStyle(document.querySelector('#jr-tab-people')).backgroundColor);
+    await jp.hover('#jr-tab-people'); await jp.waitForTimeout(250);
+    const ta = await jp.evaluate(() => getComputedStyle(document.querySelector('#jr-tab-people')).backgroundColor);
+    check('the journal\'s tabs change on hover', tb !== ta, `${tb} -> ${ta}`);
+    // a sketch, full screen, by keyboard
+    await jp.evaluate(() => window.lab.progress.journal.tab('sketches'));
+    await jp.focus('#journal .card');
+    await jp.keyboard.press('Enter'); await jp.waitForTimeout(700);
+    const v0 = await jp.evaluate(() => ({ r: window.lab.progress.journal.read(), w: document.querySelector('#journal .viewer canvas').getBoundingClientRect().width, fits: document.querySelector('#journal .viewer canvas').getBoundingClientRect().right <= innerWidth }));
+    await jp.keyboard.press('ArrowRight'); await jp.waitForTimeout(500);
+    const v1 = await jp.evaluate(() => window.lab.progress.journal.read().viewing);
+    check('a sketch opens full screen and the arrow keys page through', v0.r.viewing === 0 && v1 === 1 && v0.w > 600 && v0.fits, `${v0.r.viewing} -> ${v1}, ${Math.round(v0.w)} px wide`);
+    const copied = await jp.evaluate(async () => { const id = window.lab.progress.get().sketches[0].id; const t = await window.lab.progress.sketchText(id); const s = window.lab.progress.get().sketches[0]; return { lines: t.split('\n').length, width: t.split('\n')[0].length, rows: s.rows, cols: s.cols }; });
+    check('a sketch as text: one line a row, one character a cell', copied.lines === copied.rows && copied.width === copied.cols, JSON.stringify(copied));
+    await jp.keyboard.press('Escape'); await jp.waitForTimeout(250);
+    const v2 = await jp.evaluate(() => window.lab.progress.journal.read());
+    check('Escape closes the sketch, then the journal stays open', v2.open && v2.viewing === null);
+    await jp.keyboard.press('KeyJ'); await jp.waitForTimeout(250);
+    check('J closes the journal', !(await jp.evaluate(() => window.lab.progress.journal.read().open)));
+    // the World section's progress controls
+    await jp.keyboard.press('Escape'); await jp.waitForTimeout(400);
+    await jp.evaluate(() => document.querySelector('#menu-tab-world').click());
+    await jp.waitForTimeout(200);
+    const named = [];
+    for (let k = 0; k < 40; k++) { await jp.keyboard.press('Tab'); named.push(await focusName(jp)); }
+    const wanted = ['copy a backup as text', 'paste a backup here', 'restore from this text', 'clear progress'];
+    check('Tab reaches the save line\'s controls in World', wanted.every((w) => named.some((n) => n && n.includes(w))), wanted.filter((w) => !named.some((n) => n && n.includes(w))).join(', '));
+    const line = await jp.evaluate(() => document.querySelector('#menu .saveline').textContent);
+    check('the save line says what is saved for this world', /places found.*(people|person) met.*sketch.*favours? done/.test(line), line);
+    const fitW = await jp.evaluate(() => { const b = document.querySelector('#menu .pane'); return b.scrollWidth <= b.clientWidth && document.documentElement.scrollWidth <= innerWidth; });
+    check('the World section fits at 1024 x 640 with no sideways scrolling', fitW);
+    const emo = await jp.evaluate(() => /\p{Extended_Pictographic}/u.test(document.querySelector('#menu').innerText + document.querySelector('#talk').innerText + document.querySelector('#card').innerText));
+    check('no emoji in the menu, the exchange or the start card', !emo);
+    await J.check();
+    await J.ctx.close();
+  }
 
   console.log(`menu check: ${results.filter((r) => r.ok).length} of ${results.length} passed\n`);
   for (const r of results) console.log(`${r.ok ? 'pass' : 'FAIL'}  ${r.name}${r.detail ? `  (${r.detail})` : ''}`);

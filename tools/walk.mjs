@@ -67,6 +67,12 @@ const WALKS = [
   // the clock running an hour in the three minutes; they lift their heads,
   // then run for the trees
   { name: 'world-dawn-deer', world: true, deer: true, hour: 5.85, rate: 1 / 180, secs: 180 },
+  // phase 5a: ten minutes of a first session in real time, as a new player
+  // sees it: the start card, the villager coming up the road, the favour
+  // asked and taken, the journal, the walk to the one it is for, the
+  // favour done (and the lantern given), a sketch of the view, and the
+  // journal's sketches (the start card, the exchange and the journal shown)
+  { name: 'world-first-session', world: true, first: true, shown: true, secs: 600 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -78,8 +84,9 @@ try {
   for (const w of WALKS) {
     if (only ? !only.includes(w.name) : !DEFAULT.includes(w.name)) continue;
     const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, recordVideo: { dir: OUT, size: { width, height } } });
-    // (no menu, hint or start card in the video, phase 2b)
-    await ctx.addInitScript(() => { self.LAND_QUIET = true; });
+    // (no menu, hint or start card in the video, phase 2b; but the first
+    // session shows them, as a new player sees them)
+    if (!w.shown) await ctx.addInitScript(() => { self.LAND_QUIET = true; });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -91,7 +98,7 @@ try {
     else if (w.world) { if (a.seed) q.set('seed', String(a.seed)); } else q.set('lab', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-    await page.evaluate(async ({ cam, camName, hour, day, rate }) => {
+    if (!w.first) await page.evaluate(async ({ cam, camName, hour, day, rate }) => {
       await window.lab.ready;
       if (camName !== undefined) cam = window.lab.cameras.findIndex((c) => c.name.includes(camName));
       if (cam !== undefined) window.lab.camera(cam);
@@ -109,6 +116,7 @@ try {
     else if (w.village) await walkVillage(page, a.seed, w.secs);
     else if (w.flock !== undefined) await followFlock(page, w.flock, w.secs);
     else if (w.deer) await walkToDeer(page, a.seed, w.secs);
+    else if (w.first) await firstSession(page, a.seed, w.secs);
     else if (w.pan) {
       // turn at a steady rate, one step each display refresh
       await page.evaluate(({ secs, deg }) => new Promise((res) => {
@@ -479,4 +487,79 @@ async function walkToDeer(page, seed, secs) {
     const step = () => { const t = Math.min(1, (performance.now() - t0) / (secs * 1000)); L.face(y0 - 50 + 100 * t * t * (3 - 2 * t)); if (t < 1) requestAnimationFrame(step); else res(); };
     step();
   }), { secs: left });
+}
+
+// (phase 5a) A first session, in real time: the start card for a few
+// seconds; a click; a look up the road to the villager coming to meet you;
+// up to them, greet (E) and take the favour (E); a look in the journal (J);
+// the walk to the one it is for, by the roads and the people's own way to
+// where they are (worked out in Node from the same world), greeting them
+// there (E, and on through the pages: the favour done, the lantern, and
+// their own favour, taken); a sketch of the view (K); the journal's
+// sketches; and a slow look round to fill the time.
+async function firstSession(page, seed, secs) {
+  const { generateWorld, DEFAULT_SEED } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const { buildPeople, routeOf } = await import('../src/world/people/people.js');
+  const { placesOf } = await import('../src/game/places.js');
+  const { buildFavours } = await import('../src/game/favours.js');
+  const gen = generateWorld(seed !== undefined ? Number(seed) : DEFAULT_SEED); let r; while (!(r = gen.next()).done);
+  const w = unpackWorld(packWorld(r.value)), P = buildPeople(w), F = buildFavours(w, P, placesOf(w));
+  const f0 = F.list.find((f) => f.id === F.first), m = F.meet, du = F.usual.get(f0.dest);
+  const R = routeOf(P, m.spot.place, du.place);
+  const way = []; for (let i = 0; i < R.n; i += 4) way.push([R.x[i], R.z[i]]); way.push([R.x[R.n - 1], R.z[R.n - 1]]);
+  console.log(`world-first-session: ${P.persons[m.person].name} meets you; the favour is for ${P.persons[f0.dest].name}, ${Math.round(R.len)} m off`);
+  const t0 = Date.now(), sec = () => (Date.now() - t0) / 1000;
+  const ease = (deg, ms) => page.evaluate(({ deg, ms }) => new Promise((res) => { const L = window.lab, y0 = L.state().yaw, t1 = performance.now(), d = ((deg - y0 + 540) % 360) - 180; const step = () => { const t = Math.min(1, (performance.now() - t1) / ms); L.face(y0 + d * t * t * (3 - 2 * t)); if (t < 1) requestAnimationFrame(step); else res(); }; step(); }), { deg, ms });
+  // a person's place now, and the yaw toward them
+  const who = (i) => page.evaluate((i) => { const L = window.lab, p = L.people.list()[i], s = L.state(); return { x: p.x, z: p.z, yaw: Math.atan2(p.x - s.x, p.z - s.z) * 180 / Math.PI, d: Math.hypot(p.x - s.x, p.z - s.z), hour: s.hour }; }, i);
+  // walk up to person i, until 1.8 m off, facing them
+  const upTo = async (i, limit) => {
+    await page.keyboard.down('KeyW');
+    const t1 = Date.now();
+    for (;;) {
+      const q = await who(i);
+      if (q.d < 1.9 || (Date.now() - t1) / 1000 > limit) break;
+      await page.evaluate((y) => window.lab.face(y), q.yaw);
+      await page.waitForTimeout(50);
+    }
+    await page.keyboard.up('KeyW');
+    await ease((await who(i)).yaw, 600);
+  };
+  const press = async (k, wait) => { await page.keyboard.press(k); await page.waitForTimeout(wait); };
+  // the start card, then a click
+  await page.waitForTimeout(5000);
+  await page.mouse.click(720, 450);
+  await page.waitForTimeout(1500);
+  // a look toward the road and the one coming
+  await ease((await who(m.person)).yaw, 2500);
+  await page.waitForTimeout(3000);
+  // (wait until they are at the road's edge, watching them come)
+  for (let k = 0; k < 120; k++) { const q = await who(m.person); if (q.hour >= m.arrive + 0.002) break; await page.evaluate((y) => window.lab.face(y), q.yaw); await page.waitForTimeout(500); }
+  await upTo(m.person, 30);
+  await press('KeyE', 7000);          // the exchange: read it
+  await press('KeyE', 3500);          // yes
+  await press('KeyE', 600);
+  await press('KeyJ', 6000);          // the journal: the favour, its words
+  await press('KeyJ', 800);
+  // the walk, then to them
+  await page.evaluate(({ x, z }) => window.lab.face(Math.atan2(x - window.lab.state().x, z - window.lab.state().z) * 180 / Math.PI), { x: way[2][0], z: way[2][1] });
+  await page.keyboard.down('KeyW');
+  await follow(page, way, 5, Math.max(60, secs - sec() - 150));
+  await page.keyboard.up('KeyW');
+  console.log(`  at the end of the way after ${sec().toFixed(0)} s`);
+  await upTo(f0.dest, 40);
+  await press('KeyE', 5000);          // the favour done
+  for (let k = 0; k < 3; k++) await press('KeyE', 5000);   // the lantern; their own favour; yes
+  await page.waitForTimeout(2000);
+  // a sketch of the view: turned away from them, toward the open land
+  await ease((await page.evaluate(() => window.lab.state().yaw)) + 150, 3000);
+  await press('KeyK', 3000);
+  await press('KeyJ', 1200);
+  await page.evaluate(() => window.lab.progress.journal.tab('sketches'));
+  await page.waitForTimeout(5000);
+  await press('KeyJ', 800);
+  console.log(`  favour done and sketched after ${sec().toFixed(0)} s`);
+  const left = Math.max(5, secs - sec());
+  await page.evaluate(({ secs }) => new Promise((res) => { const L = window.lab, y0 = L.state().yaw, t1 = performance.now(); const step = () => { const t = Math.min(1, (performance.now() - t1) / (secs * 1000)); L.face(y0 + 200 * t * t * (3 - 2 * t)); if (t < 1) requestAnimationFrame(step); else res(); }; step(); }), { secs: left });
 }

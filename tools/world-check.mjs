@@ -63,8 +63,21 @@
 // 13. (phase 4b) the wild ground detail: no boulder, outcrop, log, stump or
 //     reed bed on a road or a footpath, nor near a door, the fort's gate, a
 //     bridge's or a jetty's end (and the people's routes are walked again in 11).
+// 14. (phase 5a) wayfaring: every favour's giver, the one it is for and the
+//     lost thing exist and can be reached on foot from the giver (the
+//     people's routes, under the player's rules); everyone a favour is for
+//     (and every giver one comes back to) can be met for at least two hours
+//     of each of 28 days; no lost thing lies inside a shape, in water or on
+//     a road or path; every place the journal lists can be found by walking
+//     to it (a node reached from the spawn within its distance, with sight
+//     of it); the first favour's giver reaches the spawn's road within two
+//     game minutes of the start, by a way that can be walked, and stands at
+//     its edge clear of the spawn; and a scripted player who knows only the
+//     words (tools/lib/reader.mjs) does one favour of each kind, in four to
+//     twelve minutes' walking each.
 //
 //   node tools/world-check.mjs [--seeds 1,2,3,4,5] [--points 300] [--road 50] [--out file.json]
+//   node tools/world-check.mjs --way-only [--seeds ...] [--sweep 60]   (phase 5a) wayfaring's checks alone
 //   node tools/world-check.mjs --fort-only --sweep 60 [--from 1000]   (phase 3a) the fort's
 //         checks (8) alone on sixty random seeds
 import fs from 'node:fs';
@@ -92,6 +105,9 @@ import { buildAnimals } from '../src/world/animals/build.js';
 import { animalsAt } from '../src/world/animals/state.js';
 import { settle, overlap } from '../src/world/animals/meet.js';
 import { AS, A as AI, APOSE, KIND as AK, SPEC, KIND_NAMES } from '../src/world/animals/kinds.js';
+import { placesOf, sightLine } from '../src/game/places.js';
+import { buildFavours, favourWords, START_DAY, START_HOUR } from '../src/game/favours.js';
+import { playFavour } from './lib/reader.mjs';
 
 const a = args();
 // (the default seed and four others: 3, 1, 2, 4, 5)
@@ -1014,6 +1030,139 @@ function wildChecks(w) {
   out.ok = !out.fails.length;
   return out;
 }
+// 14. (phase 5a) Wayfaring.
+function wayChecks(w) {
+  const t0 = performance.now();
+  const P = buildPeople(w), places = placesOf(w), fav = buildFavours(w, P, places), p = P.p;
+  const out = { favours: fav.list.length, kinds: { carry: 0, find: 0, tell: 0 }, chains: fav.list.filter((f) => f.parent).length, fails: [], places: places.list.length };
+  for (const f of fav.list) out.kinds[f.kind]++;
+  const T = w.terrain, NN = w.NN;
+  const fail = (m) => out.fails.push(m);
+  // the first meeting
+  const m = fav.meet;
+  if (!m) fail('no first meeting');
+  else {
+    const rd = w.roads[0], dRoad = Math.min(...Array.from({ length: rd.n }, (_, i) => Math.hypot(rd.x[i] - m.spot.x, rd.z[i] - m.spot.z)));
+    out.meet = { person: P.persons[m.person].name, role: P.persons[m.person].role, minutes: +((m.arrive - START_HOUR) * 60).toFixed(2), walk: Math.round(m.rin.len), back: Math.round(m.rout.len),
+      fromRoad: +dRoad.toFixed(2), fromSpawn: +Math.hypot(m.spot.x - w.start.x, m.spot.z - w.start.z).toFixed(1), waits: +((m.leave - m.arrive) * 60).toFixed(0) };
+    if (out.meet.minutes > 2) fail(`the first giver reaches the road ${out.meet.minutes} min after the start`);
+    if (dRoad < 1.2 || dRoad > 2.6) fail(`the first giver stands ${dRoad.toFixed(2)} m from the road's middle`);
+    if (out.meet.fromSpawn < 15) fail('the first giver stands on the spawn');
+    // (their way out walked again by the move rule, and the spot clear)
+    for (const R of [m.rin, m.rout]) {
+      let x = R.x[0], z = R.z[0], ft = R.y[0];
+      for (let k = 1; k < R.n; k++) {
+        const L = Math.hypot(R.x[k] - x, R.z[k] - z);
+        if (L < 1e-6) continue;
+        const r = P.move(x, z, ft, (R.x[k] - x) / L, (R.z[k] - z) / L, L);
+        if (!r) { if (k >= R.n - 3 || k <= 3) { x = R.x[k]; z = R.z[k]; ft = R.y[k]; continue; } fail(`the first giver's way stops at ${R.x[k].toFixed(1)},${R.z[k].toFixed(1)}`); break; }
+        [x, z, ft] = r;
+      }
+    }
+    if (p.blocked(m.spot.x, m.spot.z, m.spot.ft)) fail('the first giver stands inside something');
+    if (!fav.first) fail('no first favour');
+  }
+  // every favour: the people, the thing, the ways
+  const usual = fav.usual;
+  const fromOf = (f) => (f.first ? m.spot.place : usual.get(f.giver).place);
+  out.lens = [];
+  for (const f of fav.list) {
+    if (!P.persons[f.giver]) { fail(`${f.id}: no giver`); continue; }
+    if (!f.first && !usual.get(f.giver)) fail(`${f.id}: the giver has no usual place`);
+    const a = fromOf(f);
+    if (f.dest !== undefined) {
+      const du = usual.get(f.dest);
+      if (!du) { fail(`${f.id}: the one it is for has no usual place`); continue; }
+      const r = routeOf(P, a, du.place);
+      if (!r) fail(`${f.id}: ${P.persons[f.dest].name} cannot be reached from the giver`);
+      else out.lens.push(Math.round(r.len));
+      if (f.kind === 'tell' && !routeOf(P, du.place, a)) fail(`${f.id}: no way back to the giver`);
+    } else {
+      const s2 = f.spot;
+      const r = routeOf(P, a, s2.place), b = routeOf(P, s2.place, a);
+      if (!r || !b) fail(`${f.id}: the lost thing cannot be reached`); else out.lens.push(Math.round(r.len));
+      // (not in a shape, in water, or on a road or path)
+      const ft = p.supportAt(s2.x, s2.z, groundAt(T, s2.x, s2.z) + 0.3), j = Math.round(s2.z) * NN + Math.round(s2.x);
+      if (p.blocked(s2.x, s2.z, ft)) fail(`${f.id}: the lost thing is inside a shape`);
+      if (T.wWater[j] > 20 || w.terrain.levels[0].H[j] - T.ground[j] > 0.05) fail(`${f.id}: the lost thing is in water`);
+      if ((T.wRoad && T.wRoad[j] > 20) || (T.wPath && T.wPath[j] > 20)) fail(`${f.id}: the lost thing is on a road or path`);
+    }
+  }
+  // everyone a favour is for, and every giver, met for two hours each day
+  const DAYS = 28, least = [];
+  const who = new Set([...fav.list.filter((f) => f.dest !== undefined).map((f) => f.dest), ...fav.list.filter((f) => !f.first).map((f) => f.giver)]);
+  let worst = Infinity;
+  for (const i of who) {
+    for (let d = 0; d < DAYS; d++) {
+      let hrs = 0;
+      for (const sg of planOf(P, i, d)) if (sg.kind === 'stay' && sg.pose !== POSE.HIDDEN && sg.pose !== POSE.SLEEP) hrs += sg.t1 - sg.t0;
+      if (hrs < worst) worst = hrs;
+      if (hrs < 2) least.push(`${P.persons[i].name} day ${d}: ${hrs.toFixed(2)} h`);
+    }
+  }
+  out.meetable = { people: who.size, days: DAYS, least: +worst.toFixed(2), short: least };
+  for (const x of least) fail(`can be met for under two hours: ${x}`);
+  // every place the journal lists can be found by walking to it
+  const G = T.ground, S2 = T.levels[0].H, N = w.N, ok = new Uint8Array(NN * NN);
+  for (let j = 0; j < NN * NN; j++) { const i = j % NN, k = (j - i) / NN; if (i < 1 || k < 1 || i > N - 1 || k > N - 1) continue; ok[j] = 1; }
+  const seen = new Uint8Array(NN * NN), q = new Int32Array(NN * NN);
+  let h = 0, tq = 0; const s0 = Math.round(w.start.z) * NN + Math.round(w.start.x); seen[s0] = 1; q[tq++] = s0;
+  const nb = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [-1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+  while (h < tq) { const j = q[h++]; for (const [dx, dz, dd] of nb) { const m2 = j + dz * NN + dx; if (seen[m2] || !ok[m2]) continue; if (G[m2] - G[j] > SCALE.climb * dd && S2[m2] - G[m2] < 0.05) continue; seen[m2] = 1; q[tq++] = m2; } }
+  out.found = [];
+  for (const pl of places.list) {
+    let yes = false;
+    for (const pt of pl.at) {
+      for (const fr of [0, 0.3, 0.6, 0.9]) {
+        for (let a = 0; a < (fr ? 24 : 1) && !yes; a++) {
+          const x = Math.round(pt[0] + Math.cos(a * Math.PI / 12) * pl.D * fr), z = Math.round(pt[1] + Math.sin(a * Math.PI / 12) * pl.D * fr);
+          if (x < 1 || z < 1 || x > N - 1 || z > N - 1 || !seen[z * NN + x]) continue;
+          const eye = Math.max(G[z * NN + x], S2[z * NN + x] - 1.55) + 1.7;
+          if (Math.hypot(pt[0] - x, pt[1] - z) < 6 || sightLine(w, x, z, eye, pt[0], pt[1], pt[2])) yes = true;
+        }
+        if (yes) break;
+      }
+      if (yes) break;
+    }
+    out.found.push([pl.id, yes]);
+    if (!yes) fail(`${pl.title} cannot be found by walking to it`);
+  }
+  // the scripted player: one favour of each kind, from the words alone
+  out.play = [];
+  for (const kind of ['carry', 'find', 'tell']) {
+    const fst = fav.first ? fav.list.find((x) => x.id === fav.first) : null;
+    const f = (fst && fst.kind === kind ? fst : null) || fav.list.find((x) => x.kind === kind);
+    if (!f) { fail(`no ${kind} favour`); continue; }
+    const words = favourWords(f, P, usual, 2);
+    const start = fromOf(f), sx = P.places[start];
+    const lake = (places.list.find((x) => x.kind === 'lake') || { at: [] }).at;
+    const r = playFavour(w, P, places.names, f, words, start, { x: sx.x, z: sx.z }, START_DAY, lake);
+    out.play.push({ id: f.id, kind, ok: r.ok, why: r.why, minutes: +r.minutes.toFixed(2), metres: r.metres, wrong: r.legs.filter((l) => /wrong|to (?!the)/.test(l.why)).length, read: r.read, words });
+    if (!r.ok) fail(`the scripted player could not do ${f.id} (${kind}): ${r.why}`);
+    else if (r.minutes < 4 || r.minutes > 12) fail(`${f.id} (${kind}) took ${r.minutes.toFixed(1)} min of walking`);
+  }
+  // (and every other favour's words too: each must be enough to do it)
+  out.every = { done: 0, of: 0, minutes: [] };
+  for (const f of fav.list) {
+    const words = favourWords(f, P, usual, 2), start = fromOf(f), sx = P.places[start];
+    const lake = (places.list.find((x) => x.kind === 'lake') || { at: [] }).at;
+    const r = playFavour(w, P, places.names, f, words, start, { x: sx.x, z: sx.z }, START_DAY, lake);
+    out.every.of++;
+    if (r.ok) { out.every.done++; out.every.minutes.push(+r.minutes.toFixed(2)); } else fail(`the words of ${f.id} (${f.kind}) are not enough: ${r.why}`);
+  }
+  out.ms = Math.round(performance.now() - t0);
+  out.ok = !out.fails.length;
+  return out;
+}
+function printWay(seed, wy) {
+  console.log(`  wayfaring: ${wy.ok ? 'pass' : 'FAIL'} in ${wy.ms} ms; ${wy.favours} favours (carry ${wy.kinds.carry}, find ${wy.kinds.find}, tell ${wy.kinds.tell}; ${wy.chains} follow another), ${wy.places} places, ${wy.found.filter((x) => x[1]).length} findable`);
+  if (wy.meet) console.log(`    first meeting: ${wy.meet.person} (${wy.meet.role}) on the road ${wy.meet.minutes} min after the start, ${wy.meet.walk} m out, waits ${wy.meet.waits} min, ${wy.meet.fromRoad} m off the road's middle, ${wy.meet.fromSpawn} m from the spawn`);
+  console.log(`    met for two hours a day: ${wy.meetable.people} people over ${wy.meetable.days} days, the least ${wy.meetable.least} h`);
+  for (const pl of wy.play) console.log(`    scripted player, ${pl.kind} ${pl.id}: ${pl.ok ? `${pl.minutes} min walking (${pl.metres} m)` : `FAILED: ${pl.why}`}`);
+  if (wy.every) console.log(`    every favour from its words alone: ${wy.every.done} of ${wy.every.of}, ${Math.min(...wy.every.minutes).toFixed(1)} to ${Math.max(...wy.every.minutes).toFixed(1)} min`);
+  for (const f of wy.fails.slice(0, 12)) console.log(`    ! ${f}`);
+}
+
 function printAnimals(seed, ac, wc) {
   const s2 = ac.samples;
   console.log(`  animals: ${ac.ok ? 'ok' : 'FAIL'}, ${Object.entries(ac.counts).map(([k, v]) => `${v} ${k}`).join(', ')} in ${ac.groups} groups${ac.missing.length ? `; MISSING: ${ac.missing.join('; ')}` : '; every village with its flocks, folds, shepherd, hens and dog'}`);
@@ -1049,6 +1198,25 @@ function printFort(seed, ft) {
   console.log(`  random walks: ${ft.walks.attempts}, through a wall ${ft.walks.through}, stuck ${ft.walks.stuck}, inside stone ${ft.walks.inside}${ft.walks.examples.length ? ` e.g. ${JSON.stringify(ft.walks.examples)}` : ''}`);
 }
 
+if (a['way-only']) {
+  // (phase 5a) wayfaring's checks alone, on the given seeds or a sweep
+  const list = a.sweep ? Array.from({ length: Number(a.sweep) }, (_, i) => Number(a.from || 1000) + i * 7919 % 100000) : seeds;
+  const rows = [];
+  for (const seed of list) {
+    let wy = null, err = null;
+    try { wy = wayChecks(unpackWorld(packWorld(build(seed)))); } catch (e) { err = String(e.stack || e); }
+    rows.push({ seed, wy, err });
+    if (err) { console.log(`seed ${seed}: FAIL ${err}`); continue; }
+    console.log(`seed ${seed}: ${wy.ok ? 'PASS' : 'FAIL'}`);
+    if (!wy.ok || a.detail || !a.sweep) printWay(seed, wy);
+  }
+  const Q = rows.filter((r) => r.wy), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0);
+  const plays = Q.flatMap((r) => r.wy.play);
+  console.log(`\n${Q.filter((r) => r.wy.ok).length} of ${rows.length} seeds pass wayfaring's checks; ${sum((r) => r.wy.favours)} favours (carry ${sum((r) => r.wy.kinds.carry)}, find ${sum((r) => r.wy.kinds.find)}, tell ${sum((r) => r.wy.kinds.tell)}); places ${sum((r) => r.wy.places)}, findable ${sum((r) => r.wy.found.filter((x) => x[1]).length)}; first meeting at most ${Math.max(...Q.map((r) => (r.wy.meet ? r.wy.meet.minutes : 99)))} min after the start; the least time to meet someone in a day ${Math.min(...Q.map((r) => r.wy.meetable.least))} h; scripted player ${plays.filter((x) => x.ok).length} of ${plays.length} done, ${Math.min(...plays.filter((x) => x.ok).map((x) => x.minutes)).toFixed(1)} to ${Math.max(...plays.filter((x) => x.ok).map((x) => x.minutes)).toFixed(1)} min; every favour from its words ${sum((r) => r.wy.every.done)} of ${sum((r) => r.wy.every.of)}, ${Math.min(...Q.flatMap((r) => r.wy.every.minutes)).toFixed(1)} to ${Math.max(...Q.flatMap((r) => r.wy.every.minutes)).toFixed(1)} min`);
+  fs.mkdirSync(path.join(ROOT, 'shots', 'world-check'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'shots', 'world-check', `way-${a.sweep ? `sweep-${list.length}` : list.join('-')}.json`), JSON.stringify(rows, null, 1));
+  process.exit(rows.every((r) => r.wy && r.wy.ok) ? 0 : 1);
+}
 if (a['animals-only']) {
   // (phase 4b) the animals' and the wild ground detail's checks alone
   let all = true;
@@ -1067,19 +1235,24 @@ if (a['fort-only']) {
   const rows = [];
   for (const seed of list) {
     let ft, vc, err = null;
-    let pc = null, ac = null, wc = null;
-    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); pc = peopleChecks(w); ac = animalChecks(w); wc = wildChecks(w); } catch (e) { err = String(e.stack || e); }
-    rows.push({ seed, ft, vc, pc, ac, wc, err, approach: null });
+    let pc = null, ac = null, wc = null, wy = null;
+    try { const w = unpackWorld(packWorld(build(seed))); ft = fortChecks(w); vc = villageChecks(w); pc = peopleChecks(w); ac = animalChecks(w); wc = wildChecks(w); wy = wayChecks(w); } catch (e) { err = String(e.stack || e); }
+    rows.push({ seed, ft, vc, pc, ac, wc, wy, err, approach: null });
     if (err) console.log(`seed ${seed}: FAIL ${err}`); else {
-      console.log(`seed ${seed}: ${ft.ok && vc.ok && pc.ok && ac.ok && wc.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}${pc.ok ? '' : ' (the people)'}${ac.ok ? '' : ' (the animals)'}${wc.ok ? '' : ' (the wild ground detail)'}`);
+      console.log(`seed ${seed}: ${ft.ok && vc.ok && pc.ok && ac.ok && wc.ok && wy.ok ? 'PASS' : 'FAIL'}${ft.ok ? '' : ' (the fort)'}${vc.ok ? '' : ' (the villages)'}${pc.ok ? '' : ' (the people)'}${ac.ok ? '' : ' (the animals)'}${wc.ok ? '' : ' (the wild ground detail)'}${wy.ok ? '' : ' (wayfaring)'}`);
+      if (!wy.ok || a.detail) printWay(seed, wy);
       if (!ft.ok || a.detail) printFort(seed, ft);
       if (!vc.ok || a.detail) printVillages(seed, vc);
       if (!pc.ok || a.detail) printPeople(seed, pc);
       if (!ac.ok || !wc.ok || a.detail) printAnimals(seed, ac, wc);
     }
   }
-  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok && r.pc && r.pc.ok && r.ac && r.ac.ok && r.wc && r.wc.ok).length;
-  console.log(`\n${okN} of ${rows.length} seeds pass the fort's, the villages', the people's, the animals' and the wild ground detail's checks`);
+  const okN = rows.filter((r) => r.ft && r.ft.ok && r.vc && r.vc.ok && r.pc && r.pc.ok && r.ac && r.ac.ok && r.wc && r.wc.ok && r.wy && r.wy.ok).length;
+  console.log(`\n${okN} of ${rows.length} seeds pass the fort's, the villages', the people's, the animals', the wild ground detail's and wayfaring's checks`);
+  {
+    const Q = rows.filter((r) => r.wy), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0), plays = Q.flatMap((r) => r.wy.play);
+    console.log(`wayfaring: ${sum((r) => r.wy.favours)} favours on ${Q.length} seeds; fails ${sum((r) => r.wy.fails.length)}; places findable ${sum((r) => r.wy.found.filter((x) => x[1]).length)} of ${sum((r) => r.wy.places)}; scripted player ${plays.filter((x) => x.ok).length} of ${plays.length}; every favour from its words ${sum((r) => r.wy.every.done)} of ${sum((r) => r.wy.every.of)}`);
+  }
   {
     const Q = rows.filter((r) => r.ac), sum = (f) => Q.reduce((s2, r) => s2 + f(r), 0);
     console.log(`animals: ${sum((r) => Object.values(r.ac.counts).reduce((x, y) => x + y, 0))} on ${Q.length} seeds; missing kinds or village animals on ${Q.filter((r) => r.ac.missing.length).length}; ${sum((r) => r.ac.samples.samples)} positions sampled: inside a shape ${sum((r) => r.ac.samples.inside)}, too close ${sum((r) => r.ac.samples.overlap)}, in water ${sum((r) => r.ac.samples.water)}, out of place ${sum((r) => r.ac.samples.outside)}, out of the fold at night ${sum((r) => r.ac.samples.unfolded)}; walker ${sum((r) => r.ac.walker.ok)} of ${sum((r) => r.ac.walker.groups)}; same from a fresh start on ${Q.filter((r) => r.ac.same).length} of ${Q.length}; wild detail fails ${rows.filter((r) => r.wc).reduce((s2, r) => s2 + r.wc.fails.length, 0)}`);
@@ -1121,7 +1294,9 @@ for (const seed of seeds) {
   // (phase 4b) the animals' (12) and the wild ground detail's (13)
   r.ani = animalChecks(w);
   r.wild = wildChecks(w);
-  r.ok = r.ani.ok && r.wild.ok && r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok && r.ppl.ok;
+  // (phase 5a) wayfaring's (14)
+  r.way = wayChecks(w);
+  r.ok = r.way.ok && r.ani.ok && r.wild.ok && r.same && r.reach.sites.every((s) => s.ok) && r.roads.ok && r.rivers.every((v) => v.ok) && r.trees.ok && r.sky.ok && r.far.ok && r.villages === 3 && r.viewpoints === 4 && r.fort.ok && r.vil.ok && r.vread.ok && r.ppl.ok;
   results.push(r);
   const pc = (x) => `${(100 * x).toFixed(1)}%`;
   console.log(`seed ${seed}: ${r.ok ? 'PASS' : 'FAIL'}  build ${r.buildMs} ms, hash ${h1} ${r.same ? '(same twice)' : `!= ${h2}`}`);
@@ -1138,6 +1313,7 @@ for (const seed of seeds) {
   printVillages(seed, r.vil);
   printPeople(seed, r.ppl);
   printAnimals(seed, r.ani, r.wild);
+  printWay(seed, r.way);
   console.log(`  villages from the viewpoints: ${r.vread.villages.map((x) => x.viewpoint ? `village ${x.village} (${x.pattern}) from viewpoint ${x.viewpoint}, ${x.dist} m: step ${x.step}${x.step > STEP ? '' : ' TOO FAINT'}, ${x.lights} light cells at night${x.lights >= 2 ? '' : ' (TOO FEW)'}` : `village ${x.village}: ${x.note}`).join('; ')}`);
 }
 const out = a.out || path.join(ROOT, 'shots', 'world-check', `world-check-${seeds.join('-')}.json`);
