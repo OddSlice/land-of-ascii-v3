@@ -810,7 +810,7 @@ function peopleChecks(w) {
     litGroups(P, d, hour, lit);
     for (const V of P.villages) for (const H of V.houses) {
       const res = P.persons.filter((q) => q.village === V.q && q.home === H.k);
-      const awake = res.some((q) => { const sg = segmentAt(planOf(P, q.id, d), hour); return sg.kind === 'stay' && sg.pose !== POSE.SLEEP && ['closed', 'sit', 'in', 'hearth'].includes(P.places[sg.at].kind); });
+      const awake = res.some((q) => { const sg = segmentAt(planOf(P, q.id, d), hour); return sg.kind === 'stay' && sg.pose !== POSE.SLEEP && !sg.act.startsWith('asleep') && ['closed', 'sit', 'in', 'hearth'].includes(P.places[sg.at].kind); });
       const dark = hour >= 16.5 || hour < 9;
       if (lit[H.group] && !awake) bad.lit++;
       if (!lit[H.group] && awake && dark) bad.lit++;

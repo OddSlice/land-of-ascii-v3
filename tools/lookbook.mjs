@@ -238,7 +238,7 @@ async function regress() {
   console.log(`compared with the set saved ${index.saved} (density ${index.density})\n`);
   console.log('| frame | cells changed | visibly changed (glyph, or a colour step over 6 levels) |');
   console.log('|---|---|---|');
-  let worst = 0;
+  let worst = 0; let compared = 0, same = 0;
   for (const f of frames) {
     const e = index.frames.find((x) => x.name === f.name);
     if (!e || e.cols !== f.cols || e.rows !== f.rows) { console.log(`| ${f.name} | not comparable (no saved frame of this size) | |`); process.exitCode = 1; continue; }
@@ -253,9 +253,10 @@ async function regress() {
     }
     const n = f.data.length / 8;
     worst = Math.max(worst, ch / n);
-    console.log(`| ${f.name} | ${(100 * ch / n).toFixed(2)}% | ${(100 * vis / n).toFixed(2)}% |`);
+    compared++; if (!ch) same++;
+    console.log(`| ${f.name} | ${(100 * ch / n).toFixed(2)}%${ch ? ` (${ch} cells)` : ''} | ${(100 * vis / n).toFixed(2)}%${vis ? ` (${vis} cells)` : ''} |`);
   }
-  console.log(`\nlargest change: ${(100 * worst).toFixed(2)}% of a frame's cells`);
+  console.log(`\nlargest change: ${(100 * worst).toFixed(2)}% of a frame's cells; ${same} of ${compared} comparable frames identical cell for cell`);
   if (a.why) await why(frames, index, saved);
 }
 
@@ -1152,8 +1153,9 @@ async function phase4a() {
       await lab.page.evaluate(async (set) => {
         const L = window.lab;
         L.setWeather(set.weather || 'fair');
-        L.freeze(set.hour, 12.5, set.day || 0);
+        // (the camera first: choosing one sets its own hour)
         if (set.free) L.setCamera(set.free); else if (set.cam !== undefined) L.camera(set.cam);
+        L.freeze(set.hour, 12.5, set.day || 0);
         await L.whenIdle();
         if (set.who !== undefined) { L.people.goTo(set.who, set.dist); await L.whenIdle(); }
         await L.whenIdle();

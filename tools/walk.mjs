@@ -4,7 +4,7 @@
 // road (`world-road`, the default seed or --seed). The videos go to
 // shots/walks/, which is kept out of git.
 //
-//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village] [--threads 8] [--density 4] [--headed]
+//   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village,world-green-day,world-fort-night] [--threads 8] [--density 4] [--headed]
 //                       [--look cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to
@@ -48,6 +48,15 @@ const WALKS = [
   // nearest bridge), then a slow look round; from 17:40, the clock running
   // an hour every four minutes, so the lanterns and windows light on the way
   { name: 'world-village', world: true, village: true, hour: 17.67, rate: 1 / 240, secs: 240 },
+  // phase 4a: five minutes on the green from the green's own camera, from
+  // 04:30 before dawn to 21:30 after dark (the clock running 17 hours in
+  // five minutes): people coming out at dawn, the day's work and talk, the
+  // lanterns carried home at dusk, the windows lit and then dark
+  { name: 'world-green-day', world: true, camName: 'at midday', hour: 4.5, rate: 17 / 300, hold: 300 },
+  // and two minutes through the fort at night, in real time from 23:00: in
+  // at the gate past its guard, across the courtyard, up a stair and along
+  // the wall walk past the watch with their torches, back, and a look round
+  { name: 'world-fort-night', world: true, fort: true, night: true, hour: 23.0, rate: 1 / 3600, secs: 120 },
 ];
 const DEFAULT = ['lake', 'forest', 'stress-lake', 'ridge'];
 const only = a.only ? a.only.split(',') : null;
@@ -72,19 +81,21 @@ try {
     else if (w.world) { if (a.seed) q.set('seed', String(a.seed)); } else q.set('lab', '1');
     await page.goto(`${url}/?${q}`);
     await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-    await page.evaluate(async ({ cam, hour, day, rate }) => {
+    await page.evaluate(async ({ cam, camName, hour, day, rate }) => {
       await window.lab.ready;
+      if (camName !== undefined) cam = window.lab.cameras.findIndex((c) => c.name.includes(camName));
       if (cam !== undefined) window.lab.camera(cam);
       if (day !== undefined) window.lab.setDay(day);
       if (hour !== undefined) window.lab.setHour(hour);
       await window.lab.whenIdle();
       window.lab.unfreeze();
       window.lab.runClock(true, rate);
-    }, { cam: w.cam, hour: w.hour, day: w.day, rate: w.rate });
+    }, { cam: w.cam, camName: w.camName, hour: w.hour, day: w.day, rate: w.rate });
     const s0 = await page.evaluate(() => window.lab.state().presented);
     const t0 = Date.now();
     if (w.road) await followRoad(page, w.road);
-    else if (w.fort) await walkFort(page, a.seed);
+    else if (w.fort) await walkFort(page, a.seed, w.night ? w.secs : 0);
+    else if (w.hold) await page.waitForTimeout(w.hold * 1000);
     else if (w.village) await walkVillage(page, a.seed, w.secs);
     else if (w.pan) {
       // turn at a steady rate, one step each display refresh
@@ -158,7 +169,9 @@ async function followRoad(page, secs) {
 // waypoints. The heading is turned toward a point a little ahead each
 // frame (at most 180 degrees a second, as a mouse would), W held, Shift too
 // along the road but its last 40 m.
-async function walkFort(page, seed) {
+// (`night`: the seconds to fill, starting 40 m out on its road instead of at
+// the spawn, walking, and back along the wall walk after it)
+async function walkFort(page, seed, night = 0) {
   const { generateWorld, DEFAULT_SEED } = await import('../src/world/gen/world.js');
   const { packWorld, unpackWorld } = await import('../src/world/pack.js');
   const g = generateWorld(seed !== undefined ? Number(seed) : DEFAULT_SEED); let r; while (!(r = g.next()).done);
@@ -197,13 +210,31 @@ async function walkFort(page, seed) {
   // (running, but walking its last 40 m: the bend into the gate is sharp)
   let cut = road.length - 1, acc = 0;
   while (cut > 0 && acc < 40) { acc += Math.hypot(road[cut][0] - road[cut - 1][0], road[cut][1] - road[cut - 1][1]); cut--; }
-  await page.keyboard.down('KeyW');
-  await page.keyboard.down('ShiftLeft');
-  await follow(page, road.slice(0, cut + 1), 4, 260);
-  await page.keyboard.up('ShiftLeft');
+  const t0 = Date.now();
+  if (night) {
+    const [x0, z0] = road[cut], [x1, z1] = road[Math.min(road.length - 1, cut + 3)];
+    await page.evaluate(({ x, z, yaw }) => { window.lab.setCamera({ x, z, yaw, pitch: 0 }); }, { x: x0, z: z0, yaw: Math.atan2(x1 - x0, z1 - z0) * 180 / Math.PI });
+    await page.keyboard.down('KeyW');
+  } else {
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('ShiftLeft');
+    await follow(page, road.slice(0, cut + 1), 4, 260);
+    await page.keyboard.up('ShiftLeft');
+  }
   await follow(page, road.slice(cut), 2.5, 60);
   await follow(page, inside, 1.5, 120);
+  if (night) await follow(page, [...inside].reverse().slice(0, inside.length - 5), 1.5, 60);
   await page.keyboard.up('KeyW');
+  if (night) {
+    // a slow look round the courtyard from the wall walk till the time is up
+    const left = Math.max(5, night - (Date.now() - t0) / 1000);
+    await page.evaluate(({ secs }) => new Promise((res) => {
+      const L = window.lab, y0 = L.state().yaw, t1 = performance.now();
+      const step = () => { const t = (performance.now() - t1) / 1000; L.face(y0 + 120 * Math.min(1, t / secs)); if (t < secs) requestAnimationFrame(step); else res(); };
+      step();
+    }), { secs: left });
+    return;
+  }
   // look out over the parapet, slowly, for the last seconds
   await page.evaluate(({ out }) => new Promise((res) => {
     const L = window.lab, y0 = L.state().yaw, y1 = Math.atan2(out[0], out[1]) * 180 / Math.PI, t0 = performance.now();

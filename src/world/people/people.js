@@ -560,7 +560,9 @@ function finish(P, per, visits) {
   t = cur.to;
   for (let k = 1; k < visits.length; k++) {
     const v = visits[k];
-    if (v.at === cur.at) { segs[segs.length - 1].t1 = Math.max(segs[segs.length - 1].t1, v.to); if (v.pose !== segs[segs.length - 1].pose) { segs[segs.length - 1].t1 = Math.max(t, v.from); segs.push({ t0: segs[segs.length - 1].t1, t1: v.to, kind: 'stay', at: v.at, pose: v.pose, act: v.act }); } t = segs[segs.length - 1].t1; cur = v; continue; }
+    // (the same place again: one stay, unless the pose or what they are
+    // doing changes there: at home, then asleep behind the same door)
+    if (v.at === cur.at) { segs[segs.length - 1].t1 = Math.max(segs[segs.length - 1].t1, v.to); if (v.pose !== segs[segs.length - 1].pose || v.act !== segs[segs.length - 1].act) { segs[segs.length - 1].t1 = Math.max(t, v.from); segs.push({ t0: segs[segs.length - 1].t1, t1: v.to, kind: 'stay', at: v.at, pose: v.pose, act: v.act }); } t = segs[segs.length - 1].t1; cur = v; continue; }
     const route = routeOf(P, cur.at, v.at);
     if (!route) continue;
     const dur = route.len / per.speed / 3600;
@@ -860,7 +862,8 @@ export function litGroups(P, day, hour, out) {
   for (const per of P.persons) {
     if (per.village === undefined) continue;
     const seg = segmentAt(planOf(P, per.id, day), hour);
-    if (seg.kind !== 'stay' || seg.pose === POSE.SLEEP) continue;
+    // (asleep, in a bed one can see or behind closed doors, is dark)
+    if (seg.kind !== 'stay' || seg.pose === POSE.SLEEP || seg.act.startsWith('asleep')) continue;
     const pl = P.places[seg.at];
     if (pl.kind === 'closed' || pl.kind === 'sit' || pl.kind === 'in' || pl.kind === 'hearth') {
       const H = P.villages[per.village].houses[per.home];
