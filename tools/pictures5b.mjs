@@ -84,7 +84,7 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`${url}/index.html?seed=${seed}&quiet=1`);
+  await page.goto(`${url}/play.html?seed=${seed}&quiet=1`);
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await page.evaluate(async () => { await window.lab.ready; window.lab.setQuiet && window.lab.setQuiet(true); window.lab.setHud(false); window.lab.setDensity(3); await window.lab.whenIdle(); });
   const shot = async (name) => { const f = `${tag}-${name}.jpg`; await page.screenshot({ path: path.join(OUT, f), type: 'jpeg', quality: 88 }); console.log(`shots/phase5b/${f}`); };
@@ -172,10 +172,10 @@ try {
     // (a first visit, as a player has it: the first meeting on the road)
     const c2 = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
     const p2 = await c2.newPage();
-    await p2.goto(`${url}/index.html?seed=${seed}`);
+    await p2.goto(`${url}/play.html?seed=${seed}`);
     await p2.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
     await p2.evaluate(async () => { await window.lab.ready; await window.lab.whenIdle(); });
-    await p2.keyboard.press('Enter'); await p2.waitForTimeout(300);
+    await p2.evaluate(() => window.lab.titlePlay()); await p2.waitForTimeout(300);   // (phase 6: past the title screen)
     const ok = await p2.evaluate(async () => {
       const L = window.lab, m = L.progress.meet();
       if (!m) return false;

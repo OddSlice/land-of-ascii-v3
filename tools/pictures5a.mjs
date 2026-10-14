@@ -35,7 +35,7 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`${url}/${a.built ? 'index.html' : ''}?seed=${seed}`);
+  await page.goto(`${url}/${a.built ? 'play.html' : ''}?seed=${seed}`);
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await page.evaluate(async () => { await window.lab.ready; await window.lab.whenIdle(); await window.lab.whenIdle(); });
   const shot = async (name) => { await page.screenshot({ path: path.join(OUT, `${name}.jpg`), type: 'jpeg', quality: 86 }); console.log(`shots/phase5a/${name}.jpg`); };
@@ -75,6 +75,7 @@ try {
 
   // ---- the start: the card, the map unknown ----
   await shot('start-card');
+  await page.evaluate(() => window.lab.titlePlay && window.lab.titlePlay());   // (phase 6: past the title screen)
   await page.mouse.click(640, 400);
   await page.evaluate(() => { window.lab.menu.close(); window.lab.freeze(14.0, 0, 0); });
   await idle(3);

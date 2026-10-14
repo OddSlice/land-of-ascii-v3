@@ -725,14 +725,15 @@ async function phase2b() {
     {
       const lab = await openLab(browser, now.url, { built: !!a.built, scene: 'world', seed: 3, quiet: false, dpr: 1 });
       const { page } = lab;
-      await page.waitForTimeout(400);
+      // (phase 6: the title screen comes first, its panel forward after a second)
+      await page.waitForFunction(() => window.lab.titleState && window.lab.titleState().shown, null, { timeout: 10000 });
       const card = await pageShot(page);
       await page.keyboard.press('Enter');
       await page.waitForTimeout(400);
       const hint = await pageShot(page);
-      await page.waitForTimeout(4800);
+      await page.waitForTimeout(10400);
       const clean = await pageShot(page);
-      writeDataURL(path.join(OUT, 'screen.jpg'), await compose([card, hint, clean], ['the start card (first visit only)', 'the hint, for four seconds', 'the screen: the compact statistics only'], 'The game screen', 3, 0.42));
+      writeDataURL(path.join(OUT, 'screen.jpg'), await compose([card, hint, clean], ['the title screen', 'the hint, for ten seconds on a first walk', 'the screen: the compact statistics only'], 'The game screen', 3, 0.42));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(450);
       const secs = [];

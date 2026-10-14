@@ -22,15 +22,17 @@ const browser = await launch(name);
 const rows = [];
 const check = (what, ok, note = '') => { rows.push({ what, ok, note }); console.log(`${ok ? 'pass' : 'FAIL'}  ${what}${note ? `: ${note}` : ''}`); };
 
-async function open(ctx, s = seed) {
+// (phase 6: the title screen comes first; Play or Continue, unless `keep`)
+async function open(ctx, s = seed, keep = false, query = '') {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto(`${url}/${a.built ? 'index.html' : ''}?seed=${s}`);
+  await page.goto(`${url}/${a.built ? 'play.html' : ''}?seed=${s}${query}`);
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await page.evaluate(() => window.lab.ready);
   await page.evaluate(async () => { await window.lab.whenIdle(); });
+  if (!keep) await page.evaluate(() => window.lab.titlePlay());
   return { page, errors };
 }
 // what is saved, read back: the record and each sketch's cells
@@ -45,9 +47,10 @@ const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
 try {
   // ---- the scripted session ----
   const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  let { page, errors } = await open(ctxA);
-  const st = await page.evaluate(() => ({ card: window.lab.menu.read().card, meet: window.lab.progress.meet(), on: window.lab.progress.on }));
-  check('a first visit shows the start card and the first meeting', st.card && st.meet && st.meet.on, st.meet ? `${st.meet.name} comes to the road` : 'no meeting');
+  let { page, errors } = await open(ctxA, seed, true);
+  const st = await page.evaluate(() => ({ title: window.lab.titleState(), meet: window.lab.progress.meet(), on: window.lab.progress.on }));
+  check('a first visit shows the title screen with Play, and the first meeting', st.title.up && /^Play/.test(st.title.choices[0]) && st.meet && st.meet.on, st.meet ? `${st.title.choices[0]}; ${st.meet.name} comes to the road` : 'no meeting');
+  await page.evaluate(() => window.lab.titlePlay());
   await page.mouse.click(640, 400);
   const session = await page.evaluate(async () => {
     const L = window.lab, log = [];
@@ -95,13 +98,21 @@ try {
   const stored = await page.evaluate(() => window.lab.progress.stored());
   check('written to the browser\'s storage', !!stored, `${stored ? stored.length : 0} characters for the record`);
   // ---- 1. load again ----
+  const lastAt = await page.evaluate(() => { const s = window.lab.state(); return [s.x, s.z]; });
+  await page.evaluate(() => window.lab.progress.save());
   await page.reload();
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await page.evaluate(async () => { await window.lab.ready; await window.lab.whenIdle(); });
+  // (phase 6) the title says Continue, with the standing and where you were; Continue stands you there
+  const t2 = await page.evaluate(() => window.lab.titleState());
+  check('after loading again the title screen says Continue, with the standing and the last place', t2.up && /^Continue/.test(t2.choices[0]) && /a (stranger|wayfarer|friend|known|trusted)/.test(t2.choices[0]), t2.choices[0]);
+  await page.evaluate(() => window.lab.titlePlay());
+  const cAt = await page.evaluate(() => { const s = window.lab.state(); return [s.x, s.z]; });
+  check('Continue stands you where you left off', Math.hypot(cAt[0] - lastAt[0], cAt[1] - lastAt[1]) < 1.5, `${lastAt.map((v) => v.toFixed(1))} -> ${cAt.map((v) => v.toFixed(1))}`);
   const B = await snapshot(page);
   for (const k of ['found', 'met', 'favours', 'lantern', 'lit', 'sketches', 'seen', 'walked', 'first']) check(`after loading again: ${k}`, same(A.p[k], B.p[k]));
   check('after loading again: every sketch\'s cells', same(A.sk, B.sk), `${Object.keys(B.sk).length} sketches`);
-  check('after loading again: no first meeting, no start card', await page.evaluate(() => !window.lab.progress.meet().on && !window.lab.menu.read().card));
+  check('after loading again: no first meeting', await page.evaluate(() => !window.lab.progress.meet().on));
   const backup = await page.evaluate(() => window.lab.progress.backup());
   console.log(`  backup text: ${backup.length} characters, ${backup.split('\n').length} lines`);
   check('no page errors in the session', !errors.length, errors.join(' | ').slice(0, 200));
@@ -146,6 +157,25 @@ try {
   const back3 = await snapshot(p3);
   check('and the first world is kept', same(back3.p.favours, A.p.favours) && same(back3.sk, A.sk));
   await ctxA.close();
+  // ---- (phase 6) a shared link with a place and an hour opens there ----
+  {
+    const ctxE = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    const e = await open(ctxE, seed, true, '&at=700.5,1100.2,90&hour=16.5');
+    const up = await e.page.evaluate(() => window.lab.titleState().up);
+    await e.page.evaluate(() => window.lab.titlePlay());
+    const at = await e.page.evaluate(() => { const s = window.lab.state(); return { x: s.x, z: s.z, yaw: s.yaw, hour: s.hour }; });
+    const yawDeg = (at.yaw % 360 + 360) % 360;   // (lab.state gives degrees)
+    check('a shared link with a place and an hour opens there, after the title screen', up && Math.abs(at.x - 700.5) < 0.05 && Math.abs(at.z - 1100.2) < 0.05 && Math.abs(yawDeg - 90) < 0.5 && Math.abs(at.hour - 16.5) < 0.05,
+      `(${at.x.toFixed(1)}, ${at.z.toFixed(1)}), facing ${yawDeg.toFixed(0)}, ${at.hour.toFixed(2)} h`);
+    // and the link the World section makes for where you stand opens there too
+    await e.page.evaluate(() => window.lab.setCamera({ x: 812.3, z: 1013.7, yaw: 200 }));
+    const made = await e.page.evaluate(() => window.lab.shareLink(true));
+    const q = new URL(made).searchParams;
+    const e2 = await open(ctxE, seed, false, `&at=${q.get('at')}&hour=${q.get('hour')}`);
+    const at2 = await e2.page.evaluate(() => { const s = window.lab.state(); return { x: s.x, z: s.z }; });
+    check('the link Share this world makes, with the place, opens at that place', /seed=3/.test(made) && Math.hypot(at2.x - 812.3, at2.z - 1013.7) < 0.1, `${made.replace(/^.*\?/, '?')}`);
+    await ctxE.close();
+  }
   // ---- 3. no storage at all ----
   const ctxD = await browser.newContext({ viewport: { width: 1024, height: 640 } });
   await ctxD.addInitScript(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('storage is blocked'); } }); });

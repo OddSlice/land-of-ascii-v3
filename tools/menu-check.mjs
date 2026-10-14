@@ -57,23 +57,43 @@ async function tabTo(page, re, max = 80) {
   throw new Error(`no control matching ${re} within ${max} presses of Tab`);
 }
 const st = (page) => page.evaluate(() => ({ ...window.lab.state(), m: window.lab.menu.read(), hudText: document.getElementById('hud').textContent }));
+// (phase 6) the title screen: wait for its panel, then Play (or Continue) by the keyboard, as a player would
+const title = (page) => page.evaluate(() => window.lab.titleState());
+async function play(page) {
+  await page.waitForFunction(() => window.lab.titleState && window.lab.titleState() && window.lab.titleState().shown, null, { timeout: 8000 });
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(250);
+}
 
 try {
   // ---- a first visit ----
   const lab = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1440, height: 900, dpr: 1 });
   const { page } = lab;
-  await page.waitForTimeout(400);
+  // (phase 6) the title screen, over the world; a key while its panel fades in brings it forward at once
+  await page.reload();
+  await page.waitForFunction(() => window.lab && window.lab.titleState && window.lab.titleState() && window.lab.titleState().up, null, { timeout: 180000 });
+  const fading = !(await title(page)).shown;
+  await page.keyboard.press('Shift'); await page.waitForTimeout(60);
+  let t = await title(page);
+  check('the title screen shows on a visit; a key while its panel fades in brings it forward at once', t.up && t.shown, fading ? 'was fading' : 'already forward when checked');
+  check('the title screen\'s first choice, Play, has the keyboard; no statistics over it', /^Play/.test(t.focus) && (await page.evaluate(() => getComputedStyle(document.getElementById('hud')).visibility)) === 'hidden', t.focus);
+  check('the title screen\'s foot shows the version and the seed', /^version \S+ · seed 3/.test(t.foot), t.foot);
+  await page.keyboard.press('ArrowDown'); await page.waitForTimeout(50);
+  const down = (await title(page)).focus;
+  await page.keyboard.press('ArrowUp'); await page.waitForTimeout(50);
+  check('the arrow keys move between its choices', /^New world/.test(down) && /^Play/.test((await title(page)).focus), down);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   let s = await st(page);
-  check('the start card shows on a first visit', s.m.card);
-  check('the compact statistics show from the start: one line with the frame rate', s.m.hud === 'minimal' && s.hudText.split('\n').filter(Boolean).length === 1 && /fps/.test(s.hudText), JSON.stringify(s.hudText.trim()));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  check('Escape on the title screen opens nothing', (await title(page)).up && !s.m.open);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(300);
   s = await st(page);
-  check('Escape on the start card closes it and does not open the menu', !s.m.card && !s.m.open);
+  check('Enter on Play leaves the title screen; the compact statistics show: one line with the frame rate', !(await title(page)).up && s.m.hud === 'minimal' && s.hudText.split('\n').filter(Boolean).length === 1 && /fps/.test(s.hudText), JSON.stringify(s.hudText.trim()));
   check('then the hint that Escape opens the menu shows', s.m.hint);
-  await page.waitForTimeout(4600);
+  // (phase 6: on a first walk it names the keys that matter, for ten seconds)
+  check('on a first walk the hint names the keys that matter', /walk/.test(await page.evaluate(() => document.getElementById('hint').innerText)) && /greet/.test(await page.evaluate(() => document.getElementById('hint').innerText)));
+  await page.waitForTimeout(10600);
   s = await st(page);
-  check('the hint fades after a few seconds', !s.m.hint);
+  check('the hint fades after ten seconds', !s.m.hint);
 
   // ---- open, and walk every control ----
   await page.keyboard.press('Escape');
@@ -173,7 +193,9 @@ try {
   await page.evaluate(() => window.lab.ready);
   await page.waitForTimeout(500);
   s = await st(page);
-  check('after a reload the start card stays away (seen once)', !s.m.card);
+  check('after a reload the title screen shows again', (await title(page)).up);
+  await page.evaluate(() => window.lab.titlePlay());
+  s = await st(page);
   check('after a reload the Display choices are back', s.preset === 1 && s.glyphs === false && s.m.hud === 'full' && Math.abs(s.sensitivity - 1.5) < 1e-9 && s.invert === true,
     `density ${s.preset + 1}, glyphs ${s.glyphs}, statistics ${s.m.hud}, sensitivity ${s.sensitivity}, invert ${s.invert}`);
   check('after a reload the seed, the time and the weather are the default ones', Math.abs(s.hour - 14) < 0.01 && s.weather === 'auto' && (await page.evaluate(() => window.lab.seed)) === 3, `hour ${s.hour}, weather ${s.weather}`);
@@ -182,7 +204,7 @@ try {
 
   // ---- 1024 x 640 ----
   const small = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
-  await small.page.keyboard.press('Enter'); await small.page.waitForTimeout(200);
+  await play(small.page);
   await small.page.keyboard.press('Escape'); await small.page.waitForTimeout(400);
   const fit = await small.page.evaluate(() => {
     const b = document.querySelector('#menu .pane'), p = document.querySelector('#menu .panel'), r = p.getBoundingClientRect();
@@ -196,7 +218,7 @@ try {
   {
     const mid = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1280, height: 720, dpr: 1 });
     const mp = mid.page;
-    await mp.keyboard.press('Enter'); await mp.waitForTimeout(200);
+    await play(mp);
     await mp.keyboard.press('Escape'); await mp.waitForTimeout(400);
     const ctl = await mp.evaluate(() => { const b = document.querySelector('#menu .pane'); return { scroll: b.scrollHeight, client: b.clientHeight }; });
     check('at 1280 x 720 the Controls fit without scrolling', ctl.scroll <= ctl.client + 1, JSON.stringify(ctl));
@@ -236,11 +258,11 @@ try {
   const p2 = await ctx.newPage();
   const errs = [];
   p2.on('pageerror', (e) => errs.push(String(e)));
-  await p2.goto(`${url}/index.html?threads=4`);
+  await p2.goto(`${url}/play.html?threads=4`);
   await p2.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await p2.evaluate(() => window.lab.ready);
   await p2.waitForTimeout(300);
-  await p2.keyboard.press('Enter'); await p2.waitForTimeout(200);
+  await play(p2);
   await p2.keyboard.press('Escape'); await p2.waitForTimeout(400);
   const ok2 = await p2.evaluate(() => window.lab.menu.read().open);
   await p2.click('#menu [role="tab"]:has-text("Display")'); await p2.waitForTimeout(200);
@@ -261,7 +283,7 @@ try {
     } catch { /* no storage */ }
   });
   const p3 = await ctx3.newPage();
-  await p3.goto(`${url}/index.html?threads=4`);
+  await p3.goto(`${url}/play.html?threads=4`);
   await p3.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
   await p3.evaluate(() => window.lab.ready);
   await p3.waitForTimeout(500);
@@ -285,7 +307,7 @@ try {
   {
     const J = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
     const jp = J.page;
-    await jp.keyboard.press('Enter'); await jp.waitForTimeout(300);
+    await play(jp);
     // the first meeting: greet, and the exchange's buttons by mouse
     const ex = await jp.evaluate(async () => {
       const L = window.lab, m = L.progress.meet();
@@ -335,12 +357,12 @@ try {
     const j0 = await jp.evaluate(() => ({ r: window.lab.progress.journal.read(), focus: document.activeElement && document.activeElement.closest('#journal') ? document.activeElement.textContent : null, t: window.lab.state().t }));
     await jp.waitForTimeout(500);
     const t1 = await jp.evaluate(() => window.lab.state().t);
-    check('J opens the journal, with the focus in it', j0.r.open && !!j0.focus, j0.focus);
+    check('J opens the journal, with the focus in it; the first time on the favour taken', j0.r.open && !!j0.focus && j0.r.tab === 'favours', `${j0.focus}; ${j0.r.tab}`);
     check('while the journal is open the clock stands still', t1 === j0.t, `${j0.t} -> ${t1}`);
     // the arrow keys between the pages
     const tabs = [];
     for (let k = 0; k < 4; k++) { tabs.push(await jp.evaluate(() => window.lab.progress.journal.read().tab)); await jp.keyboard.press('ArrowDown'); await jp.waitForTimeout(120); }
-    check('the arrow keys move between the four pages, round again', tabs.join(' ') === 'places people sketches favours' && (await jp.evaluate(() => window.lab.progress.journal.read().tab)) === 'places', tabs.join(' '));
+    check('the arrow keys move between the four pages, round again', tabs.join(' ') === 'favours places people sketches' && (await jp.evaluate(() => window.lab.progress.journal.read().tab)) === 'favours', tabs.join(' '));
     // each page: fits, Tab stays inside, focus outlined, pointer and hover
     const pages = [];
     for (const tab of ['places', 'people', 'sketches', 'favours']) {
@@ -404,8 +426,8 @@ try {
     check('the save line says what is saved for this world', /places found.*(people|person) met.*sketch.*favours? done/.test(line), line);
     const fitW = await jp.evaluate(() => { const b = document.querySelector('#menu .pane'); return b.scrollWidth <= b.clientWidth && document.documentElement.scrollWidth <= innerWidth; });
     check('the World section fits at 1024 x 640 with no sideways scrolling', fitW);
-    const emo = await jp.evaluate(() => /\p{Extended_Pictographic}/u.test(document.querySelector('#menu').innerText + document.querySelector('#talk').innerText + document.querySelector('#card').innerText));
-    check('no emoji in the menu, the exchange or the start card', !emo);
+    const emo = await jp.evaluate(() => /\p{Extended_Pictographic}/u.test(document.querySelector('#menu').innerText + document.querySelector('#talk').innerText + document.querySelector('#title').innerText));
+    check('no emoji in the menu, the exchange or the title screen', !emo);
     await J.check();
     await J.ctx.close();
   }
@@ -414,14 +436,15 @@ try {
   {
     const Sd = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
     const sp = Sd.page;
-    const silent = await sp.evaluate(() => ({ on: window.lab.sound.on, line: document.querySelector('#card .snd') && !document.querySelector('#card .snd').hidden ? document.querySelector('#card .snd').textContent : '' }));
-    check('the page starts silent, and the start card says sound starts with the first click', !silent.on && /first click/.test(silent.line), JSON.stringify(silent));
-    await sp.mouse.click(500, 300); await sp.waitForTimeout(400);
+    const silent = await sp.evaluate(() => ({ on: window.lab.sound.on, line: window.lab.titleState().foot }));
+    check('the page starts silent, and the title screen says sound starts with the first click', !silent.on && /first click/.test(silent.line), JSON.stringify(silent));
+    await sp.mouse.click(30, 620); await sp.waitForTimeout(400);
     check('the first click starts the sound', await sp.evaluate(() => window.lab.sound.on));
     // (0.5.3) the music: its first piece a few seconds in
     await sp.waitForTimeout((SOUND.music.first + 1.5) * 1000);
     const mus = await sp.evaluate(() => window.lab.sound.music);
     check('the music starts a few seconds after the sound', mus && mus.playing && mus.played > 0, JSON.stringify(mus));
+    await play(sp);
     await sp.keyboard.press('Escape'); await sp.waitForTimeout(300);
     if (!(await sp.evaluate(() => window.lab.menu.read().open))) { await sp.keyboard.press('Escape'); await sp.waitForTimeout(300); }
     await sp.evaluate(() => document.querySelector('#menu-tab-sound').click());
@@ -445,6 +468,7 @@ try {
     const muted = await sp.evaluate(() => ({ m: window.lab.sound.settings.muted, note: document.getElementById('note').textContent }));
     check('N turns the sound off, and says so', muted.m === true && /Sound off/.test(muted.note), JSON.stringify(muted));
     await sp.reload(); await sp.waitForFunction(() => window.lab && window.lab.ready); await sp.waitForTimeout(500);
+    await sp.evaluate(() => window.lab.titlePlay());
     const kept = await sp.evaluate(() => window.lab.sound.settings);
     check('after a reload the Sound choices are back', Math.abs(kept.master - vol) < 1e-9 && kept.muted === true && vol < 0.8, JSON.stringify(kept));
     await sp.keyboard.press('KeyN'); await sp.waitForTimeout(150);
@@ -457,7 +481,7 @@ try {
   {
     const Mp = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
     const mp = Mp.page;
-    await mp.keyboard.press('Enter'); await mp.waitForTimeout(4600);   // (the start card, then its hint's four seconds)
+    await play(mp); await mp.waitForTimeout(4400);   // (the title screen, then its hint's four seconds)
     // behind someone at work in a field, 2.2 m back, looking the way they look
     const who = await mp.evaluate(async () => {
       const L = window.lab; L.freeze(11, 0, 0);
@@ -511,6 +535,131 @@ try {
     check('M again closes it, and its layer with it', await mp.evaluate(() => document.getElementById('mapover').hidden));
     await Mp.check();
     await Mp.ctx.close();
+  }
+
+  // ---- (phase 6) the title screen's choices, the keys, text size, motion, the cap, sharing, the pause ----
+  {
+    const T = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1, context: { permissions: ['clipboard-read', 'clipboard-write'] } });
+    const tp = T.page;
+    const clip = () => tp.evaluate(() => navigator.clipboard.readText());
+    await tp.waitForFunction(() => window.lab.titleState().shown, null, { timeout: 8000 });
+    let t = await title(tp);
+    const fit = await tp.evaluate(() => { const r = document.querySelector('#title .panel').getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth; });
+    check('the title screen fits at 1024 x 640', fit);
+    check('its flyover: four spots found from the world\'s own cameras, one of them in rain', t.spots.length === 4 && new Set(t.spots.map((x) => x.name)).size === 4 && t.spots.some((x) => x.weather === 'rain'), t.spots.map((x) => `${x.name} at ${x.hour}${x.weather === 'rain' ? ' in rain' : ''}`).join('; '));
+    // the flyover touches nothing that is kept: a spot goes by, then Play
+    const before = await tp.evaluate(() => ({ found: Object.keys(window.lab.progress.get().found).length, at: window.lab.progress.get().at || null }));
+    await tp.waitForTimeout(21500);
+    const during = await tp.evaluate(() => ({ cam: window.lab.state().camName, found: Object.keys(window.lab.progress.get().found).length }));
+    // Settings opens the menu over the title; Escape closes it, back to the title with Play focused
+    await tp.click('#title .choice:has-text("Settings")'); await tp.waitForTimeout(500);   // (an Escape in the menu's first 350 ms is the one that opened it)
+    const menuOver = await tp.evaluate(() => window.lab.menu.read().open && window.lab.titleState().up);
+    await tp.keyboard.press('Escape'); await tp.waitForTimeout(300);
+    t = await title(tp);
+    check('Settings opens the menu over the title screen; Escape goes back to it, Play focused', menuOver && t.up && !(await tp.evaluate(() => window.lab.menu.read().open)) && /^Play/.test(t.focus));
+    // Share this world, on the title
+    await tp.click('#title .choice:has-text("Share this world")'); await tp.waitForTimeout(300);
+    const c1 = await clip();
+    check('Share this world on the title screen copies a link to this seed', /\/play\.html\?seed=3$/.test(c1) && /copied/.test((await title(tp)).note), c1);
+    await tp.keyboard.press('Home');
+    await tp.evaluate(() => window.lab.titlePlay()); await tp.waitForTimeout(400);
+    const after = await tp.evaluate(() => { const s = window.lab.state(); return { x: s.x, z: s.z, cam: s.camName, weather: s.weather, found: Object.keys(window.lab.progress.get().found).length }; });
+    check('the flyover changes no saved progress, and Play puts you where you were', before.found === 0 && during.found === 0 && /^title: /.test(during.cam) && Math.hypot(after.x - 624, after.z - 1088) < 2 && after.weather === 'auto', `${during.cam}; then (${after.x.toFixed(0)}, ${after.z.toFixed(0)}), weather ${after.weather}`);
+    // the keys: one changed, a clash refused, kept after a reload, the old key free, reset
+    await tp.evaluate(() => window.lab.menu.open()); await tp.waitForTimeout(250);
+    const bindBtn = (n) => tp.locator('#menu .rebind').nth(n);
+    await bindBtn(11).click(); await tp.keyboard.press('KeyU'); await tp.waitForTimeout(100);          // the map, to U
+    const said1 = await tp.evaluate(() => document.querySelector('#menu .keysaid').textContent);
+    await bindBtn(0).click(); await tp.keyboard.press('KeyE'); await tp.waitForTimeout(100);           // walk forward, to E: refused
+    const said2 = await tp.evaluate(() => document.querySelector('#menu .keysaid').textContent);
+    await bindBtn(0).click(); await tp.keyboard.press('Escape'); await tp.waitForTimeout(100);         // Escape leaves it
+    const said3 = await tp.evaluate(() => document.querySelector('#menu .keysaid').textContent);
+    check('a key can be changed; one already used is refused, and says why; Escape leaves it', /the map: U/.test(said1) && /already greet/.test(said2) && /Left as it was/.test(said3), `${said1} | ${said2} | ${said3}`);
+    await tp.evaluate(() => window.lab.menu.close()); await tp.waitForTimeout(150);
+    await tp.keyboard.press('KeyM'); await tp.waitForTimeout(250);
+    const mOpen = await tp.evaluate(() => !document.getElementById('mapover').hidden);
+    await tp.keyboard.press('KeyU'); await tp.waitForTimeout(250);
+    const uOpen = await tp.evaluate(() => !document.getElementById('mapover').hidden);
+    await tp.keyboard.press('KeyU'); await tp.waitForTimeout(150);
+    check('the changed key does its action and the old one is free', !mOpen && uOpen);
+    await tp.reload(); await tp.waitForFunction(() => window.lab && window.lab.ready); await tp.evaluate(() => window.lab.titlePlay());
+    const keptKeys = await tp.evaluate(() => JSON.parse(localStorage.getItem('land-of-ascii-v3.keys') || '{}').map);
+    await tp.evaluate(() => window.lab.menu.open()); await tp.waitForTimeout(200);
+    await tp.click('#menu button:has-text("reset the keys")'); await tp.waitForTimeout(150);
+    const resetTo = await tp.evaluate(() => JSON.parse(localStorage.getItem('land-of-ascii-v3.keys') || '{}').map);
+    check('the changed key is kept after a reload; reset puts them all back', keptKeys === 'KeyU' && resetTo === 'KeyM', `${keptKeys} -> ${resetTo}`);
+    // text size: larger, and every section still fits with no sideways scrolling
+    await tp.click('#menu-tab-display'); await tp.waitForTimeout(150);
+    await tp.click('#menu button:has-text("larger")'); await tp.waitForTimeout(200);
+    const fits = [];
+    for (const id of ['controls', 'display', 'sound', 'world', 'advanced']) {
+      await tp.click(`#menu-tab-${id}`); await tp.waitForTimeout(120);
+      fits.push(await tp.evaluate(() => { const b = document.querySelector('#menu .pane'); return b.scrollWidth <= b.clientWidth + 1 && document.documentElement.scrollWidth <= innerWidth; }));
+    }
+    const zoom = await tp.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-text').trim());
+    check('the text size "larger" applies, and every section still fits at 1024 x 640 with no sideways scrolling', zoom === '1.3' && fits.every(Boolean), `--ui-text ${zoom}; ${fits.join(' ')}`);
+    await tp.click('#menu-tab-display'); await tp.waitForTimeout(100);
+    await tp.click('#menu button:has-text("regular")');
+    // reduced motion: the class that stills every transition; the title's drift still
+    await tp.click('#menu button:has-text("reduced")'); await tp.waitForTimeout(150);
+    const still = await tp.evaluate(() => document.documentElement.classList.contains('still') && getComputedStyle(document.querySelector('#menu .panel')).transitionDuration.split(',').every((d) => parseFloat(d) === 0));
+    // the cap: 30 frames a second at most
+    await tp.click('#menu button:has-text("30 at most")'); await tp.waitForTimeout(1500);
+    const pace = await tp.evaluate(() => window.lab.pace());
+    check('reduced motion stills the menu\'s transitions', still);
+    check('the frame-rate cap of 30 holds the frames at least two refreshes apart (60 Hz)', pace.cap === 30 && pace.every >= 2 && pace.refresh > 12, JSON.stringify(pace));
+    await tp.reload(); await tp.waitForFunction(() => window.lab && window.lab.ready);
+    await tp.waitForFunction(() => window.lab.titleState().shown, null, { timeout: 8000 });
+    const y0 = await tp.evaluate(() => window.lab.state().yaw); await tp.waitForTimeout(2000);
+    const y1 = await tp.evaluate(() => window.lab.state().yaw);
+    check('with reduced motion the title screen\'s view holds still', Math.abs(y1 - y0) < 1e-6, `${y0.toFixed(3)} -> ${y1.toFixed(3)}`);
+    await tp.evaluate(() => window.lab.titlePlay());
+    await tp.evaluate(() => window.lab.menu.open()); await tp.click('#menu-tab-display'); await tp.waitForTimeout(100);
+    await tp.click('#menu button:has-text("as the device asks")'); await tp.click('#menu button:has-text("as fast as it goes")');
+    // Share this world with the place and the hour
+    await tp.click('#menu-tab-world'); await tp.waitForTimeout(150);
+    await tp.check('#m-share-place');
+    await tp.click('#menu button:has-text("share this world")'); await tp.waitForTimeout(300);
+    const c2 = await clip();
+    check('Share this world with the place and the hour copies a link that has both', /\?seed=3&at=[\d.]+%2C[\d.]+%2C\d+&hour=[\d.]+$/.test(c2), c2.replace(/^.*\?/, '?'));
+    await tp.evaluate(() => window.lab.menu.close()); await tp.waitForTimeout(200);
+    // the pause while the window is elsewhere
+    await tp.evaluate(() => window.dispatchEvent(new Event('blur'))); await tp.waitForTimeout(150);
+    const away = await tp.evaluate(() => document.getElementById('away').classList.contains('on'));
+    const xz0 = await tp.evaluate(() => { const s = window.lab.state(); return [s.x, s.z]; });
+    await tp.keyboard.down('KeyW'); await tp.waitForTimeout(400); await tp.keyboard.up('KeyW');
+    const xz1 = await tp.evaluate(() => { const s = window.lab.state(); return [s.x, s.z]; });
+    await tp.click('#away'); await tp.waitForTimeout(200);
+    const back = await tp.evaluate(() => !document.getElementById('away').classList.contains('on'));
+    check('leaving the window pauses the game (nothing moves) until a click', away && xz0[0] === xz1[0] && xz0[1] === xz1[1] && back);
+    // full screen: the button, on and off again
+    await tp.evaluate(() => window.lab.menu.open()); await tp.click('#menu-tab-display'); await tp.waitForTimeout(100);
+    await tp.click('#menu button.fs'); await tp.waitForTimeout(500);
+    const fsOn = await tp.evaluate(() => !!document.fullscreenElement);
+    await tp.click('#menu button.fs'); await tp.waitForTimeout(500);
+    const fsOff = await tp.evaluate(() => !document.fullscreenElement);
+    check('the full screen button goes full screen and back', fsOn && fsOff);
+    // New world: the seed field refuses words, opens a number
+    await tp.reload(); await tp.waitForFunction(() => window.lab && window.lab.ready);
+    await tp.waitForFunction(() => window.lab.titleState().shown, null, { timeout: 8000 });
+    await tp.click('#title .choice:has-text("New world")');
+    await tp.fill('#title .newrow input', 'abc'); await tp.keyboard.press('Enter'); await tp.waitForTimeout(100);
+    const refused = (await title(tp)).note;
+    await tp.fill('#title .newrow input', '48211'); await tp.keyboard.press('Enter');
+    await tp.waitForURL(/seed=48211/, { timeout: 10000 });
+    check('New world refuses a seed that is not a number, and opens one that is', /whole number/.test(refused) && /seed=48211/.test(tp.url()), refused);
+    await T.ctx.close();
+  }
+  // ---- (phase 6) a browser that cannot run the game is told what it lacks ----
+  {
+    const ctx6 = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    await ctx6.addInitScript(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (k, ...r) { return k === 'webgl2' ? null : g.call(this, k, ...r); }; });
+    const p6 = await ctx6.newPage();
+    await p6.goto(`${url}/play.html`);
+    await p6.waitForSelector('#error.unsupported', { timeout: 20000 });
+    const msg = await p6.evaluate(() => document.getElementById('error').innerText);
+    check('a browser without WebGL 2 is told so, naming it, instead of an error', /cannot run in this browser/.test(msg) && /WebGL 2/.test(msg), msg.split('\n')[0]);
+    await ctx6.close();
   }
 
   console.log(`menu check: ${results.filter((r) => r.ok).length} of ${results.length} passed\n`);
