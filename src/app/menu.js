@@ -14,6 +14,11 @@ import { LOOK } from '../look.js';
 import { KINDS } from '../weather.js';
 import { icon } from './icons.js';
 
+/* global __VERSION__, __BUILT__ */
+// (set by the build from package.json; 'dev' when served from src/)
+export const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
+const BUILT = typeof __BUILT__ !== 'undefined' ? __BUILT__ : '';
+
 const h = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -129,7 +134,8 @@ export class Menu {
     // into its section; the grid draws it at the foot of the rail)
     this.pane = h('div', { class: 'pane' });
     this.panel = h('div', { class: 'panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'menu-title' }, rail, this.pane,
-      h('div', { class: 'foot' }, this.resumeBtn));
+      h('div', { class: 'foot' }, this.resumeBtn,
+        h('p', { class: 'version', title: BUILT ? `built ${BUILT}` : 'served from the source' }, VERSION === 'dev' ? 'version dev' : `version ${VERSION}`)));
     this.root.append(this.back, this.panel);
 
     // the sections

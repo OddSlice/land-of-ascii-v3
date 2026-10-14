@@ -1,9 +1,9 @@
 {
   "name": "land-of-ascii-v3",
-  "version": "0.0.1",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
-  "description": "Land of Ascii v3: a text-rendered explorer. Phase 0a: the Look Lab.",
+  "description": "Land of Ascii v3: a text-rendered explorer.",
   "scripts": {
     "dev": "node tools/dev.mjs",
     "build": "node tools/build.mjs",

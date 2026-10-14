@@ -37,7 +37,7 @@ import { CAMERAS } from './app/cameras.js';
 import { layout, cellWidth, TARGETS } from './app/grid.js';
 import { MAX_PITCH } from './scene/cpu/view.js';
 import { weatherFor, forecastOf, mainKind, KINDS } from './weather.js';
-import { Menu } from './app/menu.js';
+import { Menu, VERSION } from './app/menu.js';
 import { BenchRun, browserName } from './app/benchrun.js';
 import { loadDisplay, saveDisplay, seenCard, markCardSeen } from './app/settings.js';
 import { moonLit } from './world/sky.js';
@@ -677,6 +677,7 @@ game.bench = new BenchRun({
   }),
 });
 lab.bench = game.bench;   // (for the tools)
+lab.version = VERSION;
 // (phase 4a) people, for the tools and the menu (before the menu, which
 // lists them)
 lab.people = {
