@@ -46,23 +46,28 @@ export const countBits = (a) => { let n = 0; for (let i = 0; i < a.length; i++) 
 
 // A bitset as runs (alternating zeros and ones, starting with zeros), each a
 // variable-length number, in base 64.
+let packBuf = new Uint8Array(1 << 12);
 export function packBits(a, n) {
-  const out = [];
+  let len = 0;
+  const put = (x) => {
+    if (len + 5 > packBuf.length) { const b = new Uint8Array(packBuf.length * 2); b.set(packBuf); packBuf = b; }
+    while (x >= 128) { packBuf[len++] = (x & 127) | 128; x >>>= 7; }
+    packBuf[len++] = x;
+  };
   let cur = 0, run = 0;
-  const put = (x) => { while (x >= 128) { out.push((x & 127) | 128); x >>>= 7; } out.push(x); };
   for (let i = 0; i < n;) {
     // (whole bytes of the same bit at once)
     if ((i & 7) === 0 && i + 8 <= n) {
       const by = a[i >> 3];
       if (by === (cur ? 255 : 0)) { run += 8; i += 8; continue; }
     }
-    const b = bit(a, i);
+    const b = (a[i >> 3] >> (i & 7)) & 1;
     if (b === cur) run++;
     else { put(run); cur = b; run = 1; }
     i++;
   }
   put(run);
-  return toB64(Uint8Array.from(out));
+  return toB64(packBuf.subarray(0, len));
 }
 export function unpackBits(s, n) {
   const bytes = fromB64(s), a = new Uint8Array(Math.ceil(n / 8));
@@ -99,10 +104,12 @@ export function fromB64(s) {
 }
 
 // The record as plain JSON (the grids packed).
-export function toJSON(p) {
+// (`packed`: the seen and walked squares already packed, when a save is
+// spread over frames)
+export function toJSON(p, packed = null) {
   return JSON.stringify({
     v: p.v, seed: p.seed, sn: p.sn, wn: p.wn,
-    seen: packBits(p.seen, p.sn * p.sn), walked: packBits(p.walked, p.wn * p.wn),
+    seen: packed ? packed.seen : packBits(p.seen, p.sn * p.sn), walked: packed ? packed.walked : packBits(p.walked, p.wn * p.wn),
     found: p.found, met: p.met, favours: p.favours, lantern: p.lantern, lit: p.lit,
     sketches: p.sketches, nextSketch: p.nextSketch, first: p.first,
   });

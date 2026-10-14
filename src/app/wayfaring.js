@@ -16,8 +16,8 @@
 //   is left.
 // Off (the tools, which run with progress cleared): nothing is tracked or
 // drawn, and nothing changes from phase 4b.
-import { freshProgress, fromJSON, toJSON, Store, F, countBits, packSketch, unpackSketch, backupText, readBackup, bit } from '../game/progress.js';
-import { placesOf, findsFrom, compass, fill, cap } from '../game/places.js';
+import { freshProgress, fromJSON, toJSON, Store, F, countBits, packSketch, unpackSketch, backupText, readBackup, bit, packBits } from '../game/progress.js';
+import { placesOf, finds, compass, fill, cap } from '../game/places.js';
 import { buildFavours, favourWords, START_DAY, START_HOUR } from '../game/favours.js';
 import { Discovery, VIEW_REVEAL } from '../game/discovery.js';
 import { FS, S, POSE } from '../world/people/figure.js';
@@ -95,23 +95,17 @@ export class Wayfaring {
     const p = this.progress, k = this.frameNo++;
     // what is in view, and where you walk
     if (this.disc.step(p, player.x, player.z, player.eye, player.yaw, hfov)) this.touch();
-    // the places, a few times a second
-    if (k % 12 === 0) {
-      const got = findsFrom(this.world, this.places.list, p.found, player.x, player.z, player.eye);
-      for (const id of got) {
-        p.found[id] = [day, round2(hour)];
-        const pl = this.places.list.find((x) => x.id === id);
-        this.note(`The journal notes ${pl.title}.`, 'found');
-        this.touch(true);
-      }
-      // (standing on a viewpoint shows the land round it)
-      for (const pl of this.places.list) {
-        if (pl.kind !== 'viewpoint' || this.revealed?.has(pl.id)) continue;
-        if (Math.hypot(pl.x - player.x, pl.z - player.z) < 8) {
-          (this.revealed ||= new Set()).add(pl.id);
-          if (this.disc.circle(p, pl.x, pl.z, VIEW_REVEAL)) this.touch();
-        }
-      }
+    // the places, one a frame in turn (each a few times a second)
+    const list = this.places.list, pl = list[k % list.length];
+    if (!p.found[pl.id] && finds(this.world, pl, player.x, player.z, player.eye)) {
+      p.found[pl.id] = [day, round2(hour)];
+      this.note(`The journal notes ${pl.title}.`, 'found');
+      this.touch(true);
+    }
+    // (standing on a viewpoint shows the land round it)
+    if (pl.kind === 'viewpoint' && !this.revealed?.has(pl.id) && Math.hypot(pl.x - player.x, pl.z - player.z) < 8) {
+      (this.revealed ||= new Set()).add(pl.id);
+      if (this.disc.circle(p, pl.x, pl.z, VIEW_REVEAL)) this.touch();
     }
     // a lost thing within reach is picked up
     for (const f of this.fav.list) {
@@ -144,20 +138,29 @@ export class Wayfaring {
   // What the renderer draws for you: the lantern, the thing carried, the
   // lost things (of favours taken).
   you(player) {
-    const p = this.progress;
-    const lost = [];
-    let carry = null, latest = -1;
-    for (const f of this.fav.list) {
-      const st = this.stateOf(f);
-      if (f.kind === 'find' && st === F.TAKEN) lost.push([f.spot.x, f.spot.z, f.spot.ft, f.shape, f.spot.yaw]);
+    const p = this.progress, list = this.fav.list;
+    // (the favours looked at without making anything; the lost things'
+    // list and the answer are made again only when they change)
+    let carry = null, latest = -1, key = 0, nl = 0;
+    for (let j = 0; j < list.length; j++) {
+      const f = list[j], st = this.stateOf(f);
+      if (f.kind === 'find' && st === F.TAKEN) { key = (key * 31 + j + 1) | 0; nl++; }
       if ((f.kind === 'carry' && st === F.TAKEN) || (f.kind === 'find' && st === F.GOT)) {
         const t = p.favours[f.id].n || 0;
         if (t > latest) { latest = t; carry = f.shape; }
       }
     }
-    if (!p.lit && !carry && !lost.length) return undefined;
-    const room = p.lit || carry ? roomAt(this.world.kit, player.x, player.z, player.feet + 0.02) : -1;
-    return { lantern: !!p.lit, carry, lost, walk: this.walked || 0, room };
+    if (!p.lit && !carry && !nl) return undefined;
+    let y = this.youWas;
+    if (!y || y.lantern !== !!p.lit || y.carry !== carry || this.lostKey !== key) {
+      const lost = [];
+      for (const f of list) if (f.kind === 'find' && this.stateOf(f) === F.TAKEN) lost.push([f.spot.x, f.spot.z, f.spot.ft, f.shape, f.spot.yaw]);
+      y = this.youWas = { lantern: !!p.lit, carry, lost, walk: 0, room: -1 };
+      this.lostKey = key;
+    }
+    y.walk = this.walked || 0;
+    y.room = p.lit || carry ? roomAt(this.world.kit, player.x, player.z, player.feet + 0.02) : -1;
+    return y;
   }
 
   // ---- favours ------------------------------------------------------------------------
@@ -318,19 +321,38 @@ export class Wayfaring {
   // ---- saving -------------------------------------------------------------------------
 
   touch(urgent = false) { this.dirty = true; if (urgent) this.urgent = true; this.changed(); }
+  // A save in play is spread over four frames, so no frame pays for all of
+  // it: the seen squares packed, the walked squares packed, the record made,
+  // the record written. (What changes in between is in the next save.)
   maybeSave() {
+    if (this.staged) {
+      const g = this.staged, p = this.progress, t0 = performance.now();
+      if (g.seen === undefined) g.seen = packBits(p.seen, p.sn * p.sn);
+      else if (g.walked === undefined) g.walked = packBits(p.walked, p.wn * p.wn);
+      else if (g.text === undefined) g.text = toJSON(p, g);
+      else { this.staged = null; this.write(g.text); }
+      this.saveMs = Math.max(this.saveStep || 0, performance.now() - t0);
+      this.saveStep = this.saveMs;
+      return;
+    }
     if (!this.dirty) return;
     const now = performance.now();
-    if (this.urgent || now - this.lastSave > SAVE_EVERY) this.save();
+    if (this.urgent || now - this.lastSave > SAVE_EVERY) {
+      this.lastSave = now;
+      this.dirty = false; this.urgent = false;
+      this.staged = {}; this.saveStep = 0;
+    }
   }
+  // Everything at once (leaving the page, a tool, a restore).
   save(force = false) {
-    if (!this.on || (!this.dirty && !force)) return;
+    if (!this.on || (!this.dirty && !force && !this.staged)) return;
     const t0 = performance.now();
     this.lastSave = t0;
-    this.dirty = false; this.urgent = false;
-    this.store.set('progress', toJSON(this.progress));
-    this.saveMs = performance.now() - t0; this.saves = (this.saves || 0) + 1;
+    this.dirty = false; this.urgent = false; this.staged = null;
+    this.write(toJSON(this.progress));
+    this.saveMs = performance.now() - t0;
   }
+  write(text) { this.store.set('progress', text); this.saves = (this.saves || 0) + 1; }
   changed() { for (const f of this.listeners) f(); }
   onChange(f) { this.listeners.push(f); }
   note(text, kind) { this.notes.push({ text, kind }); }
@@ -377,7 +399,7 @@ export class Wayfaring {
   }
   afterReset() {
     this.revealed = new Set();
-    this.dirty = false; this.urgent = false;
+    this.dirty = false; this.urgent = false; this.staged = null; this.youWas = null;
     this.store.set('progress', toJSON(this.progress));
     this.changed();
   }

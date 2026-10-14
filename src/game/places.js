@@ -185,13 +185,15 @@ function footOf(world) {
 // finds now: within its distance and with a clear sight of one of its points.
 export function findsFrom(world, list, done, x, z, eye) {
   const out = [];
-  for (const pl of list) {
-    if (done[pl.id]) continue;
-    for (const p of pl.at) {
-      const d = Math.hypot(p[0] - x, p[1] - z);
-      if (d > pl.D) continue;
-      if (d < 6 || sightLine(world, x, z, eye, p[0], p[1], p[2])) { out.push(pl.id); break; }
-    }
-  }
+  for (const pl of list) if (!done[pl.id] && finds(world, pl, x, z, eye)) out.push(pl.id);
   return out;
+}
+// Is one place found from here?
+export function finds(world, pl, x, z, eye) {
+  for (const p of pl.at) {
+    const d = Math.hypot(p[0] - x, p[1] - z);
+    if (d > pl.D) continue;
+    if (d < 6 || sightLine(world, x, z, eye, p[0], p[1], p[2])) return true;
+  }
+  return false;
 }

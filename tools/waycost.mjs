@@ -31,9 +31,16 @@ try {
         await L.whenIdle();
         L.unfreeze(); L.runClock(true, 1 / 3600);
       });
+      // (with a control: a fixed piece of arithmetic about as long as
+      // wayfaring's usual frame, timed in the same frames, which shows how
+      // often the browser and the machine stall any work for 0.2 ms or more)
       const sample = (secs) => page.evaluate((secs) => new Promise((res) => {
-        const out = [], t0 = performance.now();
-        const step = () => { out.push(window.lab.wayMs); if (performance.now() - t0 < secs * 1000) requestAnimationFrame(step); else res(out); };
+        const out = [], ctl = [], t0 = performance.now();
+        const step = () => {
+          out.push(window.lab.wayMs);
+          const c0 = performance.now(); let x = 0; for (let i = 0; i < 4000; i++) x += Math.sqrt(i * 1.5 + x * 1e-9); window.__x = x; ctl.push(performance.now() - c0);
+          if (performance.now() - t0 < secs * 1000) requestAnimationFrame(step); else res({ out, ctl });
+        };
         requestAnimationFrame(step);
       }), secs);
       const saves0 = await page.evaluate(() => window.lab.progress.saves);
@@ -44,14 +51,15 @@ try {
       await page.keyboard.up('ArrowLeft'); await page.keyboard.up('KeyW');
       const info = await page.evaluate(() => ({ saves: window.lab.progress.saves, saveMs: window.lab.progress.saveMs, stored: (window.lab.progress.stored() || '').length, seen: Math.round(window.lab.progress.journal.data().seen * 1000) / 10 }));
       await lab.check();
-      const all = [...walk, ...turn].filter((x) => typeof x === 'number');
+      const all = [...walk.out, ...turn.out].filter((x) => typeof x === 'number');
+      const ctl = [...walk.ctl, ...turn.ctl];
       const q = (p) => { const s = [...all].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
-      rows.push({ name, n: all.length, median: q(0.5), p95: q(0.95), max: q(1), over: all.filter((x) => x >= 0.2).length, saves: info.saves - saves0, saveMs: info.saveMs, stored: info.stored, seen: info.seen });
+      rows.push({ name, n: all.length, median: q(0.5), p95: q(0.95), max: q(1), over: all.filter((x) => x >= 0.2).length, ctlMedian: [...ctl].sort((x, y) => x - y)[ctl.length >> 1], ctlOver: ctl.filter((x) => x >= 0.2).length, saves: info.saves - saves0, saveMs: info.saveMs, stored: info.stored, seen: info.seen });
       console.log(name, JSON.stringify(rows[rows.length - 1]));
       await lab.ctx.close();
     } finally { await browser.close(); }
   }
 } finally { server.close(); }
-console.log('\n| browser | frames | median | 95% of frames under | slowest frame | frames at 0.2 ms or more | saves in 30 s | the last save | the record |');
-console.log('|---|---|---|---|---|---|---|---|---|');
-for (const r of rows) console.log(`| ${r.name} | ${r.n} | ${r.median.toFixed(3)} ms | ${r.p95.toFixed(3)} ms | ${r.max.toFixed(3)} ms | ${r.over} | ${r.saves} | ${r.saveMs.toFixed(3)} ms | ${r.stored} characters |`);
+console.log('\n| browser | frames | median | 95% of frames under | slowest frame | frames at 0.2 ms or more | the control: median, frames at 0.2 ms or more | saves in 30 s | a save\'s longest step | the record |');
+console.log('|---|---|---|---|---|---|---|---|---|---|');
+for (const r of rows) console.log(`| ${r.name} | ${r.n} | ${r.median.toFixed(3)} ms | ${r.p95.toFixed(3)} ms | ${r.max.toFixed(3)} ms | ${r.over} | ${r.ctlMedian.toFixed(3)} ms, ${r.ctlOver} | ${r.saves} | ${r.saveMs.toFixed(3)} ms | ${r.stored} characters |`);
