@@ -15,7 +15,7 @@ You arrive on a rise by a road in a land you do not know. The map shows nothing 
 - **Do favours.** Some people have a favour to ask when you greet them. Each one sends you across the land to a named person or a described place, with directions a villager would give and no marker.
 - **Earn standing.** Each favour done raises how the land knows you, from a stranger to a wayfarer and on. People greet you by it. It unlocks nothing.
 - **Walk at night.** The first favour you finish earns a lantern (L), which lights your way as the villagers' lanterns light theirs.
-- **Listen** (phase 5b). The land has a voice made in code, from where each thing is: the wind and the rain, the water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, and N or the menu's Sound section turns it off (`docs/art-bible.md`, section 10).
+- **Listen** (phase 5b). The land has a voice made in code, from where each thing is: the wind and the rain, the water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. Between them, now and then, slow quiet music written in code to the hour and the weather (0.5.3). It starts with your first click, and N or the menu's Sound section turns it off (`docs/art-bible.md`, section 10).
 
 Nothing here can be lost or failed. There is no combat, hunger, health, money, inventory grid or crafting, and no door opens that did not before.
 

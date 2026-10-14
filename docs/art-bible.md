@@ -660,7 +660,7 @@ The reasons and measurements are in `docs/phase0c.md`. The regression set was sa
 
 ## 10. Sound (phase 5b)
 
-The world has a voice, and no music. Every sound is made at runtime in code (`src/sound/`): oscillators, filtered noise made once from a seeded generator, and short envelopes. There are no audio files, and the build stays one HTML file. Every level, filter and envelope is in one data file, `src/sound/palette.js`, as the picture's are in `src/look.js`.
+The world has a voice, and (since 0.5.3) quiet music between its sounds. Every sound and every note is made at runtime in code (`src/sound/`): oscillators, filtered noise made once from a seeded generator, and short envelopes. There are no audio files, and the build stays one HTML file. Every level, filter and envelope is in one data file, `src/sound/palette.js`, as the picture's are in `src/look.js`.
 
 ### The rules
 
@@ -679,7 +679,7 @@ The world has a voice, and no music. Every sound is made at runtime in code (`sr
   - What plays depends on the clock, where you are, the weather and what is near.
   - An event falls due by the game's clock and is played on the audio clock, a quarter of a second ahead. A slow or fast frame rate changes nothing.
   - When the clock stands still (the menu, the journal, an exchange), events stop. The beds go on, fainter.
-- **Footsteps keep the walk's stride.** Two steps to the stride the hands sway by (1.3 m walking, 1.7 m running), each sounding the ground under the foot:
+- **Footsteps keep the walk's stride.** Two steps to the stride the hands sway by (1.3 m walking, 1.7 m running). Since 0.5.3 one step in two is heard (every step was too busy), each sounding the ground under the foot:
   - meadow, road and yard, sand, stone, timber, water (with a splash) and snow;
   - a creak on stairs and now and then on a floor of boards indoors;
   - a soft thud on landing a jump.
@@ -710,6 +710,17 @@ The world has a voice, and no music. Every sound is made at runtime in code (`sr
 | | well | event | The rope's creak and the bucket, when someone stands at the well. |
 | | chapel bell | event | Strikes the hour's count as the clock runs into it (6 to 21), heard across the village. |
 | | doors | event | A latch as someone goes in or comes out. |
+| Music (0.5.3) | pieces | its own bus | See below. |
+
+### The music (0.5.3)
+
+Slow, soft pieces in the spirit of a quiet field at rest: a warm pad holding the chords, a felt piano rolling through them, and now and then a short tune on the piano or a soft flute, in a long room's echo. They are written in code as they start (`src/sound/music.js`), none of them a recording or a borrowed tune.
+
+- **Written to the hour and the weather.** Bright modes by day (major, Lydian at dawn), Mixolydian or Dorian toward dusk, Dorian or Aeolian at night and in rain. Night pieces are slower (48 to 56 beats a minute, against 58 to 68) and lower, and the whole is darker by night and in rain.
+- **A piece:** four chords, each held two bars, three times round by day and twice by night. The first time round has no tune. The tune is one motif, its shape kept and its notes fitted to each chord, closing on a long note. The last time round is lighter. It ends on the home chord with a few bell notes.
+- **Long quiet between.** After a piece, 50 to 120 seconds of only the land, and the first piece a few seconds after the sound starts. Each visit the pieces come in a new order.
+- **Not of the world.** It is not placed or faded by distance, not counted in the sixteen voices, and plays on, softer, under the menu (60%) and an exchange (80%). Muting the sound mutes it. The menu's music slider sets its share.
+- **Level:** about −35 dB at the default settings, against −42 dB for the land on a fair day and −27 dB in rain; its loudest sample is 0.14 (`tools/music-check.mjs`, which renders whole pieces offline to WAV to listen to).
 
 ### Never do this
 
@@ -728,3 +739,5 @@ S6. **Never stop a sound dead.** Fade it.
 S7. **Never let a sound clip, and never play more than sixteen at once.** `tools/sound-check.mjs` checks both.
 
 S8. **Never judge sound by the numbers alone.** Listen with headphones.
+
+S9. **Never let the music fill the land.** No piece runs into the next, nothing is quick or bright, and no tune is borrowed from another game.

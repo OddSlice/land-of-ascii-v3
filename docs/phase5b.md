@@ -519,3 +519,26 @@ The control stalls as often in Firefox. In WebKit, wayfaring had 4 frames more t
 | Version 0.5.2 | `package.json`; the menu |
 | The checks and the measurements | section 4 |
 | A six-minute video with sound | `tools/walk-sound.mjs`; section 4 |
+
+## 7. After 5b: 0.5.3
+
+Two changes asked for after 5b (music was out of 5b's brief):
+
+- **Footsteps sound every other step** (`SOUND.steps.every` 2). A stair still creaks on each step heard.
+- **Music.** Slow, quiet pieces written in code as they start, to the hour and the weather, with 50 to 120 seconds of quiet between them (`src/sound/music.js`; the rules are in `docs/art-bible.md`, section 10). The menu's Sound section has a music slider (70% to start).
+
+`tools/music-check.mjs` renders whole pieces offline through the game's chain at the default settings, to WAV files in `shots/music/` (kept out of git):
+
+| Hour | Mode | Tempo | Tune on | Length | Peak | Loudness |
+|---|---|---|---|---|---|---|
+| dawn | Lydian | 65 bpm | flute | 104 s | 0.102 | −35.2 dB |
+| midday | Lydian | 58 bpm | piano | 115 s | 0.125 | −35.6 dB |
+| dusk | Dorian | 62 bpm | piano | 110 s | 0.143 | −35.2 dB |
+| night | Aeolian | 50 bpm | piano | 95 s | 0.130 | −36.3 dB |
+| rain by day | Dorian | 64 bpm | piano | 106 s | 0.140 | −34.9 dB |
+
+The land alone is about −42 dB on a fair day and −27 dB in rain, so the music sits a little over the land and under the rain.
+
+The sound check with the music playing: 30 of 30 stops, loudest sample 0.171 after the limiter (0.104 before), at most 10 voices (the music is outside the cap), and the sound's main-thread work a median 0.060 ms a frame, 95% under 0.100 ms. 9 frames of 22,379 took 0.5 ms or more, the slowest 1.19 ms (7 and 0.93 ms in 0.5.2): a frame that starts a chord's pad makes its eight oscillators at once. The menu check (70 of 70) checks that the music starts a few seconds after the sound and that the slider is reached by Tab and kept.
+
+I couldn't listen to it. The levels and balance are measured; whether it is pleasant needs your ears.

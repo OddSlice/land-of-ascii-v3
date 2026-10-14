@@ -79,7 +79,7 @@ function keyGroups(scene) {
 const TABS = [
   ['controls', 'Controls', 'keyboard', 'Every key, and what it does.'],
   ['display', 'Display', 'monitor', 'How the picture is drawn. Kept in this browser for your next visit.'],
-  ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go. Kept in this browser for your next visit.'],
+  ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go, and the music between. Kept in this browser for your next visit.'],
   ['world', 'World', 'landscape', 'The time, the weather and the seed.'],
   ['advanced', 'Advanced', 'sliders', 'The comparison tools of earlier phases.'],
 ];
@@ -173,6 +173,7 @@ export class Menu {
     page('sound', sndLine,
       this.toggle('sound', 'N turns it on or off anywhere', () => !!snd && !snd.settings.muted, (v) => { if (snd) { if (snd.allowed) snd.unlock(); snd.set('muted', !v); } }),
       this.slider('volume', 0, 1, 0.05, sv('master'), ss('master'), pct),
+      this.slider('music', 0, 1, 0.05, sv('music'), ss('music'), pct),
       h('h3', { class: 'part' }, 'each kind of sound'),
       this.slider('wind and rain', 0, 1, 0.05, sv('air'), ss('air'), pct),
       this.slider('water', 0, 1, 0.05, sv('water'), ss('water'), pct),

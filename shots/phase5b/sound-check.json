@@ -7,21 +7,25 @@
     "step:meadow"
    ],
    "heard": {
-    "step:meadow": {
-     "n": 10,
-     "max": 0.05
-    },
     "birdsong": {
      "n": 8,
      "max": 0.03147
+    },
+    "step:meadow": {
+     "n": 5,
+     "max": 0.05
     },
     "gull": {
      "n": 1,
      "max": 0.00347
     },
+    "music": {
+     "n": 1,
+     "max": 0.08953
+    },
     "wind": {
      "n": 0,
-     "max": 0.0470094611935459,
+     "max": 0.0470468332240734,
      "bed": true
     },
     "sea": {
@@ -39,13 +43,17 @@
     "birdsong"
    ],
    "heard": {
+    "music": {
+     "n": 8,
+     "max": 0.0896
+    },
     "birdsong": {
      "n": 1,
      "max": 0.035
     },
     "wind": {
      "n": 0,
-     "max": 0.03860090377243205,
+     "max": 0.03859931600092344,
      "bed": true
     },
     "sea": {
@@ -67,6 +75,10 @@
     "drip": {
      "n": 9,
      "max": 0.00973
+    },
+    "music": {
+     "n": 7,
+     "max": 0.0896
     },
     "gull": {
      "n": 1,
@@ -97,6 +109,10 @@
     "lake"
    ],
    "heard": {
+    "music": {
+     "n": 2,
+     "max": 0.0896
+    },
     "wind": {
      "n": 0,
      "max": 0.0739999177667337,
@@ -127,9 +143,9 @@
     "river"
    ],
    "heard": {
-    "step:stone": {
-     "n": 1,
-     "max": 0.05
+    "music": {
+     "n": 7,
+     "max": 0.0896
     },
     "wind": {
      "n": 0,
@@ -151,6 +167,10 @@
     "sea"
    ],
    "heard": {
+    "music": {
+     "n": 5,
+     "max": 0.0896
+    },
     "wind": {
      "n": 0,
      "max": 0.0889082047124894,
@@ -171,13 +191,17 @@
     "river"
    ],
    "heard": {
+    "music": {
+     "n": 7,
+     "max": 0.0896
+    },
     "sheep": {
      "n": 2,
      "max": 0.00097
     },
     "wind": {
      "n": 0,
-     "max": 0.07759495355258315,
+     "max": 0.07769313179981334,
      "bed": true
     },
     "lake": {
@@ -201,8 +225,12 @@
    ],
    "heard": {
     "step:road": {
-     "n": 28,
+     "n": 15,
      "max": 0.085
+    },
+    "music": {
+     "n": 6,
+     "max": 0.0896
     },
     "sheep": {
      "n": 2,
@@ -210,7 +238,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.08093703779846108,
+     "max": 0.0807020104616202,
      "bed": true
     },
     "lake": {
@@ -229,8 +257,12 @@
    ],
    "heard": {
     "step:sand": {
-     "n": 14,
+     "n": 7,
      "max": 0.05
+    },
+    "music": {
+     "n": 5,
+     "max": 0.0896
     },
     "wind": {
      "n": 0,
@@ -254,12 +286,16 @@
    ],
    "heard": {
     "step:water": {
-     "n": 12,
+     "n": 5,
      "max": 0.05
     },
     "splash": {
-     "n": 12,
+     "n": 5,
      "max": 0.06
+    },
+    "music": {
+     "n": 5,
+     "max": 0.0896
     },
     "wind": {
      "n": 0,
@@ -287,8 +323,12 @@
    ],
    "heard": {
     "step:snow": {
-     "n": 13,
+     "n": 7,
      "max": 0.05
+    },
+    "music": {
+     "n": 4,
+     "max": 0.0896
     },
     "wind": {
      "n": 0,
@@ -306,15 +346,19 @@
    ],
    "heard": {
     "step:timber": {
+     "n": 2,
+     "max": 0.05
+    },
+    "music": {
+     "n": 7,
+     "max": 0.0896
+    },
+    "step:water": {
      "n": 3,
      "max": 0.05
     },
-    "step:water": {
-     "n": 7,
-     "max": 0.05
-    },
     "splash": {
-     "n": 7,
+     "n": 3,
      "max": 0.06
     },
     "well": {
@@ -323,7 +367,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.08794378993054622,
+     "max": 0.08794378993054473,
      "bed": true
     },
     "lake": {
@@ -343,16 +387,20 @@
    ],
    "heard": {
     "step:road": {
-     "n": 14,
+     "n": 7,
      "max": 0.05
     },
     "land": {
      "n": 1,
      "max": 0.08
     },
+    "music": {
+     "n": 3,
+     "max": 0.0896
+    },
     "wind": {
      "n": 0,
-     "max": 0.08550497085210415,
+     "max": 0.0857271604205008,
      "bed": true
     }
    },
@@ -370,20 +418,24 @@
      "max": 0.05
     },
     "step:stone": {
-     "n": 9,
+     "n": 4,
      "max": 0.05
     },
+    "music": {
+     "n": 5,
+     "max": 0.0896
+    },
     "step:water": {
-     "n": 9,
+     "n": 4,
      "max": 0.05
     },
     "splash": {
-     "n": 9,
+     "n": 4,
      "max": 0.06
     },
     "wind": {
      "n": 0,
-     "max": 0.07071549507538248,
+     "max": 0.07085785220430352,
      "bed": true
     },
     "lake": {
@@ -412,12 +464,16 @@
      "max": 0.05
     },
     "step:stone": {
-     "n": 15,
+     "n": 7,
      "max": 0.05
     },
     "creak": {
-     "n": 8,
+     "n": 7,
      "max": 0.03
+    },
+    "music": {
+     "n": 3,
+     "max": 0.0896
     },
     "land": {
      "n": 1,
@@ -425,7 +481,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.09004888634951837,
+     "max": 0.0900488863495182,
      "bed": true
     }
    },
@@ -443,9 +499,13 @@
      "max": 0.015662969664100298,
      "bed": true
     },
+    "music": {
+     "n": 6,
+     "max": 0.0896
+    },
     "wind": {
      "n": 0,
-     "max": 0.0974936129876354,
+     "max": 0.09751718652262677,
      "bed": true
     }
    },
@@ -465,12 +525,16 @@
      "bed": true
     },
     "step:road": {
-     "n": 17,
+     "n": 8,
      "max": 0.05
+    },
+    "music": {
+     "n": 2,
+     "max": 0.0896
     },
     "wind": {
      "n": 0,
-     "max": 0.07763896603901643,
+     "max": 0.0776389660390169,
      "bed": true
     },
     "echo": {
@@ -493,13 +557,17 @@
      "max": 0.03,
      "bed": true
     },
+    "music": {
+     "n": 7,
+     "max": 0.0896
+    },
     "well": {
      "n": 1,
      "max": 0.01015
     },
     "wind": {
      "n": 0,
-     "max": 0.012332329860898553,
+     "max": 0.012332329860898564,
      "bed": true
     },
     "lake": {
@@ -517,6 +585,10 @@
     "bell"
    ],
    "heard": {
+    "music": {
+     "n": 10,
+     "max": 0.0896
+    },
     "bell": {
      "n": 18,
      "max": 0.05625
@@ -535,7 +607,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.10418395135188938,
+     "max": 0.10418395135188936,
      "bed": true
     },
     "lake": {
@@ -567,7 +639,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.10368825242239597,
+     "max": 0.10368921951963722,
      "bed": true
     },
     "lake": {
@@ -644,7 +716,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.09775382823932183,
+     "max": 0.0977532783571936,
      "bed": true
     }
    },
@@ -665,9 +737,13 @@
      "n": 4,
      "max": 0.00482
     },
+    "music": {
+     "n": 6,
+     "max": 0.0896
+    },
     "wind": {
      "n": 0,
-     "max": 0.1083049951450817,
+     "max": 0.1083108660259151,
      "bed": true
     },
     "lake": {
@@ -690,6 +766,10 @@
     "hens"
    ],
    "heard": {
+    "music": {
+     "n": 28,
+     "max": 0.0896
+    },
     "sheep": {
      "n": 5,
      "max": 0.00049
@@ -726,13 +806,17 @@
     "duck"
    ],
    "heard": {
+    "music": {
+     "n": 29,
+     "max": 0.0896
+    },
     "duck": {
      "n": 2,
      "max": 0.01675
     },
     "wind": {
      "n": 0,
-     "max": 0.10472258980710324,
+     "max": 0.10472481547553263,
      "bed": true
     },
     "river": {
@@ -750,6 +834,10 @@
     "gull"
    ],
    "heard": {
+    "music": {
+     "n": 28,
+     "max": 0.0896
+    },
     "gull": {
      "n": 5,
      "max": 0.01106
@@ -774,13 +862,17 @@
     "crow"
    ],
    "heard": {
+    "music": {
+     "n": 5,
+     "max": 0.0896
+    },
     "crow": {
      "n": 2,
      "max": 0.01693
     },
     "wind": {
      "n": 0,
-     "max": 0.10157030351411045,
+     "max": 0.10157030351411044,
      "bed": true
     }
    },
@@ -807,7 +899,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.045944345539710635,
+     "max": 0.04594434553971109,
      "bed": true
     },
     "lake": {
@@ -831,11 +923,7 @@
    ],
    "heard": {
     "step:meadow": {
-     "n": 30,
-     "max": 0.085
-    },
-    "step:stone": {
-     "n": 1,
+     "n": 15,
      "max": 0.085
     },
     "sheep": {
@@ -867,7 +955,7 @@
    ],
    "heard": {
     "step:sand": {
-     "n": 14,
+     "n": 7,
      "max": 0.085
     },
     "birdsong": {
@@ -875,7 +963,7 @@
      "max": 0.00957
     },
     "step:meadow": {
-     "n": 16,
+     "n": 8,
      "max": 0.085
     },
     "deer": {
@@ -884,7 +972,7 @@
     },
     "wind": {
      "n": 0,
-     "max": 0.08310742477378066,
+     "max": 0.08310742477377765,
      "bed": true
     },
     "sea": {
@@ -900,53 +988,60 @@
  "summary": {
   "spikes": [
    {
-    "ms": 0.77,
+    "ms": 0.88,
     "events": 0,
     "pending": 0,
     "played": 0,
     "voices": 1
    },
    {
-    "ms": 0.51,
+    "ms": 0.54,
     "events": 1,
     "pending": 0,
     "played": 1,
     "voices": 3
    },
    {
-    "ms": 0.68,
+    "ms": 0.85,
     "events": 2,
     "pending": 0,
-    "played": 12,
+    "played": 7,
     "voices": 3
    },
    {
-    "ms": 0.92,
+    "ms": 1.19,
     "events": 1,
     "pending": 0,
-    "played": 1,
+    "played": 9,
+    "voices": 3
+   },
+   {
+    "ms": 0.53,
+    "events": 0,
+    "pending": 0,
+    "played": 4,
+    "voices": 2
+   },
+   {
+    "ms": 0.91,
+    "events": 1,
+    "pending": 0,
+    "played": 3,
     "voices": 4
    },
    {
-    "ms": 0.66,
+    "ms": 0.59,
     "events": 7,
     "pending": 0,
     "played": 5,
     "voices": 8
    },
    {
-    "ms": 0.56,
+    "ms": 0.71,
     "events": 4,
     "pending": 0,
-    "played": 3,
+    "played": 14,
     "voices": 5
-   },
-   {
-    "ms": 0.77,
-    "events": 7,
-    "pending": 0,
-    "played": 27,
-    "voices": 6
    }
   ],
   "marks": [
@@ -956,130 +1051,130 @@
    ],
    [
     "the same edge at noon",
-    3
+    4
    ],
    [
     "the same edge as rain arrives",
-    3
+    4
    ],
    [
     "the lake shore",
-    3
+    4
    ],
    [
     "a river at its fastest reach",
-    3
+    4
    ],
    [
     "the sea's edge",
-    3
+    5
    ],
    [
     "under a bridge",
-    3
+    5
    ],
    [
     "walking the road",
-    4
+    6
    ],
    [
     "walking on sand",
-    4
+    6
    ],
    [
     "wading in the shallows",
-    4
+    6
    ],
    [
     "walking on snow",
-    4
+    6
    ],
    [
     "walking a jetty's planks",
-    4
+    6
    ],
    [
     "walking the courtyard's packed earth, and a jump",
-    4
+    6
    ],
    [
     "walking over the stone bridge",
-    4
+    6
    ],
    [
     "climbing a stair to the wall walk",
-    4
+    6
    ],
    [
     "the fort gate at night: torches",
-    4
+    6
    ],
    [
     "walking through the gate passage (the echo)",
-    4
+    6
    ],
    [
     "inside a house by its hearth, evening",
-    4
+    6
    ],
    [
     "40 m from a chapel as ten strikes",
-    5
+    7
    ],
    [
     "by a well, the keeper drawing water",
-    5
+    7
    ],
    [
     "by a door as someone goes in (the latch)",
-    6
+    7
    ],
    [
     "beside the flock",
-    6
+    7
    ],
    [
     "beside the herd",
-    6
+    7
    ],
    [
     "beside the hens",
-    6
+    7
    ],
    [
     "beside the ducks",
-    6
+    7
    ],
    [
     "beside the gulls",
-    6
+    7
    ],
    [
     "beside the crow",
-    6
+    7
    ],
    [
     "beside the finches",
-    6
+    7
    ],
    [
     "walking up to a dog (one bark)",
-    6
+    7
    ],
    [
     "walking up to deer at dawn (breaking cover)",
-    7
+    8
    ]
   ],
   "state": {
-   "peak": 0.15919947624206543,
-   "prePeak": 0.0966707170009613,
-   "maxVoices": 11,
+   "peak": 0.1714678853750229,
+   "prePeak": 0.10412046313285828,
+   "maxVoices": 10,
    "voices": 2,
    "dropped": 0,
-   "ms": 0.12999999523162842,
+   "ms": 0.050000011920928955,
    "beds": {
-    "wind": 0.04700964823535166,
+    "wind": 0.047009648235334475,
     "rain": 0,
     "lake": 0,
     "river": 0,
@@ -1089,12 +1184,12 @@
    },
    "underfoot": "meadow",
    "ctx": "running",
-   "time": 373.2853333333333
+   "time": 373.33866666666665
   },
-  "frames": 22376,
+  "frames": 22379,
   "median": 0.06000000238418579,
-  "p95": 0.09000003337860107,
-  "max": 0.9249999523162842,
-  "over": 7
+  "p95": 0.10000002384185791,
+  "max": 1.1899999976158142,
+  "over": 9
  }
 }

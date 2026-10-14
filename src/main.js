@@ -742,6 +742,9 @@ lab.sound = {
   scene() { if (!sound || !sound.scene) return null; const c = (g) => g.cells.reduce((a, x) => a + x.length, 0); const S = sound.scene; return { lake: c(S.water.lake), river: c(S.water.river), sea: c(S.water.sea), trees: c(S.trees), fires: c(S.fires), wells: S.wells.slice(), chapels: S.chapels.slice(), gate: S.gate, bridges: S.bridges.slice() }; },
   stream() { return sound && sound.on ? sound.recordStream() : null; },
   get engine() { return sound; },
+  // (0.5.3) the music: what plays, and the next piece now
+  get music() { const m = sound && sound.music; return m ? { playing: !!m.piece, mode: m.piece ? m.piece.mode : null, bpm: m.piece ? +m.piece.bpm.toFixed(1) : null, lead: m.piece ? m.piece.lead : null, played: m.played, nextIn: m.piece ? 0 : +(m.nextAt - sound.ctx.currentTime).toFixed(1) } : null; },
+  nextPiece() { if (sound && sound.music) sound.music.next(); },
 };
 lab.version = VERSION;
 // (phase 4a) people, for the tools and the menu (before the menu, which

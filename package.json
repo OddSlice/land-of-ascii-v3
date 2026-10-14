@@ -1,6 +1,6 @@
 {
   "name": "land-of-ascii-v3",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "type": "module",
   "description": "Land of Ascii v3: a text-rendered explorer.",

@@ -8,7 +8,8 @@
 // and every other sound is an occasional event.
 //
 // The rules (docs/art-bible.md, section 10):
-// - quiet, filtered and sparse: nothing bright, nothing loud, no music;
+// - quiet, filtered and sparse: nothing bright, nothing loud; the music
+//   (0.5.3) is slow, soft and rare, with long quiet between pieces;
 // - wind and water are beds; everything else is an event;
 // - two loops never beat against each other (every slow wobble has its
 //   own rate, none a multiple of another);
@@ -88,6 +89,7 @@ export const SOUND = {
   // two steps a stride), each by the ground under the foot.
   steps: {
     level: 0.05, run: 1.7,      // walking; running is this much louder
+    every: 2,                   // one step in this many is heard (every step was too busy)
     stride: 1.3,                // metres a stride (two steps)
     runStride: 1.7,
     // per material: [band-pass Hz, q, decay s, thump Hz (0: none), thump share, grit (crunch grains)]
@@ -99,7 +101,7 @@ export const SOUND = {
     water: [1100, 0.7, 0.24, 0, 0, 0],
     snow: [2900, 0.6, 0.13, 0, 0, 1],
     splash: { level: 0.06, band: 1300, decay: 0.3 },          // wading
-    creak: { level: 0.03, pitch: [175, 135], band: 820, q: 6, decay: 0.32, every: 2 },   // timber stairs: a creak every so many steps
+    creak: { level: 0.03, pitch: [175, 135], band: 820, q: 6, decay: 0.32, every: 1 },   // timber stairs: a creak every so many heard steps
     land: { level: 0.08, pitch: [95, 48], decay: 0.16 },       // a jump's landing
     echo: { delay: 0.11, feedback: 0.34, low: 1600, wet: 0.55 },   // in the fort's gate passage
   },
@@ -113,4 +115,32 @@ export const SOUND = {
   well: { level: 0.04, ref: 5, reach: 45, every: 9, rope: [210, 260], splash: 1500 },   // someone drawing water: the rope's creak, the bucket
   bell: { level: 0.09, ref: 25, reach: 900, pitch: 523, partials: [[1, 1], [2.0, 0.5], [2.39, 0.35], [3.0, 0.25], [4.16, 0.15]], decay: 3.2, apart: 2.4, hours: [6, 21] },   // the chapel's bell, the hour's count, by day
   latch: { level: 0.04, ref: 4, reach: 40 },                   // a door's latch as someone goes in or out
+
+  // ---- music (0.5.3) ------------------------------------------------------------------
+  // Slow, soft pieces made in code as the land plays (src/sound/music.js):
+  // a warm pad, a felt-piano roll under it, now and then a melody on the
+  // piano or a soft flute, all in a long room's echo. Each piece is written
+  // when it starts, from a seeded generator, to the hour and the weather
+  // (bright modes by day, darker and slower by night and in rain), plays a
+  // minute or two, and leaves a long quiet after it, as the land's own sound
+  // is the point. It is not of the world: not placed, not in the voices, and
+  // it plays on (softer) under the menu and an exchange.
+  music: {
+    level: 0.16,                // the bus at full, of the master volume
+    default: 0.7,               // the menu's music slider to start with
+    first: 4,                   // seconds after the sound starts before the first piece
+    gap: [50, 120],             // seconds of quiet between pieces
+    lookahead: 0.6,             // seconds of notes scheduled ahead
+    bpm: { day: [58, 68], night: [48, 56] },
+    cycles: { day: 3, night: 2 },   // times round the four chords
+    chordBeats: 8,              // beats a chord (two bars)
+    duck: { menu: 0.6, talk: 0.8 },   // its level under the menu and an exchange (it plays on)
+    tone: { day: 4800, night: 3400, rain: 2600 },   // the bus's low-pass: warm, darker by night and in rain
+    room: { seconds: 3.8, decay: 2.4, wet: 0.55, dry: 0.75 },   // the echo: a long soft room
+    keys: { level: 0.5, decay: [5, 1.8], body: 0.3 },     // the felt piano: its ring (low to high notes), the early fall
+    flute: { level: 0.3, vibrato: [5.1, 0.006], breath: 0.05, low: 2600 },
+    pad: { level: 0.065, attack: 2.6, release: 3.4, low: [650, 1050], detune: 7 },
+    bass: { level: 0.13, low: 300 },
+    bell: { level: 0.24, decay: 1.6 },   // a few high notes on the last chord
+  },
 };

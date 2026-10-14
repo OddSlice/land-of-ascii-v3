@@ -16,6 +16,7 @@
 import { SOUND } from './palette.js';
 import * as SY from './synth.js';
 import { soundScene, around } from './scene.js';
+import { Music } from './music.js';
 import { weatherParams } from '../weather.js';
 import { primUnder, P as KP, PT, TX } from '../world/kit.js';
 import { MAT } from '../contract.js';
@@ -23,20 +24,20 @@ import { FS, S as PS, POSE } from '../world/people/figure.js';
 import { AS, A as AN, APOSE, KIND } from '../world/animals/kinds.js';
 
 const KEY = 'land-of-ascii-v3.sound';
-export const SOUND_DEFAULTS = { master: SOUND.master, air: 1, water: 1, life: 1, player: 1, places: 1, muted: false };
+export const SOUND_DEFAULTS = { master: SOUND.master, music: SOUND.music.default, air: 1, water: 1, life: 1, player: 1, places: 1, muted: false };
 
 export function loadSoundSettings() {
   const d = { ...SOUND_DEFAULTS };
   let s = null;
   try { s = JSON.parse(window.localStorage.getItem(KEY) || 'null'); } catch { s = null; }
   if (s && typeof s === 'object') {
-    for (const k of ['master', ...SOUND.groups]) if (typeof s[k] === 'number' && s[k] >= 0 && s[k] <= 1) d[k] = s[k];
+    for (const k of ['master', 'music', ...SOUND.groups]) if (typeof s[k] === 'number' && s[k] >= 0 && s[k] <= 1) d[k] = s[k];
     if (typeof s.muted === 'boolean') d.muted = s.muted;
   }
   return d;
 }
 export function saveSoundSettings(d) {
-  try { window.localStorage.setItem(KEY, JSON.stringify({ master: d.master, air: d.air, water: d.water, life: d.life, player: d.player, places: d.places, muted: d.muted })); } catch { /* not kept */ }
+  try { window.localStorage.setItem(KEY, JSON.stringify({ master: d.master, music: d.music, air: d.air, water: d.water, life: d.life, player: d.player, places: d.places, muted: d.muted })); } catch { /* not kept */ }
 }
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -114,6 +115,9 @@ export class Sound {
     this.rain = SY.rainBed(ctx, this.nz, this.group.air);
     this.waterBeds = ['lake', 'river', 'sea'].map((kind) => { const pl = this.place('water'); return { kind, pl, bed: SY.waterBed(ctx, this.nz, pl.in, kind), ear: 0 }; });
     this.fireBeds = Array.from({ length: SOUND.fire.near }, (_, k) => { const pl = this.place('places'); return { pl, beds: { torch: SY.fireBed(ctx, this.nz, pl.in, 'torch'), hearth: SY.fireBed(ctx, this.nz, pl.in, 'hearth') }, ear: 0, k }; });
+    // (0.5.3) the music: its own bus into the limiter, outside the world's voices
+    this.music = new Music(ctx, this.limiter, this.nz, (this.world.seed || 0) * 7919 + Math.floor(Math.random() * 1e6));   // (a new piece order each visit)
+    this.music.out.connect(this.preMeter);
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.visibility());
     return true;
   }
@@ -128,6 +132,7 @@ export class Sound {
     if (name === 'muted') this.settings.muted = !!v; else this.settings[name] = Math.max(0, Math.min(1, v));
     saveSoundSettings(this.settings);
     if (this.ctx && this.group[name]) this.group[name].gain.setTargetAtTime(this.settings[name], this.ctx.currentTime, 0.05);
+    else if (this.ctx && name === 'music') this.applyMaster();
   }
   toggleMute() { this.set('muted', !this.settings.muted); return this.settings.muted; }
   visibility() {
@@ -162,6 +167,11 @@ export class Sound {
     else if (this.paused === 'menu') { v *= SOUND.duck.menu; tc = F.menu / 3; }
     else if (this.paused === 'talk') { v *= SOUND.duck.talk; tc = F.talk / 3; }
     this.out.gain.setTargetAtTime(v, now, tc);
+    // the music plays on under the menu and an exchange, a little softer
+    const Mu = SOUND.music;
+    let mv = s.muted || this.hidden ? 0 : s.master * s.music * Mu.level;
+    if (this.paused === 'menu') mv *= Mu.duck.menu; else if (this.paused === 'talk') mv *= Mu.duck.talk;
+    this.music.level(mv, this.hidden ? tc : F.unhide / 2);
   }
 
   // ---- events --------------------------------------------------------------------------
@@ -302,6 +312,9 @@ export class Sound {
       this.bells(fr, hour, now);
     }
     this.footsteps(fr, now);
+    // (0.5.3) the music: the next piece as its time comes, its notes as they fall due
+    const notes = this.music.update(now, hour, rain, !this.settings.muted && this.settings.music > 0 && this.settings.master > 0);
+    if (notes && this.log) for (let k = 0; k < notes; k++) this.log.push({ kind: 'music', group: 'music', level: +this.music.out.gain.value.toFixed(5), at: +now.toFixed(3), d: 0 });
     // the gate passage's echo
     const G = this.scene.gate;
     let inGate = 0;
@@ -430,6 +443,8 @@ export class Sound {
     this.walked -= half;
     if (this.walked > half) this.walked = 0;
     this.steps++;
+    // (one step in St.every is heard: every step was too busy)
+    if (this.steps % St.every) return;
     const r = hashU(this.steps, 77), v = St.level * (running ? St.run : 1);
     // what is underfoot
     const W = this.world, T = W.terrain, j = Math.round(fr.z) * T.NN + Math.round(fr.x);
@@ -451,6 +466,6 @@ export class Sound {
     this.underfoot = m;
     this.play(`step:${m}`, 'player', (c, n, o, t, vv, rr) => SY.footstep(c, n, o, t, vv, St[m], rr), now, fr.x, fr.z, v, 1, 30, r);
     if (m === 'water') this.play('splash', 'player', SY.splash, now + 0.03, fr.x, fr.z, St.splash.level * (running ? 1.4 : 1), 1, 30, r);
-    if (creak && this.steps % St.creak.every === 0) this.play('creak', 'player', SY.creak, now + 0.02, fr.x, fr.z, St.creak.level, 1, 30, r);
+    if (creak && (this.steps / St.every) % St.creak.every === 0) this.play('creak', 'player', SY.creak, now + 0.02, fr.x, fr.z, St.creak.level, 1, 30, r);
   }
 }

@@ -29,6 +29,7 @@
 //     save line, backup, restore box and clear (asked first) are reached
 //     by Tab; and nothing on any of them is an emoji.
 //   node tools/menu-check.mjs [--browser chromium]
+import { SOUND } from '../src/sound/palette.js';
 import { launch } from './lib/browser.mjs';
 import { serve, args, openLab } from './lib/serve.mjs';
 
@@ -417,6 +418,10 @@ try {
     check('the page starts silent, and the start card says sound starts with the first click', !silent.on && /first click/.test(silent.line), JSON.stringify(silent));
     await sp.mouse.click(500, 300); await sp.waitForTimeout(400);
     check('the first click starts the sound', await sp.evaluate(() => window.lab.sound.on));
+    // (0.5.3) the music: its first piece a few seconds in
+    await sp.waitForTimeout((SOUND.music.first + 1.5) * 1000);
+    const mus = await sp.evaluate(() => window.lab.sound.music);
+    check('the music starts a few seconds after the sound', mus && mus.playing && mus.played > 0, JSON.stringify(mus));
     await sp.keyboard.press('Escape'); await sp.waitForTimeout(300);
     if (!(await sp.evaluate(() => window.lab.menu.read().open))) { await sp.keyboard.press('Escape'); await sp.waitForTimeout(300); }
     await sp.evaluate(() => document.querySelector('#menu-tab-sound').click());
@@ -425,11 +430,11 @@ try {
       const pane = document.querySelector('#menu .pane'), sec2 = document.querySelector('#menu-panel-sound');
       return { sliders: sec2.querySelectorAll('input[type="range"]').length, toggles: sec2.querySelectorAll('[role="switch"]').length, fit: pane.scrollWidth <= pane.clientWidth && document.documentElement.scrollWidth <= innerWidth, text: sec2.innerText };
     });
-    check('the Sound section: on or off, the volume and five kinds of sound', sec.toggles === 1 && sec.sliders === 6, JSON.stringify({ sliders: sec.sliders, toggles: sec.toggles }));
+    check('the Sound section: on or off, the volume, the music and five kinds of sound', sec.toggles === 1 && sec.sliders === 7, JSON.stringify({ sliders: sec.sliders, toggles: sec.toggles }));
     check('the Sound section fits at 1024 x 640 with no sideways scrolling', sec.fit);
     const named = [];
     for (let k = 0; k < 12; k++) { await sp.keyboard.press('Tab'); named.push(await focusName(sp)); }
-    const want = ['sound', 'volume', 'wind and rain', 'water', 'birds and beasts', 'your footsteps', 'fires, wells, bells and doors'];
+    const want = ['sound', 'volume', 'music', 'wind and rain', 'water', 'birds and beasts', 'your footsteps', 'fires, wells, bells and doors'];
     check('Tab reaches every Sound control', want.every((w2) => named.some((n) => n && n.includes(w2))), want.filter((w2) => !named.some((n) => n && n.includes(w2))).join(', '));
     // the volume down by the arrow keys, kept after a reload
     await sp.focus('#menu-panel-sound input[type="range"]');
