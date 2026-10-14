@@ -150,9 +150,12 @@ export function planFort({ H, N, kind, wetDist, site, arrive, seed, base: given 
     const walls = [Math.atan2(prev[1] - p[1], prev[0] - p[0]), Math.atan2(next[1] - p[1], next[0] - p[0])];
     return { at: p, size, round: round[k], inward, walls };
   });
-  // (phase 3b: the first square tower's ground floor furnished)
+  // (phase 3b: the first square tower's ground floor furnished; phase 5b:
+  // every tower's, as the houses are)
+  // (the first square tower's furniture where it always was; the others'
+  // added late, src/world/kit.js)
   const furnished = towers.findIndex((t) => !t.round);
-  towers.forEach((t, k) => pieces.push({ kind: 'tower', shape: t.round ? 'round' : 'square', at: t.at, size: t.size, base, inward: t.inward, walls: t.walls, seed: 2000 + k * 37, furnish: k === furnished }));
+  towers.forEach((t, k) => pieces.push({ kind: 'tower', shape: t.round ? 'round' : 'square', at: t.at, size: t.size, base, inward: t.inward, walls: t.walls, seed: 2000 + k * 37, furnish: k === furnished ? true : 'late' }));
   // the curtain walls, from tower to tower: each runs on to the towers'
   // middles, with the towers' insides cut out of it, so it meets a tower
   // cleanly at any angle

@@ -184,7 +184,9 @@ export const LOOK = {
     flowera:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
     flowerb:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
     flowerc:  { glyphs: ',:;"+*',    ink: { lit: -0.28, dark: 0.48 }, tone: 0.22 },
-    reed:     { glyphs: '.:|!I',     ink: { lit: -0.28, dark: 0.46 }, tone: 0.20, toneRung: 0.2 },
+    // (phase 5b: strokes on every rung, darker on lit stems, so a bed reads
+    // as stems; it read as a mound of dots in the light)
+    reed:     { glyphs: "'|!I",      ink: { lit: -0.42, dark: 0.50 }, tone: 0.20, toneRung: 0.2 },
     bark:     { glyphs: ':|!I#',     ink: { lit: -0.28, dark: 0.46 }, tone: 0.20 },
     wool:     { glyphs: '.,:;o%',    ink: { lit: -0.18, dark: 0.38 }, tone: 0.08 },
     hide:     { glyphs: '.,:;=+',    ink: { lit: -0.22, dark: 0.42 }, tone: 0.08 },
@@ -230,14 +232,26 @@ export const LOOK = {
   // - `bark.groove`: bark's grooves (metres apart); `rings`: a cut end's
   // - `reed`: `stem` (metres apart), `jag` (how much the stems' heights
   //   differ), `tip` (paler toward their tips), `part`: a walker parts them
-  //   [from, to] metres from the eye, down to [2] of their height
+  //   [from, to] metres from the eye, down to [2] of their height;
+  //   (phase 5b) each sector of `wave` a tuft: level across its middle and
+  //   eased to the next over `ease` of it (a ragged top of tufts rather
+  //   than a wave), its own tone `tuft`, taller tufts paler, so a bed reads
+  //   as stems from 10 m rather than a mound; only at the middle distance,
+  //   while a tuft is under `mid` columns across (nearer, the stems show)
+  // (phase 5b) The fort's masonry: its blocks' head joints `head` metres
+  // wide, crisp near, and from a cell's footprint of `from` metres held at `held` cells across when narrower than that and darkened
+  // by their true share, drawn while a cell's footprint is under `fade`
+  // metres (fully to about 24 m, gone by about 35 m), on a wall seen within
+  // `square` of square on (the cosine; along a wall they sweep too fast)
+  masonry: { head: 0.05, held: 3.5, dark: 0.6, from: [0.045, 0.07], fade: [0.11, 0.16], square: [0.7, 0.88] },
+
   wild: {
     fadeMin: 0.06,
     boulder: { own: 0.5, lichen: [0.6, 0.35] },
     outcrop: { band: 0.32 },
     bark: { groove: 0.07 },
     rings: 0.035,
-    reed: { stem: 0.24, wave: 0.6, jag: 0.3, tip: 0.4, part: [0.45, 1.5, 0.3] },
+    reed: { stem: 0.24, wave: 0.6, jag: 0.3, jagMid: 0.1, ease: 0.35, tip: 0.4, part: [0.45, 1.5, 0.3], tuft: 0.6, mid: [16, 28] },
   },
 
   water: {
@@ -329,12 +343,19 @@ export const LOOK = {
   //   `lift` of the way to its lit one, faded out toward `far` metres; a far
   //   flock shows `keep` marks at `near` metres and fewer beyond (by count,
   //   the last one fading), never fewer than `least`.
+  //   (phase 5b) `lift` below 0 makes the mark darker than the bird's shaded
+  //   colour, and `weight` darkens the cell under it a little too, so a far
+  //   bird reads as a dark tick against the sky; `grow`: a crow or a small
+  //   bird drawn up to this much bigger toward the middle distance (from 0.7
+  //   of the near distance to the middle one), where its true size is a cell
+  //   or two and it went unnoticed
   animals: {
     // (a far silhouette held at two cells is drawn while it is at least this
     // share of them, and faded by that share)
     fadeMin: 0.05,
     shadow: { dark: 0.62, soft: 0.45, far: 90 },
-    marks: { glyphs: 'v-^', lift: 0.3, far: 700, near: 160, least: 3 },
+    marks: { glyphs: 'v-^', lift: -0.35, weight: 0.22, far: 700, near: 160, least: 3 },
+    grow: 0.8,
   },
 
   // A flame held at its minimum size (two rows) is faded toward what is

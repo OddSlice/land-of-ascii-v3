@@ -119,7 +119,11 @@ export class KitBuilder {
   // A shape. `o`: { type, x, z, a (radians), hx, hz, y0, y1, mat, flags, ...,
   // holes: [{ type, x, z, a, hx, hz, y0, y1, r, room, close }] } (hole
   // positions in world space).
+  // (phase 5b) `late`: added after everything else when the kit is compiled,
+  // so a shape added to an old place (a tower's furniture) moves no other
+  // shape's index, and so no unseeded shape's seed (its index)
   add(o) {
+    if (o.late) { (this.late || (this.late = [])).push(o); return -1; }
     const h0 = this.holes.length;
     for (const h of o.holes || []) this.holes.push(h);
     const id = this.prims.length;
@@ -138,7 +142,13 @@ export class KitBuilder {
   // `nz`: the wall's outward normal), or a hearth's fire (`mount:
   // 'hearth'`), its flame at height `y`; `mask`: which zones it lights (the
   // yard, outside), and `rooms`: which rooms.
-  torch(t) { this.torches.push(t); }
+  torch(t) { if (t.late) (this.lateTorches || (this.lateTorches = [])).push(t); else this.torches.push(t); }
+  // the late shapes and torches after the rest (they have no openings)
+  settle() {
+    for (const o of this.late || []) { const { late, ...rest } = o; void late; this.prims.push({ ...rest, h0: this.holes.length, hn: 0, id: this.prims.length }); }
+    for (const t of this.lateTorches || []) { const { late, ...rest } = t; void late; this.torches.push(rest); }
+    this.late = []; this.lateTorches = [];
+  }
 }
 
 // ---- compiling ---------------------------------------------------------------
@@ -146,6 +156,7 @@ export class KitBuilder {
 const GRID = 4;           // metres per square of the walking and lookup index
 
 export function compileKit(b) {
+  if (b.settle) b.settle();
   const np = b.prims.length, nh = b.holes.length;
   const prims = new Float64Array(np * P_STRIDE);
   const holes = new Float64Array(nh * H_STRIDE);
@@ -213,6 +224,7 @@ export function compileKit(b) {
 // The description, as plain data, for a world's packed form; the kit is
 // compiled again from it in each thread.
 export function kitData(b) {
+  if (b.settle) b.settle();
   return { prims: b.prims, holes: b.holes, rooms: b.rooms, torches: b.torches, yards: b.yards, cleared: b.cleared };
 }
 export function kitFromData(d) {
@@ -376,6 +388,17 @@ export function supportAt(kit, x, z, maxY) {
   return best;
 }
 
+// (phase 5b) The shape a foot at (x, feet, z) stands on, for its sound: the
+// offset of the shape whose solid is just under it, or -1 (the ground).
+// (just under the feet, or a step's height under them: on a stair the feet
+// ride the next step's edge)
+export function primUnder(kit, x, z, feet) {
+  if (!kit || !kit.np) return -1;
+  const list = near(kit, x, z, NEAR_TMP);
+  for (const dy of [0.04, 0.3]) for (const i of list) if (inPrim(kit, i, x, feet - dy, z)) return i * P_STRIDE;
+  return -1;
+}
+
 // Is there solid just under height y at (x, z), and none just over it?
 function holds(kit, list, n, x, y, z) {
   return solidAtList(kit, list, n, x, y - 0.02, z) && !solidAtList(kit, list, n, x, y + 0.02, z);
@@ -504,7 +527,9 @@ export function shelterOf(kit, r, x, y, z, nx, ny, nz) {
 // Raise occluder heights (a grid of node heights, NN a side) by the kit's
 // shapes: each node under a shape takes its top, unless an opening cuts
 // through that top there (a round tower's inside); crenels count as half.
-export function raiseOccluders(kit, occ, N, NN) {
+// (`step`: nodes that many metres apart, for a coarser grid; 1 for the
+// shadows' own)
+export function raiseOccluders(kit, occ, N, NN, step = 1) {
   if (!kit || !kit.np) return;
   // (shape by shape over its own footprint, phase 3b: the kit's box now
   // spans the villages too; the same heights as node by node)
@@ -514,11 +539,12 @@ export function raiseOccluders(kit, occ, N, NN) {
     if (t === PT.PANE) continue;
     const R = reachOf(S, q), cx = S[q + P.CX], cz = S[q + P.CZ], ca = S[q + P.CA], sa = S[q + P.SA];
     const cren = (S[q + P.FLAGS] & PF.CRENEL) !== 0;
-    for (let z = Math.max(0, Math.ceil(cz - R)); z <= Math.min(N, Math.floor(cz + R)); z++) {
-      for (let x = Math.max(0, Math.ceil(cx - R)); x <= Math.min(N, Math.floor(cx + R)); x++) {
+    for (let gz = Math.max(0, Math.ceil((cz - R) / step)); gz <= Math.min(N, Math.floor((cz + R) / step)); gz++) {
+      for (let gx = Math.max(0, Math.ceil((cx - R) / step)); gx <= Math.min(N, Math.floor((cx + R) / step)); gx++) {
+        const x = gx * step, z = gz * step;
         const dx = x - cx, dz = z - cz, u = dx * ca + dz * sa, w = -dx * sa + dz * ca;
         let y = topAt(kit, q, u, w);
-        const j = z * NN + x;
+        const j = gz * NN + gx;
         if (y === -Infinity || y <= occ[j]) continue;
         if (cren) y = S[q + P.Y1] - S[q + P.MH] * (1 - S[q + P.MW]);
         let cut = false;

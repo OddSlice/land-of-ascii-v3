@@ -89,7 +89,13 @@ const methods = {
       // the stems' ragged top, while their difference is a couple of rows
       // and each wave of it a few columns across (narrower, each cell would
       // land on a height of its own and the top would sparkle as you move)
-      kp.jag = W.reed.jag * smooth(1.5, 3, W.reed.jag * h / rowH) * smooth(2.5, 5, W.reed.wave / minR);
+      // (phase 5b) the tufts' plateaus, and a taller rag, at the middle
+      // distance only (a tuft up to about `mid` columns across); nearer,
+      // the eased wave as before
+      const mid = 1 - smooth(W.reed.mid[0], W.reed.mid[1], W.reed.wave / minR), jag = W.reed.jag + W.reed.jagMid * mid;
+      kp.jag = jag * smooth(1.5, 3, jag * h / rowH) * smooth(2.5, 5, W.reed.wave / minR);
+      kp.ease = 1 - (1 - W.reed.ease) * mid;
+
       // a walker near: the bed parts round the eye
       const ox = this.v.ex - S[q + P.CX], oz = this.v.ez - S[q + P.CZ];
       kp.part = ox * ox + oz * oz < (R + W.reed.part[1] + 0.2) * (R + W.reed.part[1] + 0.2);
@@ -166,7 +172,11 @@ const methods = {
           // a ray there would take one, then the other)
           // (eased from one sector's height to the next, so the top's edge
           // has no steps for a moving eye to catch)
-          const ang = (Math.atan2(z - cz, x - cx) + Math.PI) * R / W.reed.wave, i = Math.floor(ang), f = ang - i, e = f * f * (3 - 2 * f);
+          // (phase 5b: each sector a tuft, level across its middle and eased
+          // to the next only near its sides, so the top reads ragged, tuft
+          // by tuft, from 10 m; plateaus, not peaks, which a moving eye
+          // would sweep past a cell and back)
+          const ang = (Math.atan2(z - cz, x - cx) + Math.PI) * R / W.reed.wave, i = Math.floor(ang), f = ang - i, e = smooth(0.5 - kp.ease / 2, 0.5 + kp.ease / 2, f);
           const nS = Math.max(1, Math.round(2 * Math.PI * R / W.reed.wave)), a0 = hashU(((i % nS) + nS) % nS, seed), a1 = hashU((((i + 1) % nS) + nS) % nS, seed);
           k = 1 - kp.jag * (a0 + (a1 - a0) * e);
         }
@@ -212,3 +222,11 @@ const methods = {
 };
 
 export function installWild(cls) { Object.assign(cls.prototype, methods); }
+
+// (phase 5b) The tuft of a reed bed at `arc` metres round it (from the
+// angle -pi), radius R: the hash its top's height comes from (higher hash,
+// lower tuft), the same for the side's tone, so tall tufts are the pale ones.
+export function reedTuft(arc, R, seed) {
+  const nS = Math.max(1, Math.round(2 * Math.PI * R / W.reed.wave)), i = Math.floor(arc / W.reed.wave);
+  return hashU(((i % nS) + nS) % nS, seed);
+}

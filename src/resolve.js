@@ -697,7 +697,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
   if (rainOn) rainStreaks(frame, P, hits, c0, sw, rows);
   const marksOn = viewed && !!(frame.marks && frame.marks.length);
   if (marksOn) birdMarks(frame, hits, c0, sw, rows);
-  const markLift = LOOK.animals.marks.lift;
+  const markLift = LOOK.animals.marks.lift, markWeight = LOOK.animals.marks.weight || 0;
   const mc = pal.mistC, rc = pal.rainC;
   const [ifr, ifg, ifb] = pal.inkFloor;
   const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
@@ -802,8 +802,11 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
         // a bird far off: its mark, in its shaded colour (a little lit)
         const st = markS[i], j = markM[i] * 3, sh = pal.shade, lt = pal.lit;
         cells[oc + 3] = markG[i];
-        const mr = sh[j] + (lt[j] - sh[j]) * markLift, mg = sh[j + 1] + (lt[j + 1] - sh[j + 1]) * markLift, mb = sh[j + 2] + (lt[j + 2] - sh[j + 2]) * markLift;
-        fr = br + (mr - br) * st; fg = bgG + (mg - bgG) * st; fb = bb + (mb - bb) * st;
+        const mr = Math.max(0, sh[j] + (lt[j] - sh[j]) * markLift), mg = Math.max(0, sh[j + 1] + (lt[j + 1] - sh[j + 1]) * markLift), mb = Math.max(0, sh[j + 2] + (lt[j + 2] - sh[j + 2]) * markLift);
+        // (phase 5b) the cell under a mark darkened a little toward it
+        const wgt = markWeight * st, dk = clampColour(br + (mr - br) * wgt, bgG + (mg - bgG) * wgt, bb + (mb - bb) * wgt);
+        cells[oc] = dk[0]; cells[oc + 1] = dk[1]; cells[oc + 2] = dk[2];
+        fr = dk[0] + (mr - dk[0]) * st; fg = dk[1] + (mg - dk[1]) * st; fb = dk[2] + (mb - dk[2]) * st;
       } else { fr = br + ink * (br > ifr ? br : ifr); fg = bgG + ink * (bgG > ifg ? bgG : ifg); fb = bb + ink * (bb > ifb ? bb : ifb); }
       const fc = clampColour(fr, fg, fb);
       cells[oc + 4] = fc[0]; cells[oc + 5] = fc[1]; cells[oc + 6] = fc[2]; cells[oc + 7] = 0;

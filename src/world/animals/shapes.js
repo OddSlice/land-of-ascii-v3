@@ -60,8 +60,12 @@ export function animalParts(st, o, dist, colAngle, rowAngle, t, out, at, ex = Na
     const rel = Number.isNaN(ex) ? Math.PI / 2 : Math.atan2(X - ex, Z - ez) - yaw;
     const across = sp.len * 0.5 * s * Math.abs(Math.sin(rel)) + sp.r * s * Math.abs(Math.cos(rel));
     const wH = Math.max(across, minC), hH = Math.max(h - base, minR);
-    const cover = Math.min(1, (across * (h - base)) / (wH * hH));
+    let cover = Math.min(1, (across * (h - base)) / (wH * hH));
     if (cover < LOOK.animals.fadeMin) return 0;
+    // (phase 5b) a perched crow or small bird far off: drawn at the size it
+    // has at the middle distance, and less faded, a dark mark rather than a
+    // pale speck (it went unnoticed)
+    if (kind === KIND.CROW || kind === KIND.FINCH) cover = Math.min(1, cover * (1 + LOOK.animals.grow) * (1 + LOOK.animals.grow));
     box(0, 0, wH, wH, base, base + hH, M1, 0, cover);
     return n;
   }
@@ -149,17 +153,22 @@ export function animalParts(st, o, dist, colAngle, rowAngle, t, out, at, ex = Na
       break;
     }
     case KIND.GULL: case KIND.CROW: case KIND.FINCH: case KIND.KITE: {
-      const k = kind === KIND.GULL ? 1 : kind === KIND.CROW ? 0.9 : kind === KIND.FINCH ? 0.35 : 1.6;
+      let k = kind === KIND.GULL ? 1 : kind === KIND.CROW ? 0.9 : kind === KIND.FINCH ? 0.35 : 1.6;
+      // (phase 5b) a crow or a small bird bigger toward the middle distance
+      let grow = 1;
+      if (kind === KIND.CROW || kind === KIND.FINCH) { const g = Math.max(0, Math.min(1, (dist - ANEAR_D * 0.7) / (AMID_D - ANEAR_D * 0.7))); grow = 1 + LOOK.animals.grow * g * g * (3 - 2 * g); k *= grow; }
       if (pose === APOSE.PERCH) {
         if (near) box(0, 0, 0.02 * k, 0.02 * k, 0, 0.1 * k, kind === KIND.GULL ? MAT.OCHRE : M2, 1);
-        box(0, 0, 0.08 * k * s, 0.18 * k * s, 0.1 * k * s, 0.3 * k * s, M1);
+        // (phase 5b: a crow's or a small bird's body past the near distance
+        // is held at two rows and two columns, as thin parts are)
+        box(0, 0, 0.08 * k * s, 0.18 * k * s, 0.1 * k * s, 0.3 * k * s, M1, grow > 1 && !near ? 1 : 0);
         if (near) { box(0.075 * k * s, -0.06 * k * s, 0.02 * k * s, 0.15 * k * s, 0.18 * k * s, 0.3 * k * s, M2, 1); box(-0.075 * k * s, -0.06 * k * s, 0.02 * k * s, 0.15 * k * s, 0.18 * k * s, 0.3 * k * s, M2, 1); }
         box(0, 0.17 * k * s, 0.045 * k * s, 0.06 * k * s, 0.27 * k * s, 0.37 * k * s, M1);
         break;
       }
       // in the air: a body and two wings beating (thin: the render pass
       // holds them at two rows and fades them)
-      const span = (sp.span || 1) * s, e = Math.sin(ph), lift = 0.14 * k * e;
+      const span = (sp.span || 1) * s * grow, e = Math.sin(ph), lift = 0.14 * k * e;
       box(0, 0, 0.07 * k * s, 0.2 * k * s, -0.05 * k, 0.05 * k, M1);
       for (const sg of [-1, 1]) box(sg * (0.07 * k * s + span / 4), 0, span / 4, 0.1 * k * s, lift - 0.015, lift + 0.015, M1, 1);
       break;

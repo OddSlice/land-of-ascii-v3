@@ -86,8 +86,8 @@ export function windowIn(b, F, u, face, y, holes, room, seed, through = 0, lit =
 // face at (x, z), its outward normal (nx, nz), at height y; or on a post.
 // (`rooms`: the rooms it lights, besides the zones in `mask`; `light`: how
 // strongly it lights what is round it, its flame as bright whatever this is)
-export function bracketTorch(b, x, z, nx, nz, y, mask, phase, off = 0.32, rooms = [], light = 1) {
-  b.torch({ x: x + nx * off, z: z + nz * off, base: y - 0.18 - 0.36, h: 0.36, flameY: y, phase, mask, rooms, mount: 'bracket', ...(light !== 1 ? { light } : {}) });
+export function bracketTorch(b, x, z, nx, nz, y, mask, phase, off = 0.32, rooms = [], light = 1, late = false) {
+  b.torch({ x: x + nx * off, z: z + nz * off, base: y - 0.18 - 0.36, h: 0.36, flameY: y, phase, mask, rooms, mount: 'bracket', ...(light !== 1 ? { light } : {}), ...(late ? { late } : {}) });
 }
 export function postTorch(b, x, z, base, mask, phase, rooms = []) {
   b.torch({ x, z, base, h: 2.1, flameY: base + 2.1 + 0.18, phase, mask, rooms, mount: 'post' });
@@ -207,19 +207,22 @@ export function tower(b, p) {
   // (phase 3b) a table and a shelf against the wall facing the stair, at
   // the end away from the ground door, clear of the way to the stair's foot
   if (p.furnish) {
+    // (phase 5b: a tower furnished since 5b, 'late', puts its shapes after
+    // the rest, so no other shape's index moves)
+    const late = p.furnish === 'late';
     const Tb = K.table, Sh = K.shelf, inside = PF.INSIDE | PF.WALK;
     const c0 = size - wt;
     const spots = [-1, 1].map((sg) => ({ sg, pos: SF.at(c0 - Tb.d - 0.12, sg * (c0 - Tb.w - 0.35)) }))
       .sort((p1, p2) => Math.hypot(p2.pos[0] - doorAt[0], p2.pos[1] - doorAt[1]) - Math.hypot(p1.pos[0] - doorAt[0], p1.pos[1] - doorAt[1]));
     const t = spots[0];
     if (Math.hypot(t.pos[0] - doorAt[0], t.pos[1] - doorAt[1]) > 2.6) {
-      b.add({ type: PT.BOX, x: t.pos[0], z: t.pos[1], a: SF.a + D2, hx: Tb.w, hz: Tb.d, y0: base + Tb.h - 0.06, y1: base + Tb.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 90 });
+      b.add({ type: PT.BOX, x: t.pos[0], z: t.pos[1], a: SF.a + D2, hx: Tb.w, hz: Tb.d, y0: base + Tb.h - 0.06, y1: base + Tb.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 90, late });
       for (const sg of [-1, 1]) {
         const [lx, lz] = SF.at(c0 - Tb.d - 0.12, t.sg * (c0 - Tb.w - 0.35) + sg * (Tb.w - 0.12));
-        b.add({ type: PT.BOX, x: lx, z: lz, a: SF.a + D2, hx: 0.05, hz: Tb.d * 0.75, y0: base, y1: base + Tb.h - 0.06, mat: MAT.TIMBER, tex: TX.PLAIN, room, flags: inside | PF.GROW, seed: seed + 91 });
+        b.add({ type: PT.BOX, x: lx, z: lz, a: SF.a + D2, hx: 0.05, hz: Tb.d * 0.75, y0: base, y1: base + Tb.h - 0.06, mat: MAT.TIMBER, tex: TX.PLAIN, room, flags: inside | PF.GROW, seed: seed + 91, late });
       }
       const sp = SF.at(c0 - Sh.d - 0.02, -t.sg * (c0 - Sh.w - 0.4));
-      if (Math.hypot(sp[0] - doorAt[0], sp[1] - doorAt[1]) > 2.2) b.add({ type: PT.BOX, x: sp[0], z: sp[1], a: SF.a + D2, hx: Sh.w, hz: Sh.d, y0: base, y1: base + Sh.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 92 });
+      if (Math.hypot(sp[0] - doorAt[0], sp[1] - doorAt[1]) > 2.2) b.add({ type: PT.BOX, x: sp[0], z: sp[1], a: SF.a + D2, hx: Sh.w, hz: Sh.d, y0: base, y1: base + Sh.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 92, late });
     }
   }
   // the stair: a solid flight up the back strip from the -w end, a landing,
@@ -321,6 +324,17 @@ function roundTower(b, p, wa, holes, lights, top) {
     b.add({ type: PT.BOX, x, z, a: a + th, hx: band / 2 + 0.06, hz: rm * dth / 2 + 0.05, y0: y1 - slab, y1, mat: MAT.MASONRY, tex: TX.MASONRY, tex2: TX.FLAGS, room, flags: PF.INSIDE | PF.WALK, seed: s });
   };
   for (let k = 0; k < n; k++) step(th0 + (k + 0.5) * dth, base + (k + 1) * rise, seed + 10 + k);
+  // (phase 5b) furnished as the houses are: a table toward the back, clear
+  // of the spiral's band and of the way from the door to its foot
+  if (p.furnish) {
+    const Tb = K.table, inside = PF.INSIDE | PF.WALK, tu = -(rm - band / 2 - Tb.d - 0.35);
+    const [tx, tz] = F.at(tu, 0);
+    b.add({ type: PT.BOX, x: tx, z: tz, a: a + D2, hx: Tb.w, hz: Tb.d, y0: base + Tb.h - 0.06, y1: base + Tb.h, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: inside, seed: seed + 90, late: true });
+    for (const sg of [-1, 1]) {
+      const [lx, lz] = F.at(tu, sg * (Tb.w - 0.12));
+      b.add({ type: PT.BOX, x: lx, z: lz, a: a + D2, hx: 0.05, hz: Tb.d * 0.75, y0: base, y1: base + Tb.h - 0.06, mat: MAT.TIMBER, tex: TX.PLAIN, room, flags: inside | PF.GROW, seed: seed + 91, late: true });
+    }
+  }
   const thLowEnd = th0 + n * dth;
   const thUp = Math.max(wa[0] + 0.28, 60 * Math.PI / 180);
   const n3 = Math.round(T.above / S.rise), r3 = T.above / n3;
@@ -415,8 +429,21 @@ export function keep(b, p) {
     }
   }
   // (phase 3b) the hall furnished as a house is: a hearth at one end, a
-  // table, a bed along the back wall, a shelf
-  furnish(b, frame(p.at[0], p.at[1], F.a - D2), hw - wt, hd - wt, base + 0.06, room, MAT.TIMBER, seed + 500, 1, seed * 0.29);
+  // table, a bed along the back wall, a shelf; (phase 5b) and a bench either
+  // side of the table
+  const HF = frame(p.at[0], p.at[1], F.a - D2);
+  furnish(b, HF, hw - wt, hd - wt, base + 0.06, room, MAT.TIMBER, seed + 500, 1, seed * 0.29);
+  {
+    const T = K.table, Bn = K.bench, iw = hw - wt, tu = iw * 0.15;
+    for (const sg of [-1, 1]) {
+      const [x, z] = HF.at(tu, 0.1 + sg * (T.d + Bn.depth + 0.12));
+      b.add({ type: PT.BOX, x, z, a: HF.a, hx: T.w - 0.05, hz: Bn.depth, y0: base + 0.06 + Bn.seat - 0.06, y1: base + 0.06 + Bn.seat, mat: MAT.TIMBER, tex: TX.BOARDS, tex2: TX.BOARDS, room, flags: PF.INSIDE | PF.WALK, seed: seed + 530 + sg, late: true });
+      for (const e of [-1, 1]) {
+        const [lx, lz] = HF.at(tu + e * (T.w - 0.2), 0.1 + sg * (T.d + Bn.depth + 0.12));
+        b.add({ type: PT.BOX, x: lx, z: lz, a: HF.a, hx: 0.05, hz: Bn.depth * 0.8, y0: base + 0.06, y1: base + 0.06 + Bn.seat - 0.06, mat: MAT.TIMBER, tex: TX.PLAIN, room, flags: PF.INSIDE | PF.WALK | PF.GROW, seed: seed + 540 + sg + e, late: true });
+      }
+    }
+  }
   // (phase 4a) the guards' bunks, along the hall's front wall either side of
   // the door and down its far end
   for (const bk of keepBunks(p)) b.add({ type: PT.BOX, x: bk.x, z: bk.z, a: bk.a, hx: K.bed.w, hz: K.bed.d, y0: base + 0.06, y1: bk.top, mat: MAT.PLASTER2, tex: TX.PLAIN, tex2: TX.PLAIN, room, flags: PF.INSIDE | PF.WALK, seed: seed + 520 + bk.k });

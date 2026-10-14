@@ -29,6 +29,8 @@
 import { MAT, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC } from '../../contract.js';
 import { vnoise } from '../../world/noise.js';
 import { LOOK } from '../../look.js';
+import { reedTuft } from './wild.js';
+import { LOST } from '../../world/things.js';
 import { PT, HT, PF, TX, P, H, P_STRIDE, H_STRIDE, HOLD_MIN, zoneAt, roomBit, shelterOf, inMerlon } from '../../world/kit.js';
 
 // The share of a footprint f wide, centred at u, that falls on joints w wide
@@ -521,7 +523,12 @@ const methods = {
     const R = WT.reed, h = Math.max(0.1, S[q + P.Y1] - S[q + P.Y0]), up = Math.min(1, Math.max(0, (y - S[q + P.Y0]) / h));
     const clump = Math.floor(tu / R.stem), t2 = ((Math.imul(clump * 73856093 ^ (seed | 0), 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1;
     const fpu = Math.max(1e-4, fp) / Math.max(0.15, graze);
-    return R.tip * (up - 0.5) + 0.22 * t2 * smooth(4, 6, R.stem / fpu) + 0.15 * own;
+    // (phase 5b) the tufts: each one tone, taller tufts paler (the same
+    // tufts as the bed's ragged top, src/scene/cpu/wild.js), drawn while a
+    // tuft is a few columns across; one tone to a tuft, so a moving eye
+    // carries each cell across a tuft's edge once
+    const tf = 0.5 - reedTuft(tu + Math.PI * S[q + P.HX], S[q + P.HX], seed);
+    return R.tip * (up - 0.5) + 0.22 * t2 * smooth(4, 6, R.stem / fpu) + R.tuft * tf * smooth(2.5, 4.5, R.wave / fpu) * (1 - smooth(R.mid[0], R.mid[1], R.wave / fpu)) + 0.15 * own;
   },
 
   // Shade a building's hit into cell ci (slot 0 direct, 1 mirrored).
@@ -597,7 +604,29 @@ const methods = {
         head = jointCover(tu + (row2 & 1) * 1.1, 2.2, Math.max(0.14, 1.2 * fp), fp) * (1 - smooth(0.018, 0.04, fp));
         block = 0.26 * (((Math.imul(row2 * 73856093 ^ Math.floor(cu2) * 19349663 ^ seed, 0x9e3779b1) >>> 0) / 4294967296) * 2 - 1) * (1 - smooth(0.06, 0.16, fp));
       } else {
-        head = Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0;
+        // (phase 5b) the fort's head joints by how much of the cell they
+        // cover (3b's coverage, as the ashlar's), held at least `held`
+        // cells wide and darkened by their true share of that, so they last
+        // to about 25 m instead of going by 15 m, and cannot blink between
+        // columns as they narrow
+        // (near, the joints as before: crisp, a joint at least a cell wide;
+        // only past there, where they used to fade, by their coverage)
+        const J = LOOK.masonry, wT = J.head, wH = Math.max(wT, J.held * fp);
+        // (where they start and fade by distance: the footprint square on)
+        const fpd = D * len * v.colAngle;
+        const crisp = Math.min(fu, 1 - fu) * 1.1 < 0.05 + fp * 0.8 ? 1 - smooth(0.035, 0.09, fp) : 0, far = smooth(J.from[0], J.from[1], fpd);
+        // (only on a wall seen fairly square on: along a wall, as on the
+        // wall walk, a joint sweeps across the cells faster than it is wide)
+        // (a cell across two courses takes each course's joints, offset
+        // from the other's, by how much of it lies in that course)
+        let cov = 0;
+        if (far > 0) {
+          const ya = by - fy / 2, yb = by + fy / 2, r0 = Math.floor(ya / 0.55), r1 = Math.floor(yb / 0.55);
+          const hc = (r) => jointCover(tu + (r & 1) * 0.55, 1.1, wH, Math.max(1e-4, fp));
+          const w1 = r1 === r0 ? 0 : Math.min(1, (yb - r1 * 0.55) / Math.max(1e-4, fy));
+          cov = J.dark * ((1 - w1) * hc(r0) + w1 * hc(r1)) * Math.sqrt(wT / wH) * (1 - smooth(J.fade[0], J.fade[1], fpd)) * smooth(J.square[0], J.square[1], graze);
+        }
+        head = Math.max(crisp, cov * far);
         block = 0;
       }
       tone = -jy - (1 - jy) * 0.85 * head - 0.3 * (1 - kv) + (1 - jy) * block;
@@ -736,7 +765,12 @@ const methods = {
     // the gate's deep passage is a room)
     const room = hit.rev === 1 && K.holes[hit.revO + H.DEPTH] > 0 && K.holes[hit.revO + H.DEPTH] < 2 ? -1 : hit.room;
     const zone = room >= 0 ? roomBit(K, room) | (K.rooms[room] && K.rooms[room].open ? zoneAt(K, x + nx * 0.6, z + nz * 0.6) : 0) : zoneAt(K, x + nx * 0.6, z + nz * 0.6);
-    const glow = m.glowAt(x, y, z, lx, ly, lz, zone, true);
+    let glow = m.glowAt(x, y, z, lx, ly, lz, zone, true);
+    // (phase 5b) a lost thing shines: it catches what light there is
+    if (K === this.figKit && K.shine && K.shine[q / P_STRIDE]) {
+      const SH = LOST.shine;
+      lam += (1 - lam) * SH.light; glow = Math.min(1, glow * SH.glow); tone += SH.tone;
+    }
     m.write(ci, slot, mat, lam, shadow, room >= 0 ? 0 : cloud, glow, tone, leg);
     if (slot === 0 && room >= 0) {
       // inside: how much of the sky's soft light reaches it

@@ -21,7 +21,7 @@ import { P as KP, P_STRIDE, PT, PF, ZONE_OUT, ZONE_YARD, roomBit } from '../../w
 import { MAT, MAT_FAINT, HIT_STRIDE, REC, H_SHADOW } from '../../contract.js';
 import { torchPower } from './light.js';
 import { Plane } from './build.js';
-import { LYING, HELD, LANTERN, LANTERN_FLAME_Y, HANDS } from '../../world/things.js';
+import { LYING, HELD, LANTERN, LANTERN_FLAME_Y, HANDS, LOST, SHAPE_SHIFT } from '../../world/things.js';
 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
@@ -50,7 +50,7 @@ const methods = {
     const wk = this.world.kit;
     if (!this.figKit || this.figKit.cap < (n + na + ny) * MAXP) {
       const cap = Math.max(256, (n + na + ny) * MAXP);
-      this.figKit = { cap, prims: new Float64Array(cap * P_STRIDE), holes: new Float64Array(0), cover: new Float32Array(cap), flame: new Uint8Array(cap),
+      this.figKit = { cap, prims: new Float64Array(cap * P_STRIDE), holes: new Float64Array(0), cover: new Float32Array(cap), flame: new Uint8Array(cap), shine: new Uint8Array(cap),
         rooms: wk ? wk.rooms : [], roomBits: wk ? wk.roomBits : [], yards: wk ? wk.yards : [], np: 0 };
     }
     let np = 0;
@@ -85,13 +85,13 @@ const methods = {
   // drawn as people are (thin parts held at two cells and faded far off).
   prepareYou(v, frame, you, np) {
     const buf = this.figParts, c = frame.cam;
-    const push = (parts, X, Z, Y, yaw, k0) => {
+    const push = (parts, X, Z, Y, yaw, k0, g = 1) => {
       const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
       let k = k0;
       for (const [u, w, hx, hz, y0, y1, mat, flags] of parts) {
         const q = k * PART;
-        buf[q] = X + rx * u + fx * w; buf[q + 1] = Z + rz * u + fz * w; buf[q + 2] = -yaw;
-        buf[q + 3] = hx; buf[q + 4] = hz; buf[q + 5] = Y + y0; buf[q + 6] = Y + y1;
+        buf[q] = X + rx * u * g + fx * w * g; buf[q + 1] = Z + rz * u * g + fz * w * g; buf[q + 2] = -yaw;
+        buf[q + 3] = hx * g; buf[q + 4] = hz * g; buf[q + 5] = Y + y0 * g; buf[q + 6] = Y + y1 * g;
         buf[q + 7] = mat; buf[q + 8] = flags || 0; buf[q + 9] = 1;
         k++;
       }
@@ -115,8 +115,10 @@ const methods = {
     (you.lost || []).forEach(([x, z, y, shape, yaw], j) => {
       const dist = Math.hypot(x - v.ex, z - v.ez), parts = LYING[shape];
       if (!parts || dist > 160) return;
-      // (every part may be held to two cells, and fades far off)
-      const k = push(parts.map((p) => { const q = p.slice(); q[7] = 1; return q; }), x, z, y, yaw, 0);
+      // (every part may be held to two cells, and fades far off; phase 5b:
+      // a little proud of the ground and a little bigger, and catching
+      // the light, a lantern's or the moon's, as a polished thing does)
+      const k = push(parts.map((p) => { const q = p.slice(); q[7] = (q[7] || 0) | 1 | 4; return q; }), x, z, y + LOST.lift, yaw, 0, LOST.grow);
       np = this.figItem(v, np, k, 200002 + j, x, z, dist, -1, 70002 + j, NEAR_D);
     });
     return np;
@@ -131,14 +133,15 @@ const methods = {
     for (let j = 0; j < k; j++) {
       const b = j * PART, q = (np + kk) * P_STRIDE;
       let hx = buf[b + 3], hz = buf[b + 4], ya = buf[b + 5], yb = buf[b + 6], cover = buf[b + 9];
-      const flame = buf[b + 8] === 2;
+      // (flags: 1 thin, 2 a flame, 4 (phase 5b) shining)
+      const fl = buf[b + 8], flame = (fl & 2) !== 0, thin = (fl & 1) !== 0;
       if (flame) {
         // held at a column wide and two rows tall, faded by its true share
         const w = hx, h = (yb - ya) / 2, wm = Math.max(w, minC / 2), hm = Math.max(h, minR);
         cover = Math.min(cover, (w * h) / (wm * hm));
         hx = hz = wm; const yc = (ya + yb) / 2; ya = yc - hm; yb = yc + hm;
         flames++;
-      } else if (buf[b + 8] === 1) {
+      } else if (thin) {
         // a small part (a brim, a tool's shaft, a torch's stick, a leg, a
         // wing): held at two rows tall and two columns across (its width
         // across the view), and further off faded by how much of that it
@@ -161,14 +164,16 @@ const methods = {
         if (cover < 0.06) continue;
       }
       const ang = buf[b + 2];
-      P[q + KP.TYPE] = PT.BOX; P[q + KP.CX] = buf[b]; P[q + KP.CZ] = buf[b + 1];
+      // (phase 5b) a thing's part may be another of the kit's shapes
+      const ty = (fl >> SHAPE_SHIFT) || PT.BOX;
+      P[q + KP.TYPE] = ty; P[q + KP.CX] = buf[b]; P[q + KP.CZ] = buf[b + 1];
       P[q + KP.CA] = Math.cos(ang); P[q + KP.SA] = Math.sin(ang);
-      P[q + KP.HX] = hx; P[q + KP.HZ] = hz; P[q + KP.Y0] = ya; P[q + KP.Y1] = yb;
+      P[q + KP.HX] = hx; P[q + KP.HZ] = ty === PT.CYL ? hx : hz; P[q + KP.Y0] = ya; P[q + KP.Y1] = yb;
       P[q + KP.MAT] = buf[b + 7]; P[q + KP.MAT2] = buf[b + 7];
-      P[q + KP.FLAGS] = buf[b + 8] === 1 ? PF.GROW : 0;
+      P[q + KP.FLAGS] = thin && !flame ? PF.GROW : 0;
       P[q + KP.H0] = 0; P[q + KP.HN] = 0; P[q + KP.ROOM] = room;
-      P[q + KP.SEED] = id * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ya;
-      K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; kk++;
+      P[q + KP.SEED] = id * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ty === PT.ELL ? (ya + yb) / 2 : ya;
+      K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; K.shine[np + kk] = (fl & 4) ? 1 : 0; kk++;
       const dx = buf[b] - x, dz = buf[b + 1] - z, r = Math.sqrt(dx * dx + dz * dz) + Math.max(hx, hz) * 1.42;
       if (r > reach) reach = r;
       if (ya < y0) y0 = ya; if (yb > y1) y1 = yb;

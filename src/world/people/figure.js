@@ -142,27 +142,37 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
       const u = side * (FIG.shoulder + FIG.arm) * s, sw = pose === POSE.WALK ? -side * swing * A * 0.6 : 0;
       const holding = light && side === 1 && pose !== POSE.FISH;
       const fw = sw + reach * s + (holding ? 0.06 : 0), up = raise * s + (holding ? 0.1 : 0);
-      box(u, fw * 0.4, FIG.arm * s, 0.06 * s, chestTop - 0.3 * s, chestTop, top);
       // (a hand under about a row and a half is the sleeve's end: a speck of
       // skin one column wide would blink as one walks past)
       const hand = 0.1 * s >= 1.5 * minR;
-      box(u, fw, FIG.arm * s * 0.9, 0.055 * s, chestTop - (hand ? 0.6 : 0.7) * s + up, chestTop - 0.28 * s + up, top);
+      // (phase 5b) an arm hanging still is one sleeve, shoulder to cuff, the
+      // forearm as wide and deep as the upper arm: the elbow's step of a few
+      // millimetres caught the cells along a sleeve's edge as one walked past
+      if (fw === 0 && up === 0) box(u, 0, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s, chestTop, top);
+      else {
+        box(u, fw * 0.4, FIG.arm * s, 0.06 * s, chestTop - 0.3 * s, chestTop, top);
+        box(u, fw, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s + up, chestTop - 0.28 * s + up, top);
+      }
       if (hand) box(u, fw + 0.01, 0.045 * s, 0.045 * s, chestTop - 0.7 * s + up, chestTop - 0.6 * s + up, skin);
     }
   }
 
   // ---- head, hair, hat ----
   const hy = chestTop + 0.03 * s, ha = a - st[o + S.HEAD];
-  box(0, 0, FIG.head[0] * s, FIG.head[1] * s, hy, hy + FIG.head[2] * s, skin, 1, 1, ha);
+  // (phase 5b: the head down into the body, a neck: the 3 cm gap under the
+  // chin let what stands behind show through a row for a frame at a time)
+  box(0, 0, FIG.head[0] * s, FIG.head[1] * s, chestTop - 0.02 * s, hy + FIG.head[2] * s, skin, 1, 1, ha);
   if (near || hatK !== HATK.BARE) {
     const ht = hy + FIG.head[2] * s;
     if (hatK === HATK.HAT) {
       box(0, 0, 0.17 * s, 0.17 * s, ht - 0.03, ht, hatM, 1, 1, ha);
       box(0, 0, 0.1 * s, 0.1 * s, ht - 0.01, ht + 0.09 * s, hatM, 1, 1, ha);
-    } else if (hatK === HATK.HOOD) box(0, -0.02, FIG.head[0] * s + 0.004, 0.12, hy, ht + 0.004, hatM, 1, 1, ha);   // (round the head's sides and back, a hair proud of it, to a centimetre short of the face: no sliver of skin beside the face, and no faces fighting)
+    } else if (hatK === HATK.HOOD) box(0, -0.007, FIG.head[0] * s + 0.004, 0.113 * s + 0.002, hy, ht + 0.004, hatM, 1, 1, ha);   // (round the head's sides and back, a hair proud of it, to a centimetre short of the face: no sliver of skin beside the face, and no faces fighting)
     else if (hatK === HATK.HELMET) box(0, 0, 0.115 * s, 0.12 * s, ht - 0.1 * s, ht + 0.04, MAT.IRON, 1, 1, ha);
     else if (hatK === HATK.CAP) box(0, -0.01, 0.106 * s, 0.116 * s, ht - 0.07 * s, ht + 0.02, hatM, 1, 1, ha);
-    else box(0, -0.02, 0.105 * s, 0.1 * s, ht - 0.08 * s, ht + 0.015, MAT.HAIR, 1, 1, ha);
+    // (phase 5b: the hair to 4 mm short of the face, not 3 cm: from the side
+    // the strip of skin before it was under a column and blinked)
+    else box(0, -0.005 * s, 0.105 * s, 0.111 * s, ht - 0.08 * s, ht + 0.015, MAT.HAIR, 1, 1, ha);
   }
 
   // ---- what they carry ----

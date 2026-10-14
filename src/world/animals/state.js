@@ -90,7 +90,11 @@ function rainOf(seed, day, hour, weather) {
 // as [x, z, feet, ...] (you first). Returns how many were written; `ids`
 // gets their member ids. Birds in the air past their mark distance are also
 // written (the frame draws them as marks).
-export function animalsAt(A, day, hour, near, out, ids, groups = null, weather = null) {
+// (phase 5b) `memo` ({ t: seconds, groups: Map }, the game's only; the
+// tools pass none): how far each deer group ran, so that when the walker
+// backs off they turn and walk home at a walk instead of sliding back as
+// the distance falls. It holds nothing once they are home.
+export function animalsAt(A, day, hour, near, out, ids, groups = null, weather = null, memo = null) {
   const P = A.P, w = A.world, T = w.terrain, G = (x, z) => groundAt(T, x, z);
   const minutes = (day * 24 + hour) * 60;
   const wx = rainOf(A.seed, day, hour, weather);
@@ -162,11 +166,19 @@ export function animalsAt(A, day, hour, near, out, ids, groups = null, weather =
         const [d, nx, nz] = nearest(cx, cz), b = bold(g);
         const alert = alertOf(spec, d);
         const fl = smooth(spec.flight[0] * b, spec.flight[1] * b, d);
-        let fx = 0, fz = 0, fd = 0;
+        let fx = 0, fz = 0, fd = 0, ax = 0, az = 0, home = false;
         if (fl > 0) {
-          const [ax, az, L] = fleeWay(cx, cz, (cx - nx) / (d || 1), (cz - nz) / (d || 1), spec.flee);
-          fd = L * fl; fx = ax * fd; fz = az * fd;
+          const [bx, bz, L] = fleeWay(cx, cz, (cx - nx) / (d || 1), (cz - nz) / (d || 1), spec.flee);
+          ax = bx; az = bz; fd = L * fl;
         }
+        if (memo) {
+          // (further out than the walker now drives them: on the way home)
+          const m = memo.groups.get(g.id);
+          const was = m ? m.fd - spec.walk * Math.max(0, memo.t - m.t) : 0;
+          if (m && was > fd + 0.05) { home = true; fd = was; ax = m.ax; az = m.az; }
+          if (fd > 0.05) memo.groups.set(g.id, { fd, ax, az, t: memo.t }); else if (m) memo.groups.delete(g.id);
+        }
+        fx = ax * fd; fz = az * fd;
         for (const m of g.members) {
           const k = A.members[m].rank, ang = k * 2.39996 + g.id, rr = 1.6 * Math.sqrt(k + 0.4);
           const wn = moving ? 0.2 : 0.7;
@@ -176,7 +188,8 @@ export function animalsAt(A, day, hour, near, out, ids, groups = null, weather =
           if (ps === APOSE.GRAZE && hash2(k + g.id * 17, Math.floor(minutes / 2), 5) < 0.25) ps = APOSE.STAND;
           if (moving) ps = APOSE.WALK;
           let ph = moving ? (hour * 3600 * spec.walk) / spec.stride : 0;
-          if (fl > 0.02 && fl < 0.98) { ps = APOSE.RUN; yw = Math.atan2(fx, fz); ph = fd / spec.stride; }
+          if (home) { ps = APOSE.WALK; yw = Math.atan2(-ax, -az) + 0.15 * Math.sin(k * 1.7); ph = (memo.t * spec.walk) / spec.stride + k * 0.37; }
+          else if (fl > 0.02 && fl < 0.98) { ps = APOSE.RUN; yw = Math.atan2(fx, fz); ph = fd / spec.stride; }
           else if (fl >= 0.98) { ps = APOSE.STAND; yw = Math.atan2(nx - x, nz - z); }
           if (alert > 0.5 && (ps === APOSE.GRAZE || ps === APOSE.LIE)) ps = APOSE.STAND;
           const head = ps === APOSE.GRAZE ? 0 : 1;

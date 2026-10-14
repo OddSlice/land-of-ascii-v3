@@ -35,8 +35,13 @@ export class Animals {
 
   // Everyone's state for (day, hour); `you`: { x, z, feet }; `people`: the
   // people's states this frame (or null). Returns a copy for the frame.
-  update(day, hour, you, people, player, weather) {
+  // (phase 5b) `t`: the game's running seconds, for the deer's way home
+  // (src/world/animals/state.js); null while the clock is frozen (the tools),
+  // which forgets it.
+  update(day, hour, you, people, player, weather, t = null) {
     const t0 = performance.now();
+    let memo = null;
+    if (t !== null) { memo = this.memo || (this.memo = { t: 0, groups: new Map() }); memo.t = t; } else this.memo = null;
     const w = this.walkers;
     w.length = 0;
     if (you) w.push(you.x, you.z, you.feet);
@@ -47,7 +52,7 @@ export class Animals {
         w.push(people[o + S.X], people[o + S.Z], people[o + S.FEET]);
       }
     }
-    const n = animalsAt(this.A, day, hour, w, this.st, this.ids, null, weather);
+    const n = animalsAt(this.A, day, hour, w, this.st, this.ids, null, weather, memo);
     this.left = settle(this.st, n, w, this.P.p, you ? { x: you.x, z: you.z, r: SETTLE_R } : null);
     this.count = n;
     // the large ones near you, as bodies (added to the people's)
