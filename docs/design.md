@@ -176,7 +176,7 @@ Progress is kept for each world (each seed) in the browser's local storage:
 - the lantern, and whether it is lit;
 - whether the first favour has been asked.
 
-**When it is written:** every change within four seconds, and a favour, a sketch or the lantern at once. Leaving the page writes what is left. The record is a few hundred characters to a few kilobytes: the seen and walked squares as runs of bits. Each sketch is its own entry (its cells deflated), written once.
+**When it is written:** every change within four seconds, and a favour, a sketch or the lantern at once. In play a save is spread over four frames (the seen squares, the walked squares, the record made, the record written), so no frame pays for all of it. Leaving the page writes what is left at once. The record is a few hundred characters to a few kilobytes: the seen and walked squares as runs of bits. Each sketch is its own entry (its cells deflated), written once.
 
 **When it is read:** on load. A plain visit to the default seed resumes it. A new world from a new seed starts fresh, and the first world's record is kept.
 

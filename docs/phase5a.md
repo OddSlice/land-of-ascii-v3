@@ -191,7 +191,14 @@ The world is phase 4b's: no file of the generator has changed, and the regressio
 - the least time anyone a favour concerns can be met in a day: 3.9 h;
 - the scripted player did 180 of 180 favours (one of each kind on each seed) in 4.7 to 11.5 minutes, and every favour on every seed (749 of 749) in 4.6 to 11.5 minutes.
 
-**The earlier checks were not swept again on 60 seeds.** A sweep with every check (`--fort-only --sweep 60`, wayfaring included) was started. Its first six seeds passed everything, and it was stopped there, since the whole run takes about four hours. Nothing those checks look at has changed: no file of the generator or the simulation has changed since phase 4b (`src/world` differs only by the new `things.js`), and the regression set is identical cell for cell. Phase 4b's sweep passed on all 60.
+**The sweep with every check** (`--fort-only --sweep 60`: the fort, the villages, the people, the animals, the wild ground detail and wayfaring) passes on all 60 seeds (run on 14 Oct, about 35 minutes):
+- the people: 3,594 people, 89,068 routes walked (none failed), about a million positions sampled with nothing out of place, and no hour without a guard at the gate or on the wall;
+- the animals: 14,360, about six million positions sampled with nothing out of place, and the walker approached 1,565 of 1,565 groups;
+- the villages: all three on every seed, 240 roads, 77 bridges and 754 footpaths walked with none blocked, no overlaps or bad doors;
+- walkers in the fort and the villages: every place reached and left, with no walk through a wall;
+- wayfaring as above: 749 favours, 862 of 862 places findable, every favour from its words.
+
+(On 13 Oct this sweep was stopped after six seeds, on an estimate of four hours that was wrong.)
 
 **The first sweeps failed, and each fault was fixed where it arose.** Nothing is patched by hand: the favours and their words are drawn again from data.
 - **The scripted player's detours,** the words being wrong:
@@ -320,14 +327,18 @@ Wayfaring's own cost per frame, measured over 30 s:
 - **What it does:** the rays over the squares, the places found, the lost things, who was last seen, what is carried, and saving.
 - **The run:** walking a road in real time for 20 s, then walking and turning for 10 s, with the lantern lit, a thing carried, a lost thing waiting, and progress written to storage as in play.
 
-| browser | frames | median | 95% of frames under | slowest frame | frames at 0.2 ms or more | saves in 30 s | a save | the record |
-|---|---|---|---|---|---|---|---|---|
-| Chromium | 1,803 | 0.015 ms | 0.025 ms | 0.30 ms | 1 | 7 | 0.11 ms | 446 characters |
-| Firefox | 3,602 | 0.020 ms | 0.020 ms | 0.30 ms | 3 | 7 | 0.14 ms | 454 characters |
-| WebKit | 1,798 | 0.020 ms | 0.040 ms | 1.16 ms | 6 | 7 | 0.20 ms | 454 characters |
+- **The control:** a fixed piece of arithmetic about as long as wayfaring's usual frame, timed in the same frames. It shows how often the browser and the machine stall any work for 0.2 ms or more.
+
+| browser | frames | median | 95% of frames under | slowest frame | frames at 0.2 ms or more | the control: median, frames at 0.2 ms or more | saves in 30 s | a save's longest step | the record |
+|---|---|---|---|---|---|---|---|---|---|
+| Chromium | 1,802 | 0.015 ms | 0.020 ms | 0.10 ms | 0 | 0.035 ms, 0 | 7 | 0.04 ms | 458 characters |
+| Firefox | 3,602 | 0.020 ms | 0.020 ms | 0.26 ms | 1 | 0.040 ms, 1 | 7 | 0.04 ms | 454 characters |
+| WebKit | 1,799 | 0.020 ms | 0.040 ms | 1.24 ms | 1 | 0.040 ms, 1 | 7 | 0.04 ms | 446 characters |
 
 - **The median and 95% are under the brief's 0.2 ms** in every browser, by five to ten times.
-- **The few frames over it** are the frames that save (every four seconds while new land is seen), and in WebKit one of 1.16 ms.
+- **No step of wayfaring's own takes 0.2 ms.** A save is spread over four frames (the seen squares packed, the walked squares packed, the record made, the record written), the longest step 0.04 ms. The places are checked one a frame in turn, each a few times a second.
+- **The one frame over it** in Firefox and in WebKit falls in a different part each run (most often the rays, which do the same work every frame). The control stalls as often in the same frames, so it is the browser or the machine pausing, not wayfaring's work.
+- **As first shipped** (13 Oct), a save was written in one frame: Chromium had 1 frame over 0.2 ms, Firefox 3 and WebKit 6, a save taking 0.11 to 0.20 ms. Fixed on 14 Oct (section 10).
 - **At load,** setting up wayfaring takes once:
   - **The work:** the places, the favours and their ways, the tile heights.
   - **The time:** 294 ms in Chromium, 449 ms in Firefox, 357 ms in WebKit, before the first frame. The tools do not pay it.
@@ -388,3 +399,19 @@ Wayfaring's own cost per frame, measured over 30 s:
 | The art bible's words and pages; `docs/design.md` | `docs/art-bible.md` (section 7), `docs/design.md` |
 | `window.lab` progress control; the tools with the journal closed and progress cleared | `lab.progress` (`src/main.js`); tools run with progress off |
 | World check, progress check, regression, identity, menu check, bench, the main thread's cost, the video | section 7 |
+
+## 10. After phase 5a (14 Oct)
+
+**The judgement calls, accepted as they are:**
+- **The first meeting:** the first giver walks out to the spawn's road in a first session only. It is the one place progress moves a person (section 8, item 2; `docs/design.md`, section 2).
+- **L is the lantern in the world,** and Shift L is the look panel there. L is still the look panel everywhere else.
+- **A lost thing is drawn where it lies** while its favour is taken, so it can be found.
+
+**What fell short, done:**
+- **The main thread's 0.2 ms:**
+  - a save is spread over four frames, and the places are checked one a frame;
+  - what the renderer is given for you is made again only when it changes;
+  - no step of wayfaring's own now takes 0.2 ms (section 7, the main thread).
+- **The full sweep:** every check on 60 seeds, 60 of 60 (section 7).
+
+**A version number:** the menu's lower-left corner, under Resume, shows the version (`version 0.5.1`), with the day of the build on hover. The build takes it from `package.json`, so it changes when the version there is raised. The source served without a build shows `version dev`. Each release raises it: the middle number is the phase and the last counts the releases within it.
