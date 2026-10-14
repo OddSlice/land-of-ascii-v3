@@ -127,15 +127,16 @@ export class Menu {
     this.resumeBtn = h('button', { type: 'button', class: 'resume', onclick: () => g.close({ recapture: true }) },
       icon('play', 14), h('span', {}, 'Resume'), h('kbd', { 'aria-hidden': 'true' }, 'Esc'));
     const rail = h('div', { class: 'rail' },
-      h('div', { class: 'brand' }, h('h1', { id: 'menu-title' }, 'Land of Ascii'), h('p', { class: 'status', 'aria-live': 'off' }, where, when)),
+      h('div', { class: 'brand' }, h('h1', { id: 'menu-title' }, 'Land of Ascii'),
+        h('p', { class: 'version', title: BUILT ? `built ${BUILT}` : 'served from the source' }, `version ${VERSION}`),
+        h('p', { class: 'status', 'aria-live': 'off' }, where, when)),
       tablist);
 
     // (Resume comes after the section in the page, so Tab goes from a tab
     // into its section; the grid draws it at the foot of the rail)
     this.pane = h('div', { class: 'pane' });
     this.panel = h('div', { class: 'panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'menu-title' }, rail, this.pane,
-      h('div', { class: 'foot' }, this.resumeBtn,
-        h('p', { class: 'version', title: BUILT ? `built ${BUILT}` : 'served from the source' }, VERSION === 'dev' ? 'version dev' : `version ${VERSION}`)));
+      h('div', { class: 'foot' }, this.resumeBtn));
     this.root.append(this.back, this.panel);
 
     // the sections

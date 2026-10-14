@@ -414,4 +414,4 @@ Wayfaring's own cost per frame, measured over 30 s:
   - no step of wayfaring's own now takes 0.2 ms (section 7, the main thread).
 - **The full sweep:** every check on 60 seeds, 60 of 60 (section 7).
 
-**A version number:** the menu's lower-left corner, under Resume, shows the version (`version 0.5.1`), with the day of the build on hover. The build takes it from `package.json`, so it changes when the version there is raised. The source served without a build shows `version dev`. Each release raises it: the middle number is the phase and the last counts the releases within it.
+**A version number:** the menu shows the version under its title (`version 0.5.1`), with the day of the build on hover. The build takes it from `package.json`, so it changes when the version there is raised. The source served without a build shows `version dev`. Each release raises it: the middle number is the phase and the last counts the releases within it.
