@@ -1118,7 +1118,7 @@ function wayChecks(w) {
           const x = Math.round(pt[0] + Math.cos(a * Math.PI / 12) * pl.D * fr), z = Math.round(pt[1] + Math.sin(a * Math.PI / 12) * pl.D * fr);
           if (x < 1 || z < 1 || x > N - 1 || z > N - 1 || !seen[z * NN + x]) continue;
           const eye = Math.max(G[z * NN + x], S2[z * NN + x] - 1.55) + 1.7;
-          if (Math.hypot(pt[0] - x, pt[1] - z) < 6 || sightLine(w, x, z, eye, pt[0], pt[1], pt[2])) yes = true;
+          if (Math.hypot(pt[0] - x, pt[1] - z) < 6 || sightLine(w, x, z, eye, pt[0], pt[1], pt[2], pl.own)) yes = true;
         }
         if (yes) break;
       }

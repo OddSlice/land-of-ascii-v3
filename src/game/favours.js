@@ -346,8 +346,10 @@ export function buildFavours(world, P, places) {
   // village lies nearer within 45 degrees of that direction: a reader of
   // "Corwen lies west of here" goes to the first village west, and the fort
   // is plainly a fort)
-  // ", the farther of the two villages that way", when another village
-  // lies within 45 degrees of the direction from (x, z) to town t
+  // When another village lies within 45 degrees of the direction from
+  // (x, z) to town t, the words name it: ", beyond Dunholme", ", this side
+  // of Corwen", ", between Ashby and Corwen" (phase 5b; the plainer words
+  // for "the farther of the two villages that way")
   const whichOf = (from, t) => {
     if (t === 'fort') return '';
     const b = townXZ(t), dirA = Math.round(Math.atan2(b.x - from.x, b.z - from.z) / (TAU / 8)) * (TAU / 8);
@@ -359,8 +361,10 @@ export function buildFavours(world, P, places) {
     }).sort((A, B) => Math.hypot(A.centre.x - from.x, A.centre.z - from.z) - Math.hypot(B.centre.x - from.x, B.centre.z - from.z));
     if (way.length < 2) return '';
     const k = way.findIndex((V) => V.q === t), n = way.length;
-    if (n === 2) return `, the ${k === 0 ? 'nearer' : 'farther'} of the two villages that way`;
-    return `, the ${k === 0 ? 'nearest' : k === n - 1 ? 'farthest' : 'middle one'} of the ${n === 3 ? 'three' : n} villages that way`;
+    const nm = (j) => names.villages[way[j].q];
+    if (k === 0) return `, this side of ${nm(1)}`;
+    if (k === n - 1) return n === 2 ? `, beyond ${nm(0)}` : `, beyond ${way.slice(0, -1).map((V) => names.villages[V.q]).join(' and ')}`;
+    return `, between ${nm(k - 1)} and ${nm(k + 1)}`;
   };
   const plainFrom = (from, t) => {
     if (t === 'fort') return true;

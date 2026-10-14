@@ -103,7 +103,7 @@ export const CARRY = [
   { id: 'oil', thing: 'a flask of lamp oil and a new wick', short: 'the lamp oil', shape: 'jar',
     ask: ['{dest} has been sitting in the dark these last nights. I have oil to spare.', '{dest} {destIs}, {dir} of here. Would you carry the flask?'],
     got: ['Oil for the lamp. The evenings will be easier now.', 'You have done me a kindness.'] },
-  { id: 'cloak', thing: 'a cloak, mended at the hem', short: 'the mended cloak', shape: 'bundle',
+  { id: 'cloak', thing: 'a cloak, mended at the hem', short: 'the mended cloak', shape: 'cloak',
     ask: ['I have mended this cloak for {dest}. It tore on a gate.', '{dest} {destIs}, {dir} of here. Would you see it back to them?'],
     got: ['My cloak, and you can hardly see the mend.', '{giver} has a fine needle.'] },
 ];

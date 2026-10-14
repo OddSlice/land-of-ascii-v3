@@ -44,8 +44,13 @@ export function readWords(lines) {
   const m = t.match(/([A-Z][a-z]+ [A-Z][a-z]+) is usually (.+?), ((?:from|in|through|until)[^.]+)\./);
   if (m) { r.person = m[1]; r.where = m[2]; r.hours = (HOURS.find(([re]) => re.test(m[3])) || [null, [[8, 17]]])[1]; }
   // the town and the way to it
-  const lies = t.match(/([A-Z][a-z]+|The fort) lies ([a-z-]+) of (.+?)(?:, the (nearer|farther|nearest|farthest|middle one) of the (two|three) villages that way)?, by the road/);
-  if (lies) { r.town = lies[1] === 'The fort' ? 'the fort' : lies[1]; r.dir = lies[2]; r.from = lies[3]; r.which = lies[4] || null; }
+  const lies = t.match(/([A-Z][a-z]+|The fort) lies ([a-z-]+) of (.+?)(?:, (beyond|this side of|between) ([A-Z][a-z]+)(?: and ([A-Z][a-z]+))?)?, by the road/);
+  // (", beyond Dunholme": the village past another that way; ", this side
+  // of Corwen": the nearer; ", between Ashby and Corwen": the middle one)
+  if (lies) {
+    r.town = lies[1] === 'The fort' ? 'the fort' : lies[1]; r.dir = lies[2]; r.from = lies[3];
+    r.which = !lies[4] ? null : lies[4] === 'this side of' ? 'nearer' : lies[4] === 'between' ? 'middle one' : lies[6] ? 'farthest' : 'farther';
+  }
   const that = t.match(/That is ([a-z-]+) of ([A-Za-z ]+?)\./);
   if (that) { r.dir = that[1]; r.from = that[2]; }
   // the landmark where the person is
@@ -124,7 +129,7 @@ export class Reader {
     if (name === 'the fort' && fort) return this.walk(this.at, fort.at, 'to the fort') ? fort : null;
     for (const width of [Math.PI / 4 + 0.05, Math.PI / 2 + 0.05, Math.PI]) {
       let cands = this.towns.filter((t) => t !== here && t.q !== 'fort' && !this.tried.has(t.name) && off(t) <= width).sort((a, b) => Math.hypot(a.x - fromXZ.x, a.z - fromXZ.z) - Math.hypot(b.x - fromXZ.x, b.z - fromXZ.z));
-      // ("the farther of the two villages that way": that one first)
+      // (", beyond Dunholme": the farther first; ", this side of": the nearer)
       if (which && width < 1) { const k = which === 'nearer' || which === 'nearest' ? 0 : which === 'middle one' ? 1 : cands.length - 1; if (cands[k]) cands = [cands[k], ...cands.filter((_, j) => j !== k)]; }
       for (const t of cands) {
         this.tried.add(t.name);

@@ -7,9 +7,13 @@
 // to one of its points. Nothing here changes the world.
 import { hash2 } from '../world/noise.js';
 import { groundAt } from '../world/objects.js';
+import { sightGrid, blockedAt } from './sight.js';
 import { VILLAGE_NAMES, HILL_NAMES, RIVER_NAMES, LAKE_NAMES, COMPASS, PLACE_WORDS, FOUND_AT } from './words.js';
 
 const TAU = Math.PI * 2;
+// (phase 5b) how far from a place's point its own shapes reach, which do not
+// hide it: the fort's keep and towers, a bridge's parapets
+const OWN = { fort: 12, bridge: 5, village: 3 };
 
 // `n` different picks from a list, from the seed.
 export function pickNames(list, n, seed, salt) {
@@ -37,16 +41,20 @@ export function namesOf(world) {
   };
 }
 
-// Is there a clear line over the land (the ground, or water's surface)
-// from (x0, z0, y0) to (x1, z1, y1)? The last two metres are not tested
-// (the place's own ground).
-export function sightLine(world, x0, z0, y0, x1, z1, y1) {
-  const T = world.terrain, S = { ground: T.levels[0].H, N: T.N, NN: T.NN };
-  const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 3));
+// Is there a clear line from (x0, z0, y0) to (x1, z1, y1), over the land
+// (the ground, or water's surface) and past the trees' crowns and the
+// buildings (phase 5b)? The last `own` metres are not tested (the place's
+// own ground, or its own walls).
+export function sightLine(world, x0, z0, y0, x1, z1, y1, own = 2) {
+  const T = world.terrain, S = { ground: T.levels[0].H, N: T.N, NN: T.NN }, g = sightGrid(world);
+  const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 2));
   for (let k = 1; k < n; k++) {
     const f = k / n;
-    if (d * (1 - f) < 2) break;
-    if (groundAt(S, x0 + (x1 - x0) * f, z0 + (z1 - z0) * f) > y0 + (y1 - y0) * f - 0.25) return false;
+    if (d * (1 - f) < own) break;
+    const x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, y = y0 + (y1 - y0) * f;
+    if (groundAt(S, x, z) > y - 0.25) return false;
+    // (a metre clear of where you stand: your own tree or wall)
+    if (d * f > 1 && blockedAt(g, x, y, z)) return false;
   }
   return true;
 }
@@ -65,7 +73,7 @@ export function placesOf(world) {
     const sl = { dir: nt ? compass(nt.x, nt.z, x, z) : '', near: nt ? nt.name : '', ...slots };
     return { title: fill(W.title, sl), where: fill(W.where, sl), hint: W.hint };
   };
-  const add = (id, kind, x, z, at, slots = {}, skip = null) => out.push({ id, kind, x, z, at, D: FOUND_AT[kind], ...words(kind, slots, x, z, skip) });
+  const add = (id, kind, x, z, at, slots = {}, skip = null) => out.push({ id, kind, x, z, at, D: FOUND_AT[kind], own: OWN[kind] || 2, ...words(kind, slots, x, z, skip) });
 
   if (s.fort) {
     const f = s.fort, k = f.keep;
@@ -193,7 +201,7 @@ export function finds(world, pl, x, z, eye) {
   for (const p of pl.at) {
     const d = Math.hypot(p[0] - x, p[1] - z);
     if (d > pl.D) continue;
-    if (d < 6 || sightLine(world, x, z, eye, p[0], p[1], p[2])) return true;
+    if (d < 6 || sightLine(world, x, z, eye, p[0], p[1], p[2], pl.own)) return true;
   }
   return false;
 }
