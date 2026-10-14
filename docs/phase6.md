@@ -211,7 +211,9 @@ No melody, from any game or anywhere else, was an input. Here is each tune as it
 | the front page | Lighthouse 100 / 100 / 100 / 100 on desktop and mobile; idle 0.03% of a core; one request |
 | Sizes | `play.html` 1018.5 KB, `index.html` 36.5 KB, `og.png` 196 KB |
 
-**The unfurl** of the live link: see the note in section 10.
+**The unfurl** of the live link, in a public validator (opengraph.xyz, its Facebook-style preview; it shows the same for X, LinkedIn, WhatsApp and Discord): the image, the name and the title, with no errors. Its one useful warning, a description of 168 characters where search results show about 160, is fixed (151 now). It also notes the title is short; it is the game's name, kept.
+
+![the unfurl, in a validator](../shots/phase6/unfurl-validator.jpg)
 
 ## 10. What is still wrong, or not done
 
