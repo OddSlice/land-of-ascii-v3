@@ -22,6 +22,9 @@ import { packWorld, unpackWorld, worldHash } from './world/pack.js';
 import { shadowStore } from './scene/cpu/light.js';
 import { buildInWorker, SharedShadows } from './app/worldboot.js';
 import { MapView } from './app/map.js';
+import { MapOverlay } from './app/mapover.js';
+import { Signs, armYaw } from './game/signs.js';
+import { compass as compassWord } from './game/places.js';
 import { groundAt } from './world/objects.js';
 import { Presenter } from './present/gl.js';
 import { buildAtlas } from './present/atlas.js';
@@ -178,6 +181,8 @@ const CAMS = STRESS || WORLD || YARD ? world.cameras : CAMERAS;
 const player = new Player(world, { rules: WORLD || YARD ? 'world' : 'lab' });
 // (phase 4a) the people of the generated world (?people=0: none)
 const people = WORLD ? new People(world) : null;
+// (0.5.5) what the signposts say, read from the people's road network
+const signs = people ? new Signs(world, people.P.net) : null;
 if (people && params.get('people') === '0') people.on = false;
 // (and the cameras that look at them: a green at midday, the wall walk at
 // night, a traveller on the road)
@@ -217,6 +222,8 @@ hud.setMode(QUIET ? 'none' : display.hud);
 const ref = new RefView($('ref'));
 const lookPanel = new LookPanel($('look'));
 const map = WORLD ? new MapView(world) : null;
+// (0.5.5) the map's drawn layer: names, compass, legend, you (not in the tools' pictures)
+const mapOver = WORLD && !QUIET ? new MapOverlay(world, $('mapover')) : null;
 
 // glyph atlases for all four densities, built once (and one more for each
 // new cell size a larger window asks for)
@@ -281,7 +288,7 @@ const input = new Input(canvas, {
     location.search = q.toString();
   },
   toggleFly: () => { if (WORLD || YARD) player.toggleFly(); },
-  toggleMap: () => { if (map) map.toggle(); },
+  toggleMap: () => { if (map) { map.toggle(); if (mapOver) mapOver.show(map.on); if (map.on) hideHint(); } },
   mute: () => {
     if (!sound) return;
     if (sound.allowed) sound.unlock();
@@ -365,6 +372,57 @@ function greet() {
   if (hail) said.text = `${hail} ${said.text}`;
   showSay(said.name, said.role, said.text);
   lab.lastSaid = said;
+}
+// (0.5.5) Who you could greet (E), and the signpost you stand by: shown
+// low on the screen while they are near. The posts are read one at a
+// time when the page has a moment, or at once when you come up to one.
+let promptFor = -2, signFor = null, signFrames = 0;
+function nearbyUI() {
+  const blocked = menu.open || journal.open || talk.open || card.up || (map && map.on);
+  // the prompt
+  const i = !blocked && people && people.on ? people.greetable({ x: player.x, z: player.z, feet: player.feet, yaw: player.yaw }) : -1;
+  const pr = $('prompt'), hintOn = $('hint').classList.contains('on');
+  if (i !== promptFor) {
+    promptFor = i;
+    const who = i >= 0 ? people.nameOf(i) : null;
+    const w = pr.querySelector('.what');
+    w.textContent = '';
+    if (who) { w.append('talk to '); const b = document.createElement('b'); b.textContent = who.name; w.append(b); }
+  }
+  pr.classList.toggle('on', i >= 0 && !hintOn);
+  // the signpost
+  if (!signs) return;
+  if (++signFrames % 20 === 0) signs.step();
+  const post = blocked || $('say').classList.contains('on') ? null : signs.near(player.x, player.z, player.feet);
+  const el = $('sign');
+  if (post !== signFor) {
+    signFor = post;
+    const ul = el.querySelector('ul');
+    ul.innerHTML = '';
+    if (post) {
+      el.querySelector('.head').textContent = 'The signpost reads';
+      for (const arm of post.arms) {
+        const to = arm.to.filter((t) => t.dist > 60);
+        if (!to.length) continue;
+        const li = document.createElement('li'); li.dataset.yaw = String(armYaw(arm.a));
+        li.innerHTML = '<span class="dir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 13h-4.5v8h-5v-8H5z"/></svg></span><span class="to"></span><span class="far"></span>';
+        const t = li.querySelector('.to'), f = li.querySelector('.far');
+        to.forEach((d, k) => { if (k) t.append(', '); const b = document.createElement('b'); b.textContent = d.name; t.append(b); });
+        const dir = document.createElement('i');
+        dir.textContent = ` · ${compassWord(post.x, post.z, post.x + Math.cos(arm.a), post.z + Math.sin(arm.a))}`;
+        t.append(dir);
+        f.textContent = to.map((d) => (d.dist < 950 ? `${Math.round(d.dist / 10) * 10} m` : `${(d.dist / 1000).toFixed(1)} km`)).join(', ');
+        ul.append(li);
+      }
+      if (!ul.children.length) { const li = document.createElement('li'); li.textContent = 'Its arms are weathered blank.'; ul.append(li); }
+    }
+  }
+  el.classList.toggle('on', !!post);
+  // each arm's arrow, turned as you turn: up is the way you face
+  if (post) for (const li of el.querySelectorAll('li[data-yaw]')) {
+    const rel = (Number(li.dataset.yaw) - player.yaw) * 180 / Math.PI;
+    li.querySelector('svg').style.transform = `rotate(${rel.toFixed(1)}deg)`;
+  }
 }
 function showSay(name, role, text) {
   const el = $('say');
@@ -530,6 +588,7 @@ function tick(now) {
     lab.wayMs = way.ms;
     for (const n of way.takeNotes()) { if (n.kind === 'say') showSay('', '', n.text); else showNote(n.text, 'J'); }
   } else youNow = undefined;
+  if (started && !QUIET) nearbyUI();
   if (!state.frozen && !paused) {
     state.t += dt;
     if (state.running) {
@@ -607,10 +666,15 @@ const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => (shadows ? 
 
 // M: the overhead map, drawn in the same cells, instead of the view
 function presentMap() {
-  const cells = map.render(grid.cols, grid.rows, player, way && way.on ? way.fog() : null);
+  const fog = way && way.on ? way.fog() : null;
+  const cells = map.render(grid.cols, grid.rows, player, fog, { marks: !mapOver });
   full = cells;
   presenter.upload(0, grid.cols, cells);
   presenter.draw();
+  if (mapOver) {
+    const aspect = grid.cols / (2 * grid.rows), hfov = 2 * Math.atan(Math.tan(LOOK.fovY * DEG / 2) * aspect);
+    mapOver.update(map.geometry(), $('view').getBoundingClientRect(), { x: player.x, z: player.z, yaw: player.yaw, hfov }, fog);
+  }
 }
 requestAnimationFrame(tick);
 
@@ -749,6 +813,8 @@ lab.sound = {
 lab.version = VERSION;
 // (phase 4a) people, for the tools and the menu (before the menu, which
 // lists them)
+// (0.5.5) the signposts, read: [{ x, z, arms: [{ a, to: [{ name, dist }] }] }]
+lab.signs = () => (signs ? signs.posts.map((P, i) => { signs.read(i); return { x: P.x, z: P.z, arms: P.arms.map((r) => ({ a: r.a, to: r.to.map((t) => ({ name: t.name, dist: Math.round(t.dist) })) })) }; }) : []);
 lab.people = {
   get count() { return people ? people.n : 0; },
   get on() { return !!(people ? people.on : yardFolk && yardFolk.on); },
@@ -1105,7 +1171,7 @@ Object.assign(lab, {
   // Fly (F) on or off.
   setFly(on) { if ((WORLD || YARD) && player.flying !== !!on) player.toggleFly(); },
   // The overhead map (M) on or off.
-  setMap(on) { if (map && map.on !== !!on) map.toggle(); },
+  setMap(on) { if (map && map.on !== !!on) { map.toggle(); if (mapOver) mapOver.show(map.on); } },
   // Turn to a yaw (degrees) without moving.
   face(yaw) { player.yaw = yaw * DEG; },
   // The ground and the drawn surface (the water's level where there is water) at a point.

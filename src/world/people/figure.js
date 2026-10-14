@@ -18,6 +18,10 @@
 //   size is at least that, then faded by how much of that it really is
 //   (`cover`), as a torch's flame is.
 import { MAT } from '../../contract.js';
+import { PT } from '../kit.js';
+
+// (0.5.5) a part's shape, in its flags' high bits (as a carried thing's)
+const ELL = PT.ELL << 4, CYL = PT.CYL << 4;
 
 export const FS = 18;
 export const S = {
@@ -114,9 +118,12 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
         const lift = pose === POSE.WALK ? Math.max(0, side * Math.cos(ph)) * 0.05 : 0;
         // (likewise a boot: under about a row and a half, the leg runs down)
         const boot = 0.08 >= 1.5 * minR;
-        if (boot) box(u, lw, 0.06 * s, 0.12 * s, lift, lift + 0.08, MAT.LEATHER);
-        box(u, lw * 0.9, FIG.leg * s * 0.87 + shut / 2, 0.07 * s, lift + (boot ? 0.06 : 0), hip * 0.53, bottom);
-        box(u, lw * 0.45, FIG.leg * s + shut / 2, 0.085 * s, hip * 0.51, hip + 0.02, bottom);
+        // (0.5.5: the boot's toe reaches forward of the leg, so the feet say
+        // which way someone faces)
+        if (boot) box(u, lw + 0.045 * s, 0.06 * s, 0.13 * s, lift, lift + 0.08, MAT.LEATHER);
+        // (0.5.5: round legs, as cylinders)
+        box(u, lw * 0.9, FIG.leg * s * 0.87 + shut / 2, 0.07 * s, lift + (boot ? 0.06 : 0), hip * 0.53, bottom, 1);
+        box(u, lw * 0.45, FIG.leg * s + shut / 2, 0.085 * s, hip * 0.51, hip + 0.02, bottom, 1);
       }
     }
   } else if (sit) {
@@ -129,6 +136,14 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
   // the body: a tunic to the hip, or a little below it
   const tunic = top !== bottom;
   box(0, 0, (near ? FIG.shoulder : FIG.shoulder + 0.05) * s, FIG.chest * s, hip - (tunic ? 0.1 * s : 0), chestTop, top, 1);
+  // (0.5.5) the front: a belt with its buckle, and the tunic's neck opening,
+  // drawn at their true size (flag 0) only while each is at least a row
+  // and a half tall, so none is stretched to two rows or blinks at one
+  if (near && !sit && 0.07 * s >= 1.5 * minR) {
+    box(0, 0, FIG.shoulder * s + 0.006, FIG.chest * s + 0.006, hip + 0.01 * s, hip + 0.08 * s, MAT.LEATHER, 0);
+    if (0.06 * s >= 2 * minC) box(0, FIG.chest * s + 0.008, 0.03 * s, 0.006, hip + 0.015 * s, hip + 0.075 * s, MAT.IRON, 0);
+  }
+  if (near && 0.1 * s >= 1.5 * minR && 0.064 * s >= 2 * minC) box(0, FIG.chest * s + 0.004, 0.032 * s, 0.005, chestTop - 0.1 * s, chestTop + 0.004, skin, 0);
 
   // ---- arms and hands ----
   // (forward reach and height by pose; a swing opposite the legs walking)
@@ -148,46 +163,76 @@ export function figureParts(st, o, dist, colAngle, rowAngle, t, out, at) {
       // (phase 5b) an arm hanging still is one sleeve, shoulder to cuff, the
       // forearm as wide and deep as the upper arm: the elbow's step of a few
       // millimetres caught the cells along a sleeve's edge as one walked past
-      if (fw === 0 && up === 0) box(u, 0, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s, chestTop, top);
+      if (fw === 0 && up === 0) box(u, 0, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s, chestTop, top, 1);
       else {
-        box(u, fw * 0.4, FIG.arm * s, 0.06 * s, chestTop - 0.3 * s, chestTop, top);
-        box(u, fw, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s + up, chestTop - 0.28 * s + up, top);
+        box(u, fw * 0.4, FIG.arm * s, 0.06 * s, chestTop - 0.3 * s, chestTop, top, 1);
+        box(u, fw, FIG.arm * s, 0.06 * s, chestTop - (hand ? 0.6 : 0.7) * s + up, chestTop - 0.28 * s + up, top, 1);
       }
       if (hand) box(u, fw + 0.01, 0.045 * s, 0.045 * s, chestTop - 0.7 * s + up, chestTop - 0.6 * s + up, skin);
     }
   }
 
   // ---- head, hair, hat ----
-  const hy = chestTop + 0.03 * s, ha = a - st[o + S.HEAD];
-  // (phase 5b: the head down into the body, a neck: the 3 cm gap under the
-  // chin let what stands behind show through a row for a frame at a time)
-  box(0, 0, FIG.head[0] * s, FIG.head[1] * s, chestTop - 0.02 * s, hy + FIG.head[2] * s, skin, 1, 1, ha);
-  if (near || hatK !== HATK.BARE) {
-    const ht = hy + FIG.head[2] * s;
+  // (0.5.5) Near, a round head on a neck, the hair over its crown and down
+  // its back, so a face shows only from the front, and the eyes when near
+  // enough to be two cells; in the middle distance a box head with the hair
+  // behind it. Either way the back of the head is hair (or a hood or a hat),
+  // the front a face.
+  const hy = chestTop + 0.03 * s, ha = a - st[o + S.HEAD], ht = hy + FIG.head[2] * s;
+  // (a part placed in the head's own frame, as it turns: u across, w along its look)
+  const hh = st[o + S.HEAD], hc = Math.cos(hh), hs = Math.sin(hh);
+  const hbox = (u, w, hx, hz, y0, y1, mat, flags) => box(u * hc + w * hs, w * hc - u * hs, hx, hz, y0, y1, mat, flags, 1, ha);
+  if (near) {
+    hbox(0, 0, 0.048 * s, 0.048 * s, chestTop - 0.03 * s, hy + 0.05 * s, skin, 1);               // the neck
+    hbox(0, 0.004, FIG.head[0] * s, FIG.head[1] * s, hy, ht, skin, 1 | ELL);                      // the head
+    // the eyes: two dark marks, when each is at least two and a half cells
+    if (0.022 * s >= 2.5 * minC && 0.02 * s >= 2 * minR) {
+      for (const side of [-1, 1]) hbox(side * 0.038 * s, 0.1 * s, 0.011 * s, 0.009, hy + 0.125 * s, hy + 0.145 * s, MAT.CHARCOAL, 0);
+    }
+  } else {
+    // (the middle distance: the head down into the body, solid: held whole
+    // at a row, never faded; flag 8)
+    hbox(0, 0, FIG.head[0] * s, FIG.head[1] * s, chestTop - 0.02 * s, ht, skin, 8);
+  }
+  if (hatK === HATK.HOOD) {
+    // round the head's sides and back, a hair proud of it, open at the face
+    if (near) hbox(0, -(0.03 * s), FIG.head[0] * s + 0.004, FIG.head[1] * s + 0.005, hy - 0.02 * s, ht + 0.012, hatM, 1 | ELL);
+    else hbox(0, -0.007, FIG.head[0] * s + 0.004, 0.113 * s + 0.002, hy, ht + 0.004, hatM, 8);
+    if (near) hbox(0, -(0.07 * s), 0.11 * s, 0.05 * s, chestTop - 0.06 * s, hy + 0.08 * s, hatM, 1);    // falling on the shoulders behind
+  } else {
+    // the hair: over the crown and down the back of the head (under a hat too)
+    if (near) {
+      // (as wide as the head, so their outlines meet at the sides: a hair
+      // wider, and a strip of it blinked beside the face as one walked past)
+      hbox(0, -(0.022 * s), FIG.head[0] * s, FIG.head[1] * s + 0.004, hy + 0.06 * s, ht + 0.014, MAT.HAIR, 1 | ELL);
+      hbox(0, -(0.065 * s), 0.085 * s, 0.05 * s, hy + 0.01 * s, hy + 0.17 * s, MAT.HAIR, 1);
+    } else hbox(0, -(0.035 * s), 0.105 * s, 0.08 * s, hy + 0.06 * s, ht + 0.012, MAT.HAIR, 8);
     if (hatK === HATK.HAT) {
-      box(0, 0, 0.17 * s, 0.17 * s, ht - 0.03, ht, hatM, 1, 1, ha);
-      box(0, 0, 0.1 * s, 0.1 * s, ht - 0.01, ht + 0.09 * s, hatM, 1, 1, ha);
-    } else if (hatK === HATK.HOOD) box(0, -0.007, FIG.head[0] * s + 0.004, 0.113 * s + 0.002, hy, ht + 0.004, hatM, 1, 1, ha);   // (round the head's sides and back, a hair proud of it, to a centimetre short of the face: no sliver of skin beside the face, and no faces fighting)
-    else if (hatK === HATK.HELMET) box(0, 0, 0.115 * s, 0.12 * s, ht - 0.1 * s, ht + 0.04, MAT.IRON, 1, 1, ha);
-    else if (hatK === HATK.CAP) box(0, -0.01, 0.106 * s, 0.116 * s, ht - 0.07 * s, ht + 0.02, hatM, 1, 1, ha);
-    // (phase 5b: the hair to 4 mm short of the face, not 3 cm: from the side
-    // the strip of skin before it was under a column and blinked)
-    else box(0, -0.005 * s, 0.105 * s, 0.111 * s, ht - 0.08 * s, ht + 0.015, MAT.HAIR, 1, 1, ha);
+      // a round brim and a crown (cylinders near, boxes further off)
+      // (further off, one solid box: brim and crown)
+      if (near) {
+        hbox(0, 0, 0.17 * s, 0.17 * s, ht - 0.03, ht, hatM, 1 | CYL);
+        hbox(0, 0, 0.1 * s, 0.1 * s, ht - 0.01, ht + 0.09 * s, hatM, 1 | CYL);
+      } else hbox(0, 0, 0.15 * s, 0.15 * s, ht - 0.03, ht + 0.09 * s, hatM, 8);
+    } else if (hatK === HATK.HELMET) hbox(0, 0, 0.115 * s, 0.12 * s, ht - 0.1 * s, ht + 0.04, MAT.IRON, near ? 1 | ELL : 8);
+    else if (hatK === HATK.CAP) hbox(0, -0.01, 0.106 * s, 0.116 * s, ht - 0.07 * s, ht + 0.02, hatM, near ? 1 | ELL : 8);
   }
 
   // ---- what they carry ----
-  const hu = (FIG.shoulder + FIG.arm) * s, hand = chestTop - 0.65 * s;
-  if (tool === TOOL.HOE || tool === TOOL.STAFF || tool === TOOL.SPEAR || tool === TOOL.BROOM) {
+  // (0.5.5: a tool's shaft fades out between 15 and 21 m: held at two
+  // columns further off it was a tall pale ghost beside the figure)
+  const hu = (FIG.shoulder + FIG.arm) * s, hand = chestTop - 0.65 * s, kept = 1 - smooth(15, 21, dist);
+  if ((tool === TOOL.HOE || tool === TOOL.STAFF || tool === TOOL.SPEAR || tool === TOOL.BROOM) && kept > 0.06) {
     const fw = pose === POSE.WORK ? 0.42 : pose === POSE.SWEEP ? 0.3 : 0.14;
     const len = tool === TOOL.SPEAR ? 2.3 : tool === TOOL.STAFF ? 1.75 : 1.45;
     const yb = pose === POSE.WORK || pose === POSE.SWEEP ? 0.02 : (tool === TOOL.SPEAR ? 0.02 : 0.05);
-    box(hu + 0.03, fw, 0.022, 0.022, yb, yb + len, MAT.TIMBER, 1);
-    if (tool === TOOL.SPEAR) box(hu + 0.03, fw, 0.03, 0.03, yb + len, yb + len + 0.22, MAT.IRON, 1);
-    if (tool === TOOL.HOE) box(hu + 0.03, fw + 0.08, 0.07, 0.1, yb, yb + 0.05, MAT.IRON, 1);
-    if (tool === TOOL.BROOM) box(hu + 0.03, fw, 0.12, 0.05, yb, yb + 0.28, MAT.OCHRE, 1);
-  } else if (tool === TOOL.ROD && pose === POSE.FISH) {
+    box(hu + 0.03, fw, 0.022, 0.022, yb, yb + len, MAT.TIMBER, 1, kept);
+    if (tool === TOOL.SPEAR) box(hu + 0.03, fw, 0.03, 0.03, yb + len, yb + len + 0.22, MAT.IRON, 1, kept);
+    if (tool === TOOL.HOE) box(hu + 0.03, fw + 0.08, 0.07, 0.1, yb, yb + 0.05, MAT.IRON, 1, kept);
+    if (tool === TOOL.BROOM) box(hu + 0.03, fw, 0.12, 0.05, yb, yb + 0.28, MAT.OCHRE, 1, kept);
+  } else if (tool === TOOL.ROD && pose === POSE.FISH && kept > 0.06) {
     // a rod held out over the water, rising in short steps
-    for (let k = 0; k < 4; k++) box(0.12, 0.45 + k * 0.5, 0.02, 0.26, hand + 0.25 + k * 0.28, hand + 0.3 + k * 0.28, MAT.TIMBER, 1);
+    for (let k = 0; k < 4; k++) box(0.12, 0.45 + k * 0.5, 0.02, 0.26, hand + 0.25 + k * 0.28, hand + 0.3 + k * 0.28, MAT.TIMBER, 1, kept);
   } else if (tool === TOOL.PACK) box(0, -0.2 * s, 0.17 * s, 0.1 * s, chestTop - 0.45 * s, chestTop - 0.05 * s, MAT.LEATHER, 1);
   if (light) flame(hu + 0.08, 0.12, hand + (light === LIGHT.TORCH ? 0.55 : 0.08), light, near ? 1 : 0);
   return n;

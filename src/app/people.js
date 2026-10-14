@@ -75,25 +75,26 @@ export class People {
   // Off: nobody drawn, nobody in the way, the windows as before.
   setOn(on, player) { this.on = !!on; if (!on && player) player.others = null; }
 
-  // The person you would greet: within two and a bit metres, in front of
-  // you, awake, and facing you (their head turned to you counts).
+  // The person you would greet: within three metres, awake, on your level,
+  // from any side of them (0.5.5: before, they had to face you and be in
+  // front of you). Of several, the one nearest the middle of your view.
   greetable(you) {
     const st = this.st;
-    let best = -1, bd = 2.3;
+    let best = -1, bs = Infinity;
     for (let i = 0; i < this.n; i++) {
       const o = i * FS, pose = st[o + S.POSE];
       if (pose === POSE.HIDDEN || pose === POSE.SLEEP) continue;
       const dx = st[o + S.X] - you.x, dz = st[o + S.Z] - you.z, d = Math.hypot(dx, dz);
-      if (d > bd || Math.abs(st[o + S.FEET] - you.feet) > 1.2) continue;
-      // in front of you
-      if (dx * Math.sin(you.yaw) + dz * Math.cos(you.yaw) < 0.3 * d) continue;
-      // and they face you: their looking direction toward you
-      const look = st[o + S.YAW] + st[o + S.HEAD];
-      if (-(dx * Math.sin(look) + dz * Math.cos(look)) < 0.2 * d) continue;
-      best = i; bd = d;
+      if (d > GREET_D || Math.abs(st[o + S.FEET] - you.feet) > 1.2) continue;
+      // (how far off the middle of your view: 0 ahead, 2 behind you)
+      const off = 1 - (dx * Math.sin(you.yaw) + dz * Math.cos(you.yaw)) / Math.max(d, 1e-3);
+      const score = d + 1.6 * off;
+      if (score < bs) { bs = score; best = i; }
     }
     return best;
   }
+  // (0.5.5) who that is, for the prompt
+  nameOf(i) { const per = this.P.persons[i]; return per ? { name: per.name, role: per.label } : null; }
 
   // What person i says now: one line that fits who they are, what they are
   // doing, the hour and the weather, never the same as their last.
@@ -162,3 +163,4 @@ function walkName(P, seg) {
 }
 
 export { DUSK, DAWN };
+export const GREET_D = 3;

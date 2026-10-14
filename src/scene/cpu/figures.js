@@ -26,7 +26,7 @@ import { LYING, HELD, LANTERN, LANTERN_FLAME_Y, HANDS, LOST, SHAPE_SHIFT } from 
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
 export const FIG = 4;
-const MAXP = 24;                 // parts a figure can have
+const MAXP = 40;                 // parts a figure can have (0.5.5: 24 before the face, belt and hair)
 const FAR = 420;                 // beyond this a figure is not drawn (it has faded)
 const AFAR = 320;                // (phase 4b) an animal's
 
@@ -133,9 +133,17 @@ const methods = {
     for (let j = 0; j < k; j++) {
       const b = j * PART, q = (np + kk) * P_STRIDE;
       let hx = buf[b + 3], hz = buf[b + 4], ya = buf[b + 5], yb = buf[b + 6], cover = buf[b + 9];
-      // (flags: 1 thin, 2 a flame, 4 (phase 5b) shining)
-      const fl = buf[b + 8], flame = (fl & 2) !== 0, thin = (fl & 1) !== 0;
-      if (flame) {
+      // (flags: 1 thin, 2 a flame, 4 (phase 5b) shining, 8 (0.5.5) solid)
+      const fl = buf[b + 8], flame = (fl & 2) !== 0, thin = (fl & 1) !== 0, solid = (fl & 8) !== 0;
+      if (solid) {
+        // (0.5.5) a solid part (a person's head, hair or hat in the middle
+        // distance): kept whole, never faded, at least a row tall by
+        // reaching down (into the body under it) and a column across, so a
+        // head does not turn into a pale ghost against the sky
+        if (yb - ya < minR) ya = yb - minR;
+        if (hx < minC / 2) hx = minC / 2;
+        if (hz < minC / 2) hz = minC / 2;
+      } else if (flame) {
         // held at a column wide and two rows tall, faded by its true share
         const w = hx, h = (yb - ya) / 2, wm = Math.max(w, minC / 2), hm = Math.max(h, minR);
         cover = Math.min(cover, (w * h) / (wm * hm));
@@ -170,7 +178,7 @@ const methods = {
       P[q + KP.CA] = Math.cos(ang); P[q + KP.SA] = Math.sin(ang);
       P[q + KP.HX] = hx; P[q + KP.HZ] = ty === PT.CYL ? hx : hz; P[q + KP.Y0] = ya; P[q + KP.Y1] = yb;
       P[q + KP.MAT] = buf[b + 7]; P[q + KP.MAT2] = buf[b + 7];
-      P[q + KP.FLAGS] = thin && !flame ? PF.GROW : 0;
+      P[q + KP.FLAGS] = (thin || solid) && !flame ? PF.GROW : 0;
       P[q + KP.H0] = 0; P[q + KP.HN] = 0; P[q + KP.ROOM] = room;
       P[q + KP.SEED] = id * 37 + j; P[q + KP.TEX] = 0; P[q + KP.TEX2] = 0; P[q + KP.BASE] = ty === PT.ELL ? (ya + yb) / 2 : ya;
       K.cover[np + kk] = cover; K.flame[np + kk] = flame ? 1 : 0; K.shine[np + kk] = (fl & 4) ? 1 : 0; kk++;

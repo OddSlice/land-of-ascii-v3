@@ -9,7 +9,7 @@
 //   the walking rules allow there; else the walker waits behind.
 // - People with you: a walker coming at you steps round you if there is
 //   room, else waits (keeps a metre's gap along the route); everyone near
-//   turns their head toward you.
+//   turns their head toward you, and someone standing turns to you (0.5.5).
 import { FS, S, POSE } from './figure.js';
 
 const GAP = 0.75;            // closer than this, two people make way
@@ -38,6 +38,15 @@ export function adjust(st, n, segs, along, you, p) {
       if (pose === POSE.HIDDEN) continue;
       const dx = you.x - st[o + S.X], dz = you.z - st[o + S.Z], d = Math.hypot(dx, dz);
       if (d > 5 || Math.abs(you.feet - st[o + S.FEET]) > 1.6) continue;
+      // (0.5.5) someone standing turns toward you as you come up (by your
+      // distance alone, so it is the same in every thread): half way by
+      // 3.5 m, all the way by 2 m
+      if (pose === POSE.STAND) {
+        let rb = Math.atan2(dx, dz) - st[o + S.YAW];
+        while (rb > Math.PI) rb -= 2 * Math.PI; while (rb < -Math.PI) rb += 2 * Math.PI;
+        const kb = d < 2 ? 1 : d > 4.5 ? 0 : (4.5 - d) / 2.5;
+        st[o + S.YAW] = Math.fround(st[o + S.YAW] + rb * kb * kb * (3 - 2 * kb));
+      }
       // the head turns toward you (up to about 60 degrees)
       if (pose !== POSE.SLEEP) {
         let rel = Math.atan2(dx, dz) - st[o + S.YAW];

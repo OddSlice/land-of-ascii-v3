@@ -34,7 +34,9 @@ export class MapView {
   // or null for the whole map as before: then only the land you have seen
   // is drawn, the roads only where you have walked them, and the sites
   // only once found.
-  render(cols, rows, player, fog = null) {
+  // (0.5.5) `marks: false`: no one-glyph marks for the places and you (the
+  // page's drawn layer, src/app/mapover.js, marks them); the fort's walls stay.
+  render(cols, rows, player, fog = null, { marks = true } = {}) {
     const key = `${cols}x${rows}`;
     if (key !== this.key) this.build(cols, rows);
     const cells = this.base.slice();
@@ -52,6 +54,7 @@ export class MapView {
       const b = poly[(i + 1) % poly.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (this.mw / 2)));
       for (let k = 0; k <= n; k++) mark(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, MAP_GLYPH.fort, mk);
     });
+    if (!marks) return cells;
     s.villages.forEach((v, q) => { if (!fog || fog.found[`village${q}`]) mark(v.x, v.z, MAP_GLYPH.village, mk); });
     s.viewpoints.forEach((v, q) => { if (!fog || fog.found[`view${q}`]) mark(v.x, v.z, MAP_GLYPH.viewpoint, mk); });
     mark(s.spawn.x, s.spawn.z, MAP_GLYPH.spawn, mk);
@@ -67,13 +70,16 @@ export class MapView {
     return cells;
   }
 
+  // (0.5.5) where the map sits in the grid, for the drawn layer
+  geometry() { return { cols: this.cols, rows: this.rows, x0: this.x0, y0: this.y0, w: this.w, h: this.h, N: this.world.N }; }
+
   cellOf(x, z) {
     const cx = Math.floor(this.x0 + x / this.mw), cy = Math.floor(this.y0 + (this.world.N - z) / this.mh);
     return cx >= this.x0 && cy >= this.y0 && cx < this.x0 + this.w && cy < this.y0 + this.h ? [cx, cy] : null;
   }
 
   build(cols, rows) {
-    this.key = `${cols}x${rows}`;
+    this.key = `${cols}x${rows}`; this.cols = cols; this.rows = rows;
     const W = this.world, T = W.terrain, N = W.N, NN = W.NN;
     // a square map: cells are twice as tall as wide, so a cell covers mh
     // metres north to south and mh / 2 west to east

@@ -453,6 +453,66 @@ try {
     await Sd.ctx.close();
   }
 
+  // ---- (0.5.5) greeting from any side, the prompt, a signpost, and the map's drawn layer, at 1024 x 640 ----
+  {
+    const Mp = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
+    const mp = Mp.page;
+    await mp.keyboard.press('Enter'); await mp.waitForTimeout(4600);   // (the start card, then its hint's four seconds)
+    // behind someone at work in a field, 2.2 m back, looking the way they look
+    const who = await mp.evaluate(async () => {
+      const L = window.lab; L.freeze(11, 0, 0);
+      const list = L.people.list(), p = list.find((q) => !q.hidden && q.act === 'working the field');
+      L.setCamera({ x: p.x - Math.sin(p.yaw) * 2.2, z: p.z - Math.cos(p.yaw) * 2.2, yaw: p.yaw * 180 / Math.PI, pitch: -6 });
+      return p.name;
+    });
+    await mp.keyboard.down('KeyS'); await mp.waitForTimeout(50); await mp.keyboard.up('KeyS'); await mp.waitForTimeout(600);
+    const pr = await mp.evaluate(() => ({ on: document.getElementById('prompt').classList.contains('on'), text: document.getElementById('prompt').textContent }));
+    check('standing behind someone, the prompt says E talks to them', pr.on && pr.text.includes(who), JSON.stringify(pr));
+    await mp.keyboard.press('KeyE'); await mp.waitForTimeout(400);
+    const said = await mp.evaluate(() => (window.lab.lastSaid ? window.lab.lastSaid.name : null));
+    check('E from behind them greets them', said === who, `${said} / ${who}`);
+    // a signpost: its panel, every row an arrow, a place and a distance
+    // (once what they said has gone: the panel waits for it)
+    await mp.waitForTimeout(5600);
+    await mp.evaluate(async () => {
+      const L = window.lab, d = L.signs();
+      const P = d.find((q) => q.arms.length > 1) || d[0];
+      L.setCamera({ x: P.x + 2, z: P.z + 1, yaw: 0, pitch: -4 });
+      await new Promise((r) => setTimeout(r, 200));
+    });
+    await mp.keyboard.down('KeyS'); await mp.waitForTimeout(40); await mp.keyboard.up('KeyS'); await mp.waitForTimeout(700);
+    const sp2 = await mp.evaluate(() => { const el = document.getElementById('sign'); const r = el.getBoundingClientRect(); return { on: el.classList.contains('on'), rows: [...el.querySelectorAll('li[data-yaw]')].map((li) => li.textContent), fits: r.left >= 0 && r.right <= innerWidth }; });
+    check('by a signpost, its arms are read: a place, a way and a distance each', sp2.on && sp2.rows.length > 0 && sp2.rows.every((t) => /(north|south|east|west)/.test(t) && /\d+ (m|km)/.test(t)) && sp2.fits, JSON.stringify(sp2));
+    // the map's drawn layer, with three villages, the fort and a hill found
+    await mp.evaluate(() => {
+      const L = window.lab, j = L.progress.get();
+      for (const id of ['village0', 'village1', 'village2', 'fort', 'view3']) j.found[id] = j.found[id] || [1, 11];
+      L.progress.set(JSON.stringify(j));
+    });
+    await mp.keyboard.press('KeyM'); await mp.waitForTimeout(1200);
+    const mo = await mp.evaluate(() => {
+      const o = document.getElementById('mapover'), q = (s) => o.querySelector(s);
+      const inView = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5; };
+      const overlap = (a, b) => { const p = a.getBoundingClientRect(), q2 = b.getBoundingClientRect(); return p.left < q2.right && p.right > q2.left && p.top < q2.bottom && p.bottom > q2.top; };
+      const names = [...o.querySelectorAll('.labels .name')];
+      return {
+        shown: !o.hidden, compass: ['.ns.n', '.ns.s', '.ew.e', '.ew.w'].map((s) => q(s).textContent).join(''),
+        allIn: ['.ns.n', '.ns.s', '.ew.e', '.ew.w', '.legend', '.rose', '.readout', '.scale', '.you'].every((s) => inView(q(s)) || s === '.you'),
+        legendClear: !overlap(q('.legend'), q('.ew.w')) && !overlap(q('.legend'), q('.frame')),
+        names: names.map((n) => n.textContent), namesApart: names.every((a, i) => names.every((b, j) => i === j || !overlap(a, b))),
+        facing: q('.facing').textContent, found: q('.found').textContent,
+      };
+    });
+    check('M shows the map with north, south, east and west on its frame', mo.shown && mo.compass === 'NSEW', JSON.stringify({ shown: mo.shown, compass: mo.compass }));
+    check('the legend, the rose, the readout and the scale are all on screen at 1024 x 640, the legend clear of the map', mo.allIn && mo.legendClear, JSON.stringify({ allIn: mo.allIn, legendClear: mo.legendClear }));
+    check('the places found are named on the map, no two names overlapping', mo.names.length >= 5 && mo.namesApart, JSON.stringify(mo.names));
+    check('the readout says which way you face and how much is found', /^facing (north|south|east|west)/.test(mo.facing) && /of \d+ places found/.test(mo.found), `${mo.facing}; ${mo.found}`);
+    await mp.keyboard.press('KeyM'); await mp.waitForTimeout(200);
+    check('M again closes it, and its layer with it', await mp.evaluate(() => document.getElementById('mapover').hidden));
+    await Mp.check();
+    await Mp.ctx.close();
+  }
+
   console.log(`menu check: ${results.filter((r) => r.ok).length} of ${results.length} passed\n`);
   for (const r of results) console.log(`${r.ok ? 'pass' : 'FAIL'}  ${r.name}${r.detail ? `  (${r.detail})` : ''}`);
   console.log(`\ncontrols reached by Tab, section by section:\n  ${names.join('\n  ')}`);
