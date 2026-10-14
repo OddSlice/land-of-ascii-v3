@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // (an old link with options, such as ?seed=48211, goes straight to the game with them)
+  if (location.search && !/[?&]og=1/.test(location.search)) location.replace('play.html' + location.search + location.hash);
+</script>
+<title>Land of Ascii</title>
+<meta name="description" content="A quiet walk through a land drawn in letters. Meet the villagers, do them small favours, sketch the views. One HTML file, no images, no engine. It runs in your browser.">
+<meta name="theme-color" content="#0d0e12">
+<link rel="canonical" href="https://land-of-ascii-v3.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Land of Ascii">
+<meta property="og:title" content="Land of Ascii">
+<meta property="og:description" content="A quiet walk through a land drawn in letters. One HTML file, no images, no engine. It runs in your browser.">
+<meta property="og:url" content="https://land-of-ascii-v3.vercel.app/">
+<meta property="og:image" content="https://land-of-ascii-v3.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A lake at dawn, drawn in coloured letters, under the words Land of Ascii.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Land of Ascii">
+<meta name="twitter:description" content="A quiet walk through a land drawn in letters. It runs in your browser.">
+<meta name="twitter:image" content="https://land-of-ascii-v3.vercel.app/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 32'%3E%3Crect width='16' height='32' fill='%230d0e12'/%3E%3Ctext x='8' y='23' font-family='monospace' font-size='22' font-weight='700' text-anchor='middle' fill='%23ffb060'%3E@%3C/text%3E%3C/svg%3E">
+<style>
+  :root { --ink: #dcd7cb; --quiet: #a9a397; --head: #f0e6cc; --accent: #ffb060; --accent-hi: #ffc58a; --on-accent: #1d1409;
+    --line: #383842; --bg: #0d0e12; --mono: "Cascadia Mono", Menlo, Consolas, monospace; }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--ink); font: 14px/1.6 var(--mono); }
+  body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+  a { color: var(--head); text-decoration: underline; text-decoration-color: rgba(240, 230, 204, .35); text-underline-offset: 3px; cursor: pointer; }
+  a:hover { color: var(--accent-hi); text-decoration-color: currentColor; }
+  a:focus-visible, .play:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  .wrap { width: min(1180px, 100%); margin: 0 auto; padding: 16px 28px 8px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .name { flex: 1; min-width: 0; }
+  .name canvas { display: block; max-width: 100%; height: auto; }
+  .name { min-height: 64px; }
+  @media (max-width: 599px) { .name { min-height: calc(17 * 2 * min(4px, (100vw - 32px) / 77)); } }
+  header nav { font-size: 12px; white-space: nowrap; padding-bottom: 4px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 14px 28px; align-items: start; }
+  figure { margin: 0; }
+  .hero canvas, .sketch canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #15161b; border: 1px solid var(--line); border-radius: 4px; }
+  .hero canvas { aspect-ratio: 240 / 104; }
+  .sketch canvas { aspect-ratio: 104 / 52; }
+  figcaption { margin-top: 6px; font-size: 12px; color: var(--quiet); }
+  .pitch { display: flex; flex-direction: column; gap: 11px; font-size: 13px; line-height: 1.55; }
+  .pitch p { margin: 0; }
+  .pitch .lead { font-size: 15px; color: var(--head); }
+  figcaption { line-height: 1.3; }
+  .play { display: inline-flex; align-items: center; justify-content: center; gap: 10px; align-self: flex-start; min-width: 200px; padding: 12px 26px; font: 700 17px/1 var(--mono);
+    color: var(--on-accent); background: var(--accent); border: 1px solid #000; border-radius: 6px; text-decoration: none; cursor: pointer; }
+  .play:hover { background: var(--accent-hi); color: var(--on-accent); }
+  .play svg { width: 16px; height: 16px; fill: currentColor; }
+  .keys { font-size: 12px; color: var(--quiet); }
+  .keys kbd { display: inline-block; min-width: 1.8em; padding: 0 5px; font: 600 11px/1.6 var(--mono); color: var(--head); text-align: center;
+    background: #18191e; border: 1px solid #4a4a55; border-bottom-width: 2px; border-radius: 4px; }
+  .note { font-size: 12px; color: var(--quiet); }
+  .sketchrow { grid-column: 1 / -1; }
+  .sketchrow h2 { margin: 0 0 8px; font: 600 12px var(--mono); color: var(--quiet); letter-spacing: .08em; text-transform: uppercase; }
+  .sketches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+  footer { width: min(1180px, 100%); margin: 0 auto; padding: 6px 28px 14px; display: flex; flex-wrap: wrap; gap: 6px 22px; justify-content: space-between; font-size: 12px; color: var(--quiet); }
+  .nopics .hero, .nopics .sketches { display: none; }
+  #og[hidden] { display: none; }
+  body.og > :not(#og) { display: none; }
+  @media (max-width: 860px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .sketches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 480px) {
+    .wrap { padding: 14px 16px 10px; } footer { padding: 10px 16px 16px; }
+    header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .play { align-self: stretch; }
+    .sketches { gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="sr">Land of Ascii</h1>
+    <div class="name" aria-hidden="true"><canvas></canvas></div>
+    <nav aria-label="elsewhere"><a href="https://github.com/OddSlice/land-of-ascii-v3">the code on GitHub</a></nav>
+  </header>
+  <main>
+    <figure class="hero">
+      <canvas role="img" aria-label="Still Mere at dawn: a lake under a pale sky, a path along its shore and dark pines, drawn in coloured letters"></canvas>
+      <figcaption>Still Mere at dawn, drawn by the game (seed 3)</figcaption>
+    </figure>
+    <div class="pitch">
+      <p class="lead">A quiet walk through a land drawn in letters.</p>
+      <p>Hills, rivers, roofs, sheep and the people of the villages are made of characters, worked out as you look, by day and night and through the weather. Greet the villagers, do them small favours, sketch the views, and find your way by the signposts. Its sound and music are made in code as you go.</p>
+      <p>It is one HTML file, with no images and no engine, and it runs in your browser.</p>
+      <a class="play" href="play.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg><span class="playword">Play</span></a>
+      <p class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · mouse look · <kbd>E</kbd> greet · <kbd>J</kbd> journal · <kbd>K</kbd> sketch · <kbd>M</kbd> map · <kbd>Esc</kbd> everything else</p>
+      <p class="note">Best with a keyboard and mouse, on a laptop or a desktop.</p>
+    </div>
+    <section class="sketchrow" aria-labelledby="sk-h">
+    <h2 id="sk-h">sketches from this land</h2>
+    <ul class="sketches">
+      <li><figure class="sketch"><canvas role="img" aria-label="Elmswick green at midday: cottages round a green, a tall pine"></canvas><figcaption>Elmswick green, at midday</figcaption></figure></li>
+      <li><figure class="sketch"><canvas role="img" aria-label="a stone bridge over a river, seen from its bank"></canvas><figcaption>the bridge over the Skell</figcaption></figure></li>
+      <li><figure class="sketch"><canvas role="img" aria-label="the fort's wall walk at dusk, with torches lit"></canvas><figcaption>the fort's wall walk, at dusk</figcaption></figure></li>
+      <li><figure class="sketch"><canvas role="img" aria-label="Dunholme after dark: a chapel, a well and a lit doorway"></canvas><figcaption>Dunholme, after dark</figcaption></figure></li>
+    </ul>
+    </section>
+  </main>
+</div>
+<footer>
+  <span>Inspired by <a href="https://www.tiktok.com/@thesketchit">TheSketchit</a>'s ASCII Fort, <a href="https://www.tiktok.com/@glyphmoor">Glyphmoor</a> and <a href="https://holonaut64.itch.io/swaggerfall">Swaggerfall</a>.</span>
+  <span>version __VERSION__ · <a href="https://github.com/OddSlice/land-of-ascii-v3">source</a></span>
+</footer>
+<canvas id="og" hidden></canvas>
+<!--DATA-->
+<script>
+  // (someone who has walked here before: their walk goes on)
+  try { for (let i = 0; i < localStorage.length; i++) if (/^land-of-ascii-v3\.progress\./.test(localStorage.key(i))) { document.querySelector('.playword').textContent = 'Continue'; break; } } catch (e) { /* no storage */ }
+</script>
+<script type="module" src="/src/front/front.js"></script>
+</body>
+</html>

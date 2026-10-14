@@ -7,7 +7,8 @@
 // close to the intended dot pattern, it is drawn by hand.
 import { GLYPHS, SHADES } from '../glyphs.js';
 
-export const FONT_STACK = '"Cascadia Mono", Menlo, Consolas, monospace';
+import { FONT_STACK } from './font.js';
+export { FONT_STACK };
 export const ATLAS_COLS = 16;
 
 // The intended pattern of a shade block, 1 = ink.

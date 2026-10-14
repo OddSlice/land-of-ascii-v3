@@ -15,7 +15,9 @@ export function serve(root = ROOT, { isolated = true } = {}) {
     const server = http.createServer((req, res) => {
       let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
       if (p === '/') p = '/src/index.html';
-      const file = path.join(root, p);
+      let file = path.join(root, p);
+      // (phase 6: the game moved to play.html; an older build's copy has only index.html)
+      if (p === '/play.html' && !fs.existsSync(file)) file = path.join(root, 'index.html');
       fs.readFile(file, (err, data) => {
         if (err) { res.writeHead(404); res.end(); return; }
         // cross-origin isolation, so Firefox and WebKit give fine-grained timers
@@ -71,7 +73,7 @@ export async function openLab(browser, base, { built = false, threads, density, 
   if (extra) for (const [k, v] of Object.entries(extra)) q.set(k, String(v));
   // the look candidates (a build without them ignores these)
   if (look) for (const [k, v] of Object.entries(look)) q.set(k, String(v));
-  const url = `${base}/${built ? 'index.html' : ''}${q.toString() ? `?${q}` : ''}`;
+  const url = `${base}/${built ? 'play.html' : ''}${q.toString() ? `?${q}` : ''}`;
   await page.goto(url);
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: scene === 'lab' ? 30000 : 180000 });
   await page.evaluate(() => window.lab.ready);

@@ -1,5 +1,5 @@
 // npm run dev: serves the repository with the modules straight from src/.
-// http://localhost:5190/ is the Look Lab (src/index.html); /index.html is
+// http://localhost:5190/ is the Look Lab (src/index.html); /play.html is
 // the last build.
 import http from 'node:http';
 import fs from 'node:fs';
