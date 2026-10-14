@@ -222,3 +222,15 @@ Progress is kept for each world (each seed) in the browser's local storage:
 - a scripted player who knows only the words does one favour of each kind, and then every other favour, each in four to twelve minutes of walking.
 
 `tools/progress-check.mjs` plays a session, loads the page again, restores a backup in a fresh profile, runs without storage, and clears.
+
+## 9. Arriving, and coming back (phase 6)
+
+- **The front page** (`index.html`) says what the game is and has one thing to do: Play. Its pictures are frames the game drew, saved as data and drawn once; it never loads the game.
+- **The title screen** comes up on every visit to `play.html`, over the world drifting through four spots of this seed (the lake at dawn, the fort from the road at dusk, a village green at midday, a viewpoint in rain), 20 s each. Nothing you see there is kept: the saved progress, the clock and where you stand are put back when you choose. Its choices:
+  - **Play** on a first visit; **Continue** once anything is kept for this world, with your standing and the place you were last near. Continue stands you where you left off (a shared link's place wins).
+  - **New world:** a seed, or a random one.
+  - **Settings:** the menu, over the title screen.
+  - **Share this world:** a link to this seed.
+- **On a first visit** the title's line is the first meeting's truth ("Someone from Elmswick is walking up the road to meet you"), the detail level is measured once (the highest that keeps sixty frames a second with room to spare, said in one line, kept), and after Play the keys that matter show for ten seconds. Nothing else teaches: the greeting's prompt, the exchange, a note pointing to the journal and the map's compass once the first favour is taken, and the journal opening on that favour the first time.
+- **Sharing:** Share this world (World section, title screen) copies `play.html?seed=N`, and if asked, `&at=x,z,yaw&hour=h` for where you stand and the hour; a sketch shares as an image (a thin frame, the name and the seed in the corner), copied where the browser can put an image on the clipboard, else saved.
+- **Comfort:** keys can be changed (Controls; refused if taken or kept by the game; reset); the text of the menu, the journal and what is said in three sizes; reduced motion (the device's setting, or chosen); the frame rate capped at 30 or 60; F11 or a button for full screen; the game pauses when the window is left, and goes on at a click.

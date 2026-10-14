@@ -1,0 +1,19 @@
+## clashes (a note against the chord the pad holds as it starts; the pad's own notes too)
+
+morning field: 0 chords with two notes a semitone apart;
+morning field: 92 notes over a chord; 0 a semitone (or a semitone and an octave) from a note the pad holds; 0 bass notes a tritone from one
+still water: 0 chords with two notes a semitone apart;
+still water: 96 notes over a chord; 0 a semitone (or a semitone and an octave) from a note the pad holds; 0 bass notes a tritone from one
+long road: 0 chords with two notes a semitone apart;
+long road: 84 notes over a chord; 0 a semitone (or a semitone and an octave) from a note the pad holds; 0 bass notes a tritone from one
+
+## the tunes
+
+morning field (ionian, root C3, 62 bpm, the tune on the piano): C4 C4 A4 F4 E4 G4 D4 E4 C4 C4 C4 D4 D4 C4 C4 C4 C4 D4 C4 G4 A4 F4 A4 D5 D5 C5 A4 E4 C4 A4 G4 C4 C4 G4 A4 F4 G4 G4 C4 E4
+still water (lydian, root F3, 57 bpm, the tune on the flute): C5 G4 C5 C5 E5 G5 D5 G5 G5 G5 E5 E5 C5 C5 A4 B4 G4 A4 A4 C5 D5 D5 G5 E5 C5 A4 G4 G4
+long road (mixolydian, root G3, 64 bpm, the tune on the piano): A4 G4 E5 C5 B4 G4 B4 E5 A5 B4 B5 G4 A5 A5 A5 A4 A5 G4 G5 G4 D5 A4 E5 G4 C5 G4 B4 B4 A4 B4 A5 B4 G4 A5 A5 E6 G4 D5 E5 C5 G4 B4 G4 B4
+
+## the rendered loop (326 s)
+
+clicks (a jump far over the moment's): 0 of 7019 blocks of 2048 samples
+share of the sound above about 4 kHz: 0.59%

@@ -1,0 +1,2 @@
+desktop: performance 100, accessibility 100, best-practices 100, seo 100; largest contentful paint 0.2 s, total blocking time 0 ms, layout shift 0.034
+mobile: performance 100, accessibility 100, best-practices 100, seo 100; largest contentful paint 0.8 s, total blocking time 0 ms, layout shift 0.012

@@ -745,3 +745,11 @@ S7. **Never let a sound clip, and never play more than sixteen at once.** `tools
 S8. **Never judge sound by the numbers alone.** Listen with headphones.
 
 S9. **Never let the music crowd the land.** Nothing is quick or bright, every track keeps to the same seven notes so the hand-offs never clash, and no tune is borrowed from another game.
+
+## 11. The front page and the title screen (phase 6)
+
+- **The name** is set in the game's own lettering (`src/app/lettering.js`): block letters five pixels wide and seven tall, each pixel two cells wide and one tall, each cell filled in the masonry's cream (lighter at the top, shaded toward the foot) with a glyph over it, and a shadow a cell down and to the right. The page carries the name as text too, for readers that cannot see it.
+- **The title screen's panel** is the kit's stone and timber drawn in glyphs (`drawFrame` in `src/app/title.js`): a border of dressed stone in courses, three cells wide and two rows deep, lit from above and the left, with its joints; a timber rail under the top and over the foot, pegged every eight cells; the field dark. Nothing else decorates it: no flames, no emblem, no logo. The world behind it is only ever the game's own picture.
+- **The choices** are the menu's: the first in the accent, the rest in the dark well with a quiet line under each; focus outlined in the accent; every one a pointer and a hover.
+- **The front page** is one screen on a laptop and scrolls on a phone: the name, the main picture (a frame the game drew), a few plain sentences, Play in the accent, the keys that matter, four sketches, the inspiration as the research records it, the source. The same colours and monospace as the menu; real contrast; nothing claimed the game does not do.
+- **Never** copy another game's logo, artwork, fonts or layout, and never put a flame, a crest or an ornament on the panel.

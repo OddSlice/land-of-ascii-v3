@@ -1,0 +1,126 @@
+[
+ {
+  "rate": 1,
+  "chosen": "fine",
+  "tried": [
+   {
+    "level": "medium",
+    "p90": 8.11
+   },
+   {
+    "level": "fine",
+    "p90": 8.25
+   },
+   {
+    "level": "finest",
+    "p90": 13.3
+   }
+  ],
+  "was": "fine",
+  "note": "Detail set to fine: it keeps sixty frames a second on this machine. Settings, then Display, changes it.",
+  "kept": {
+   "v": 2,
+   "density": 2,
+   "glyphs": true,
+   "hud": "minimal",
+   "sensitivity": 1,
+   "invert": false,
+   "text": 1,
+   "motion": "system",
+   "cap": 0,
+   "auto": true
+  }
+ },
+ {
+  "rate": 2,
+  "chosen": "fine",
+  "tried": [
+   {
+    "level": "medium",
+    "p90": 8.73
+   },
+   {
+    "level": "fine",
+    "p90": 9.62
+   },
+   {
+    "level": "finest",
+    "p90": 13.8
+   }
+  ],
+  "was": "fine",
+  "note": "Detail set to fine: it keeps sixty frames a second on this machine. Settings, then Display, changes it.",
+  "kept": {
+   "v": 2,
+   "density": 2,
+   "glyphs": true,
+   "hud": "minimal",
+   "sensitivity": 1,
+   "invert": false,
+   "text": 1,
+   "motion": "system",
+   "cap": 0,
+   "auto": true
+  }
+ },
+ {
+  "rate": 4,
+  "chosen": "fine",
+  "tried": [
+   {
+    "level": "medium",
+    "p90": 9.63
+   },
+   {
+    "level": "fine",
+    "p90": 9.75
+   },
+   {
+    "level": "finest",
+    "p90": 13.86
+   }
+  ],
+  "was": "fine",
+  "note": "Detail set to fine: it keeps sixty frames a second on this machine. Settings, then Display, changes it.",
+  "kept": {
+   "v": 2,
+   "density": 2,
+   "glyphs": true,
+   "hud": "minimal",
+   "sensitivity": 1,
+   "invert": false,
+   "text": 1,
+   "motion": "system",
+   "cap": 0,
+   "auto": true
+  }
+ },
+ {
+  "rate": 6,
+  "chosen": "medium",
+  "tried": [
+   {
+    "level": "medium",
+    "p90": 9.14
+   },
+   {
+    "level": "fine",
+    "p90": 10.62
+   }
+  ],
+  "was": "fine",
+  "note": "Detail set to medium: it keeps sixty frames a second on this machine. Settings, then Display, changes it.",
+  "kept": {
+   "v": 2,
+   "density": 1,
+   "glyphs": true,
+   "hud": "minimal",
+   "sensitivity": 1,
+   "invert": false,
+   "text": 1,
+   "motion": "system",
+   "cap": 0,
+   "auto": true
+  }
+ }
+]

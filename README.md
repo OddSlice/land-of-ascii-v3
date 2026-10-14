@@ -1,6 +1,6 @@
-# Land of Ascii v3
+# Land of Ascii
 
-A text-rendered explorer, rebuilt from the ground up. Every frame is a grid of monospace cells, each one glyph on a coloured background.
+A text-rendered explorer (the third build, hence the repository's name), rebuilt from the ground up. Every frame is a grid of monospace cells, each one glyph on a coloured background.
 
 **Phase 0a, the Look Lab:** one small, fixed valley (meadow, lake, conifers, a stone wall with a gate, a snowy ridge) at day, dusk and night, built to prove the look before any world is built.
 
@@ -26,16 +26,18 @@ A text-rendered explorer, rebuilt from the ground up. Every frame is a grid of m
 - **Sound and polish (5b):** the land's sound, all made in code: wind, rain, water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, N turns it off, and the menu has a Sound section. Also a round of fixes from the earlier phases.
 - **People, the map and signposts (0.5.5):** people read front from back (a face, hair behind, boots forward), E greets from any side within 3 m with a prompt naming who, the map names what you have found and shows the compass, a legend, a scale and your heading, and signposts say where each road goes and how far.
 - **Music (0.5.3, 0.5.4):** three slow, quiet tracks made in code, each running into the next, round again. Footsteps sound every other step, and the sound starts at 90%.
-- The version is shown in the menu.
+- **Front page, title screen and sharing (phase 6, 0.6.0):** a front page at the site's root (`index.html`, written by hand; its pictures are frames the game drew, saved as data); the game moved to `play.html`. A title screen over the drifting world: Play or Continue, New world, Settings, Share this world. The detail level is measured on a first visit; links share a world (and a place and an hour), sketches share as images; keys can be changed, the text made larger, motion reduced, the frame rate capped at 30 or 60; F11 for full screen; a pause when the window is left; a plain message where the browser cannot run it. See [docs/phase6.md](docs/phase6.md).
+- The version is shown in the menu and on the title screen.
 
-- Play: https://land-of-ascii-v3.vercel.app/ (shared memory). Also https://oddslice.github.io/land-of-ascii-v3/ (each worker its own copy, at most 4 workers).
-- A seed: `?seed=N` (the default is 3). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`. The building yard: `?yard=1` (since phase 3b with the village pieces too; the prototypes the kit was chosen by were removed).
-- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md), [docs/phase3b.md](docs/phase3b.md), [docs/phase4a.md](docs/phase4a.md), [docs/phase4b.md](docs/phase4b.md), [docs/phase5a.md](docs/phase5a.md), [docs/phase5b.md](docs/phase5b.md)
+- The front page: https://land-of-ascii-v3.vercel.app/ (also https://oddslice.github.io/land-of-ascii-v3/). The game: `/play.html` (on Vercel the workers share memory; on GitHub Pages each worker has its own copy, at most 4). An old link with options (`/?seed=N`) goes on to `/play.html` with them.
+- A seed: `play.html?seed=N` (the default is 3); a place and an hour: `&at=x,z,yaw&hour=h` (what Share this world makes). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`. The building yard: `?yard=1` (since phase 3b with the village pieces too; the prototypes the kit was chosen by were removed).
+- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md), [docs/phase3b.md](docs/phase3b.md), [docs/phase4a.md](docs/phase4a.md), [docs/phase4b.md](docs/phase4b.md), [docs/phase5a.md](docs/phase5a.md), [docs/phase5b.md](docs/phase5b.md), [docs/phase6.md](docs/phase6.md)
 
 ```sh
 npm install
 npm run dev      # http://localhost:5190/ (cross-origin isolated; NOISO=1 for without)
-npm run build    # the single-file index.html
+npm run build    # the single-file play.html, and the front page index.html
+node tools/front.mjs        # the front page's pictures (src/front/data.json), from the game; --og the share image
 ```
 
 Esc opens the menu: every key explained, the display and sound options (kept in the browser), the world (seed, time, weather, your progress) and the comparison tools of earlier phases, each a tab. Keys in the world: WASD walk (Shift runs) · Space jump · E greet · J journal · K sketch · L lantern · F fly (Space climbs) · M map · N sound on/off · R new world · click or drag to look · 1 2 3 4 day, dusk, night, dawn · T time stops or runs (it runs in real time from the start) · C cameras · G glyphs off/on · − + density · Shift L look panel (8 9 0 5 6 cycle its choices) · H statistics. In the lab and the stress scene, R shows the reference (local copies only) and X switches between them.
