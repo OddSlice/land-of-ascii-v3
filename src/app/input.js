@@ -84,6 +84,8 @@ export class Input {
       case 'KeyK': if (a.sketch) a.sketch(); break;
       case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
       case 'KeyM': if (a.toggleMap) a.toggleMap(); break;
+      // (phase 5b) N: the sound on or off
+      case 'KeyN': if (a.mute) a.mute(); break;
       case 'KeyE': if (a.greet) a.greet(); break;
       case 'Space': if (a.jump) a.jump(); break;
       default: {

@@ -46,6 +46,7 @@ import { Wayfaring, clockOf } from './app/wayfaring.js';
 import { toJSON as progressJSON, fromJSON as progressFrom, F as FAVOUR } from './game/progress.js';
 import { Journal } from './app/journal.js';
 import { Talk } from './app/talk.js';
+import { Sound } from './sound/engine.js';
 import { START_LINE, CHOICE } from './game/words.js';
 
 const $ = (id) => document.getElementById(id);
@@ -191,6 +192,17 @@ if (animals) world.cameras.push(...animalCameras(world, animals.A));
 // drawn or tracked), unless they ask for it (self.LAND_PROGRESS, or
 // lab.progress.enable()).
 const way = people ? new Wayfaring(world, people, { on: !QUIET || !!self.LAND_PROGRESS }) : null;
+// (phase 5b) the world's sound, made in code: silent until the first click
+// or key (a browser allows sound only then); the tools run without it
+// unless they ask (lab.sound.enable)
+const sound = WORLD ? new Sound(world) : null;
+if (sound) {
+  sound.allowed = !QUIET;
+  const first = () => { if (sound.allowed && sound.unlock()) { removeEventListener('pointerdown', first, true); removeEventListener('keydown', first, true); } };
+  addEventListener('pointerdown', first, true);
+  addEventListener('keydown', first, true);
+}
+let soundFrame = null;
 // (in the building yard: a line of figures standing still, in every pose)
 const yardFolk = YARD ? { st: yardFigures(), on: params.get('people') !== '0' } : null;
 // (phase 4b) and every animal in every pose, standing still
@@ -270,10 +282,21 @@ const input = new Input(canvas, {
   },
   toggleFly: () => { if (WORLD || YARD) player.toggleFly(); },
   toggleMap: () => { if (map) map.toggle(); },
+  mute: () => {
+    if (!sound) return;
+    if (sound.allowed) sound.unlock();
+    const off = sound.toggleMute();
+    showNote(off ? 'Sound off.' : 'Sound on.', 'N', 2000);
+    if (menu.open) menu.update();
+  },
   greet: () => greet(),
   journal: () => toggleJournal(),
   // (J closes the journal, which otherwise holds the keys)
-  blockedKey: (e) => { if (journal.open && e.code === 'KeyJ' && !e.repeat && journal.viewing === null) { e.preventDefault(); closeJournal(false); } },
+  blockedKey: (e) => {
+    if (journal.open && e.code === 'KeyJ' && !e.repeat && journal.viewing === null) { e.preventDefault(); closeJournal(false); }
+    // (E goes on in an exchange, which otherwise holds the keys)
+    if (talk.open && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); talk.go(); }
+  },
   sketch: () => sketch(),
   lantern: () => (WORLD ? lantern() : false),
   toggleHud: () => hud.toggle(),
@@ -285,7 +308,7 @@ const input = new Input(canvas, {
 });
 input.sensitivity = display.sensitivity;
 input.invert = display.invert;
-input.blocked = () => menu.open || card.up || journal.open;
+input.blocked = () => menu.open || card.up || journal.open || talk.open;
 
 relayout();
 
@@ -314,13 +337,14 @@ function makeFrame() {
   if (animals && animals.on) {
     if (people && people.planned < 0) people.planDay(state.day);
     const t0 = performance.now();
-    f.animals = animals.update(state.day, state.hour, { x: player.x, z: player.z, feet: player.feet }, f.people || null, player, f.weather);
+    f.animals = animals.update(state.day, state.hour, { x: player.x, z: player.z, feet: player.feet }, f.people || null, player, f.weather, state.frozen ? null : state.t);
     f.marks = animals.marks(f);
     lab.mainMs = (people && people.on ? people.updateMs : 0) + (performance.now() - t0);
   } else if (people && people.on) lab.mainMs = people.updateMs;
   if (yardBeasts && yardBeasts.on) f.animals = yardBeasts.st;
   // (phase 5a) what you carry, your lantern, and the lost things
   if (youNow) f.you = youNow;
+  soundFrame = f;
   return f;
 }
 let youNow;
@@ -335,7 +359,7 @@ function greet() {
   const i = people.greetable({ x: player.x, z: player.z, feet: player.feet, yaw: player.yaw });
   if (i < 0) return;
   const ex = way && way.on ? way.greet(i, { day: state.day, hour: state.hour }) : null;
-  if (ex) { hideSay(); talk.show(ex, i); lab.lastSaid = { name: ex.who.name, role: ex.who.role, text: ex.pages[0].lines.join(' '), exchange: true }; return; }
+  if (ex) { showTalk(ex, i); lab.lastSaid = { name: ex.who.name, role: ex.who.role, text: ex.pages[0].lines.join(' '), exchange: true }; return; }
   const said = people.say(i, state.day, state.hour, weatherNow());
   const hail = way ? way.hail(i, greetCount++) : '';
   if (hail) said.text = `${hail} ${said.text}`;
@@ -358,7 +382,23 @@ const talk = new Talk($('talk'), {
   answer: (id, yes) => way.answer(id, yes, { day: state.day, hour: state.hour }),
   gift: (kind) => { if (kind === 'lantern') showNote('The lantern is yours now. L lights it or puts it away.', 'L', 9000); },
   words: { yes: CHOICE.yes, no: CHOICE.no, on: 'go on', bye: 'farewell' },
+  done: (recapture) => {
+    $('veil').classList.remove('on');
+    input.clear();
+    if (recapture && talkHadMouse) input.capture();
+  },
 });
+// (phase 5b) an exchange stands the clock still, dims the world under it
+// and frees the mouse for its buttons
+let talkHadMouse = false;
+function showTalk(ex, i) {
+  hideSay(); hideHint();
+  input.clear();
+  talk.show(ex, i);
+  $('veil').classList.add('on');
+  talkHadMouse = !!document.pointerLockElement;
+  if (talkHadMouse) { releasing = true; document.exitPointerLock(); }
+}
 // A quiet note low on the screen (a place found, a key for a new thing).
 let noteTimer = 0;
 function showNote(text, key = null, ms = 4200) {
@@ -471,7 +511,7 @@ function tick(now) {
   const R = pacer.refresh / 1000, raw = Math.max(0, (now - last) / 1000);
   const dt = Math.min(0.1, raw > 0 ? R * Math.max(1, Math.round(raw / R)) : 0);
   last = now;
-  const look = menu.open || journal.open ? { yaw: 0, pitch: 0 } : input.takeLook(dt);
+  const look = menu.open || journal.open || talk.open ? { yaw: 0, pitch: 0 } : input.takeLook(dt);
   if (look.yaw || look.pitch) {
     player.yaw += look.yaw;
     player.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, player.pitch + look.pitch));
@@ -479,8 +519,9 @@ function tick(now) {
   // an eye placed at a height by lab.setCamera stays there until a walk key
   const k = input.keys;
   if (state.held && (k.KeyW || k.KeyA || k.KeyS || k.KeyD)) state.held = false;
-  // (while the menu or the journal is open the clocks and movement stand still)
-  const paused = menu.open || journal.open;
+  // (while the menu, the journal or an exchange is open the clocks and
+  // movement stand still)
+  const paused = menu.open || journal.open || talk.open;
   if (!state.held && !paused) player.update(dt, k);
   // (phase 5a) what you see and find, the lantern and what you carry
   if (way && way.on && started) {
@@ -488,11 +529,6 @@ function tick(now) {
     youNow = way.update(player, state.day, state.hour, hfov, people && people.on ? people.st : null);
     lab.wayMs = way.ms;
     for (const n of way.takeNotes()) { if (n.kind === 'say') showSay('', '', n.text); else showNote(n.text, 'J'); }
-    // (walking away from an exchange ends it: another time)
-    if (talk.open && talk.person >= 0 && people) {
-      const o = talk.person * FS;
-      if (Math.hypot(people.st[o + S.X] - player.x, people.st[o + S.Z] - player.z) > 4.5) talk.later();
-    }
   } else youNow = undefined;
   if (!state.frozen && !paused) {
     state.t += dt;
@@ -502,6 +538,19 @@ function tick(now) {
     }
   }
   if (shadows) shadows.update(state.hour, state.day, state.look.night);
+  // (phase 5b) the sound, every display frame, from the newest frame's people
+  // and animals
+  if (sound && sound.on) {
+    const sf = soundFrame;
+    sound.update({
+      x: player.x, z: player.z, feet: player.feet, eye: player.eye, yaw: player.yaw, mode: player.mode, flying: player.flying,
+      room: roomAt(world.kit, player.x, player.z, player.feet + 0.02), running: !!(input.keys.ShiftLeft || input.keys.ShiftRight),
+      t: state.t, hour: state.hour, day: state.day, weather: sf ? sf.weather : weatherNow(),
+      people: sf && sf.people, lit: sf && sf.lit, animals: sf && sf.animals,
+      paused: menu.open || journal.open ? 'menu' : talk.open ? 'talk' : null,
+    });
+    lab.soundMs = sound.ms;
+  }
   try {
     if (map && map.on) { if (started || local) presentMap(); }
     else if (local) renderLocal();
@@ -592,6 +641,8 @@ const game = {
   seed: SEED,
   cameras: CAMS,
   get display() { return display; },
+  // (phase 5b) the Sound section's
+  get sound() { return sound; },
   setDisplay,
   get rate() { return state.running ? state.rate : 0; },
   setRate(r) { if (r === 0) state.running = false; else { state.rate = r; state.running = true; state.frozen = false; } },
@@ -677,6 +728,21 @@ game.bench = new BenchRun({
   }),
 });
 lab.bench = game.bench;   // (for the tools)
+// (phase 5b) the sound, for the tools: off unless a tool turns it on (the
+// page then needs no click: the tools' browsers allow sound from the start)
+lab.sound = {
+  enable() { if (!sound) return false; sound.allowed = true; return sound.unlock(); },
+  get on() { return !!(sound && sound.on); },
+  get settings() { return sound ? { ...sound.settings } : null; },
+  set(name, v) { if (sound) sound.set(name, v); },
+  startLog() { if (!sound) return; sound.log = []; sound.peak = 0; sound.prePeak = 0; sound.maxVoices = 0; sound.dropped = 0; },
+  takeLog() { if (!sound || !sound.log) return null; const l = sound.log; sound.log = []; return l; },
+  get spikes() { return sound ? (sound.spikes || []).slice() : []; },
+  get state() { return sound && sound.on ? { peak: sound.peak, prePeak: sound.prePeak || 0, maxVoices: sound.maxVoices, voices: sound.voicesNow, dropped: sound.dropped, ms: sound.ms, beds: sound.bedLog || null, underfoot: sound.underfoot || null, ctx: sound.ctx.state, time: sound.ctx.currentTime } : null; },
+  scene() { if (!sound || !sound.scene) return null; const c = (g) => g.cells.reduce((a, x) => a + x.length, 0); const S = sound.scene; return { lake: c(S.water.lake), river: c(S.water.river), sea: c(S.water.sea), trees: c(S.trees), fires: c(S.fires), wells: S.wells.slice(), chapels: S.chapels.slice(), gate: S.gate, bridges: S.bridges.slice() }; },
+  stream() { return sound && sound.on ? sound.recordStream() : null; },
+  get engine() { return sound; },
+};
 lab.version = VERSION;
 // (phase 4a) people, for the tools and the menu (before the menu, which
 // lists them)
@@ -870,6 +936,7 @@ const card = {
     this.up = true;
     // (phase 5a) in a first session, only this: someone is waiting on the road
     if (way && way.meetOn) { this.el.querySelector('.go').textContent = START_LINE; this.el.querySelector('.sub').hidden = false; }
+    if (sound) this.el.querySelector('.snd').hidden = false;
     this.el.classList.add('on');
     requestAnimationFrame(() => this.el.classList.add('shown'));
     this.el.focus({ preventScroll: true });

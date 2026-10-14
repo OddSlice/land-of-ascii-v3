@@ -204,6 +204,9 @@
   #note kbd { display: inline-block; min-width: 1.9em; padding: 0 5px; margin-right: 8px; font: 600 11px/1.6 var(--mono); color: var(--head); text-align: center;
     background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
   /* an exchange: who, two or three lines, and the choice */
+  /* (phase 5b) the world dims under an exchange, whose clock stands still */
+  #veil { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: rgba(8, 9, 12, .32); opacity: 0; transition: opacity 420ms ease; }
+  #veil.on { opacity: 1; }
   #talk { position: fixed; left: 50%; bottom: 54px; z-index: 4; transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); padding: 11px 18px 12px;
     font: 13px/1.55 var(--mono); color: var(--ink); background: rgba(13, 14, 18, .86); border: 1px solid var(--line); border-radius: 6px;
     opacity: 0; transition: opacity 260ms ease; }
@@ -221,6 +224,7 @@
   #talk kbd { display: inline-block; min-width: 2.4em; padding: 0 4px; font: 600 10.5px/1.6 var(--mono); color: var(--head); text-align: center;
     background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
   #card .sub { margin: -10px 0 16px; color: var(--quiet); font-size: 12px; }
+  #card .snd { margin: -8px 0 16px; color: var(--quiet); font-size: 12px; }
 
   /* the journal (J): the menu's panel, rail and tabs; its own lists */
   .journal .carry { margin-top: auto; padding: 0 10px; }
@@ -275,12 +279,14 @@
 <div id="hint" aria-hidden="true"><kbd>Esc</kbd>menu and controls</div>
 <div id="say" role="status" aria-live="polite"><div class="who"></div><div class="line"></div></div>
 <div id="note" role="status" aria-live="polite"></div>
+<div id="veil" aria-hidden="true"></div>
 <div id="talk" role="dialog" aria-live="polite" aria-label="talking" hidden></div>
 <div id="card" role="dialog" aria-labelledby="card-title" tabindex="-1">
   <div class="box">
     <h1 id="card-title">Land of Ascii</h1>
     <p class="go">click to explore</p>
     <p class="sub" hidden>click to begin</p>
+    <p class="snd" hidden>Sound starts with your first click.</p>
     <dl>
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>walk (Shift runs)</dd>
       <dt><kbd>mouse</kbd></dt><dd>look</dd>

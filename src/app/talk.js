@@ -2,8 +2,10 @@
 // favour to ask, or when you bring what they asked for, a page of two or
 // three lines at a time, low on the screen in the greetings' quiet style.
 // The last page of an ask has a choice: to do it, or another time. E (or
-// the button) goes on and says yes; Escape (or the other button, or walking
-// away) is another time. It never stops the world.
+// the button) goes on and says yes; Escape (or the other button) is another
+// time. (phase 5b) While it is open the clock stands still and the world
+// dims under it, the mouse is free to click the buttons, and every page
+// waits for an answer; E or a button on the last takes the mouse back.
 import { icon } from './icons.js';
 
 const h = (tag, attrs = {}, ...kids) => {
@@ -22,8 +24,11 @@ const h = (tag, attrs = {}, ...kids) => {
 export class Talk {
   // `answer(favourId, yes)`: returns the line said back; `gift(kind)`: a
   // page that gives something has been shown.
-  constructor(el, { answer, gift, words }) {
+  // `done(recapture)`: the exchange has closed (recapture: by E or a
+  // button, so the mouse is taken back for looking).
+  constructor(el, { answer, gift, words, done }) {
     this.el = el;
+    this.done = done || (() => {});
     this.answer = answer;
     this.gift = gift;
     this.words = words;            // { yes, no, on, bye }
@@ -58,8 +63,6 @@ export class Talk {
         h('button', { type: 'button', onclick: () => this.choose(false) }, h('kbd', {}, 'Esc'), h('span', {}, this.words.no)));
     } else {
       this.choice.replaceChildren(h('button', { type: 'button', class: 'yes', onclick: () => this.go() }, h('kbd', {}, 'E'), h('span', {}, last ? this.words.bye : this.words.on)));
-      // (a last page with nothing to choose goes by itself after a while)
-      if (last) { clearTimeout(this.timer); this.timer = setTimeout(() => this.close(), 7000); }
     }
   }
 
@@ -68,7 +71,7 @@ export class Talk {
     if (!this.open) return;
     const pg = this.ex.pages[this.k];
     if (pg.choice) { this.choose(true); return; }
-    if (this.k < this.ex.pages.length - 1) { this.k++; this.render(); } else this.close();
+    if (this.k < this.ex.pages.length - 1) { this.k++; this.render(); } else this.close(true);
   }
 
   choose(yes) {
@@ -80,21 +83,20 @@ export class Talk {
     this.ex.pages[this.k] = { ...pg, choice: false };
     this.k++;
     this.render();
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.close(), 3200);
   }
 
-  // Escape, or walking away: another time (a choice left open stays asked).
+  // Escape: another time (a choice left open stays asked).
   later() {
     if (!this.open) return;
     const pg = this.ex.pages[this.k];
     if (pg.choice) this.choose(false); else this.close();
   }
 
-  close() {
+  close(recapture = false) {
     clearTimeout(this.timer);
     if (!this.open) return;
     this.open = false;
+    this.done(recapture);
     this.el.classList.remove('on');
     if (this.el.contains(document.activeElement)) document.activeElement.blur();
     setTimeout(() => { if (!this.open) this.el.hidden = true; }, 280);

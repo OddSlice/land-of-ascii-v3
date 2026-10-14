@@ -62,6 +62,7 @@ function keyGroups(scene) {
     ['world', 'map', [
       world ? [['R'], 'a new world from a new seed'] : [['R'], 'the reference frame beside the picture (the Look Lab)'],
       world && [['M'], 'the map: # fort, o village, * viewpoint, + spawn, @ you'],
+      world && [['N'], 'sound on or off'],
       [['G'], 'glyphs on or off'],
       [['-', '+'], 'less or more detail'],
       !world && [['X'], scene === 'stress' ? 'the Look Lab' : 'the stress scene'],
@@ -78,6 +79,7 @@ function keyGroups(scene) {
 const TABS = [
   ['controls', 'Controls', 'keyboard', 'Every key, and what it does.'],
   ['display', 'Display', 'monitor', 'How the picture is drawn. Kept in this browser for your next visit.'],
+  ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go. Kept in this browser for your next visit.'],
   ['world', 'World', 'landscape', 'The time, the weather and the seed.'],
   ['advanced', 'Advanced', 'sliders', 'The comparison tools of earlier phases.'],
 ];
@@ -161,6 +163,22 @@ export class Menu {
       this.choice('statistics on screen', HUDS, () => g.display.hud, (v) => g.setDisplay('hud', v)),
       this.slider('mouse sensitivity', 0.25, 3, 0.05, () => g.display.sensitivity, (v) => g.setDisplay('sensitivity', v), (v) => `${v.toFixed(2)}×`),
       this.toggle('invert vertical look', 'moving the mouse up looks down', () => g.display.invert, (v) => g.setDisplay('invert', v)));
+
+    // (phase 5b) Sound: on or off, the volume, and each kind of sound's share
+    const snd = g.sound;
+    const pct = (v) => `${Math.round(v * 100)}%`;
+    const sv = (k) => () => (snd ? snd.settings[k] : 0), ss = (k) => (v) => { if (snd) snd.set(k, v); };
+    const sndLine = h('p', { class: 'note' });
+    this.refresh.push(() => { sndLine.textContent = !snd ? 'Sound plays in the generated world.' : snd.on ? '' : 'Sound starts with your first click in the picture.'; sndLine.hidden = !sndLine.textContent; });
+    page('sound', sndLine,
+      this.toggle('sound', 'N turns it on or off anywhere', () => !!snd && !snd.settings.muted, (v) => { if (snd) { if (snd.allowed) snd.unlock(); snd.set('muted', !v); } }),
+      this.slider('volume', 0, 1, 0.05, sv('master'), ss('master'), pct),
+      h('h3', { class: 'part' }, 'each kind of sound'),
+      this.slider('wind and rain', 0, 1, 0.05, sv('air'), ss('air'), pct),
+      this.slider('water', 0, 1, 0.05, sv('water'), ss('water'), pct),
+      this.slider('birds and beasts', 0, 1, 0.05, sv('life'), ss('life'), pct),
+      this.slider('your footsteps', 0, 1, 0.05, sv('player'), ss('player'), pct),
+      this.slider('fires, wells, bells and doors', 0, 1, 0.05, sv('places'), ss('places'), pct));
 
     // World: now, the time, the weather, then the seed
     const clock = h('span', { class: 'clock' }), clockLine = h('span', {});
