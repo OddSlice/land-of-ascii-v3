@@ -37,6 +37,33 @@ const slug = (s) => s.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 // each key drawn as a keycap.
 function keyGroups(scene) {
   const world = scene === 'world';
+  // (phase 6) in the world the keys a player can change are listed apart,
+  // each with a button to change it (Menu.keysPart)
+  if (world) {
+    return [
+      ['looking', 'eye', [
+        [['mouse'], 'look round (click the picture; Esc frees the mouse)'],
+        [['drag'], 'look round where the mouse cannot be held'],
+        [['arrows'], 'look round'],
+      ]],
+      ['time', 'clock', [
+        [['1', '2', '3', '4'], 'day, dusk, night, dawn'],
+        [['T'], 'stop or start the clock'],
+      ]],
+      ['world', 'map', [
+        [['R'], 'a new world from a new seed'],
+        [['G'], 'glyphs on or off'],
+        [['-', '+'], 'less or more detail'],
+        [['F11'], 'full screen on or off'],
+      ]],
+      ['views', 'camera', [
+        [['C'], 'the next fixed camera'],
+        [['Shift', 'L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
+        [['H'], 'full statistics on or off'],
+        [['Esc'], 'this menu'],
+      ]],
+    ];
+  }
   return [
     ['moving', 'move', [
       [['W', 'A', 'S', 'D'], 'walk'],
@@ -77,7 +104,7 @@ function keyGroups(scene) {
 }
 
 const TABS = [
-  ['controls', 'Controls', 'keyboard', 'Every key, and what it does.'],
+  ['controls', 'Controls', 'keyboard', 'Every key, and what it does. The keys at the top can be changed.'],
   ['display', 'Display', 'monitor', 'How the picture is drawn. Kept in this browser for your next visit.'],
   ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go, and the music between. Kept in this browser for your next visit.'],
   ['world', 'World', 'landscape', 'The time, the weather and the seed.'],
@@ -152,7 +179,7 @@ export class Menu {
     };
 
     // Controls: every key, in groups
-    page('controls', h('div', { class: 'keygroups' }, keyGroups(g.scene).map(([name, ic, rows]) => h('div', { class: 'keygroup' },
+    page('controls', g.scene === 'world' && g.keys ? this.keysPart() : null, h('div', { class: 'keygroups' }, keyGroups(g.scene).map(([name, ic, rows]) => h('div', { class: 'keygroup' },
       h('h3', {}, icon(ic, 15), name),
       h('dl', { class: 'keys' }, rows.map(([keys, t]) => h('div', {}, h('dt', {}, keys.map((k) => h('kbd', {}, k))), h('dd', {}, t))))))));
 
@@ -162,7 +189,17 @@ export class Menu {
       this.toggle('glyphs', 'the characters; off shows the cells as plain colour', () => g.display.glyphs, (v) => g.setDisplay('glyphs', v)),
       this.choice('statistics on screen', HUDS, () => g.display.hud, (v) => g.setDisplay('hud', v)),
       this.slider('mouse sensitivity', 0.25, 3, 0.05, () => g.display.sensitivity, (v) => g.setDisplay('sensitivity', v), (v) => `${v.toFixed(2)}×`),
-      this.toggle('invert vertical look', 'moving the mouse up looks down', () => g.display.invert, (v) => g.setDisplay('invert', v)));
+      this.toggle('invert vertical look', 'moving the mouse up looks down', () => g.display.invert, (v) => g.setDisplay('invert', v)),
+      // (phase 6)
+      h('h3', { class: 'part' }, 'comfort'),
+      this.choice('text size', [[1, 'regular', 'the menu, the journal and what people say, at their usual size'], [1.15, 'large', 'a step larger'], [1.3, 'larger', 'two steps larger']],
+        () => g.display.text, (v) => g.setDisplay('text', v)),
+      this.choice('motion', [['system', 'as the device asks', 'reduced if the device asks for less motion, else full'], ['reduced', 'reduced', 'nothing slides or pulses, what you carry does not sway, the title screen does not drift'], ['full', 'full', 'every movement, whatever the device asks']],
+        () => g.display.motion, (v) => g.setDisplay('motion', v)),
+      this.choice('frame rate', [[0, 'as fast as it goes', 'up to the display\'s own rate'], [60, '60 at most', 'never more than 60 frames a second'], [30, '30 at most', 'never more than 30: a laptop on its battery lasts longer, the picture moves less smoothly']],
+        () => g.display.cap, (v) => g.setDisplay('cap', v)),
+      g.fullscreen ? this.row('full screen', 'F11 too; Escape leaves it', h('button', { type: 'button', class: 'fs', onclick: () => { g.fullscreen(); setTimeout(() => this.update(), 300); } }, icon('expand', 15), h('span', { class: 'fsword' }, 'full screen'))) : null);
+    if (g.fullscreen) this.refresh.push(() => { const w = this.root.querySelector('.fsword'); if (w) w.textContent = g.isFullscreen ? 'leave full screen' : 'full screen'; });
 
     // (phase 5b) Sound: on or off, the volume, and each kind of sound's share
     const snd = g.sound;
@@ -197,15 +234,19 @@ export class Menu {
     if (g.scene === 'world') {
       const seedLine = h('span', { class: 'seed' });
       const copied = h('span', { class: 'note', 'aria-live': 'polite' });
-      const copyBtn = h('button', { type: 'button', onclick: async () => { copied.textContent = (await g.copyLink()) ? 'link copied' : 'could not copy: the address bar has it'; setTimeout(() => { copied.textContent = ''; }, 2500); } },
-        icon('link', 15), h('span', {}, 'copy a link to this world'));
+      // (phase 6) Share this world: the seed, and if asked where you stand and the hour
+      let withPlace = false;
+      const placeBox = h('input', { type: 'checkbox', id: 'm-share-place', onchange: (e) => { withPlace = e.target.checked; } });
+      const copyBtn = h('button', { type: 'button', onclick: async () => { copied.textContent = (await g.share(withPlace)) ? (withPlace ? 'link copied: it opens here, at this hour' : 'link copied') : 'could not copy: the address bar has it'; setTimeout(() => { copied.textContent = ''; }, 3000); } },
+        icon('share', 15), h('span', {}, 'share this world'));
       this.refresh.push(() => { seedLine.textContent = `seed ${g.seed}`; });
       const field = h('input', { type: 'text', inputmode: 'numeric', 'aria-label': 'seed to open', placeholder: 'seed', maxlength: '10',
         onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); openSeed(); } } });
       const openSeed = () => { const v = field.value.trim(); if (/^\d{1,10}$/.test(v)) g.newWorld(Number(v) >>> 0); else { field.value = ''; field.placeholder = 'digits only'; } };
       worldRows.push(
         h('h3', { class: 'part' }, 'seed'),
-        this.row('this world', null, h('div', { class: 'inline' }, seedLine, copyBtn, copied)),
+        this.row('this world', 'a link that opens the same land for anyone', h('div', { class: 'inline' }, seedLine, copyBtn,
+          h('label', { class: 'check', for: 'm-share-place' }, placeBox, h('span', {}, 'with where I stand and the hour')), copied), { wide: true }),
         this.row('another world', 'the same seed always builds the same world', h('div', { class: 'inline' }, field,
           h('button', { type: 'button', onclick: openSeed }, icon('arrow', 15), h('span', {}, 'open this seed')),
           h('button', { type: 'button', onclick: () => g.newWorld() }, icon('dice', 15), h('span', {}, 'a new world'))), { wide: true }));
@@ -235,6 +276,31 @@ export class Menu {
     this.pane.append(...TABS.map(([id]) => sections[id]));
     this.sections = sections;
     this.select(this.tab, false);
+  }
+
+  // (phase 6) The keys a player can change: each action with its key, and a
+  // button that takes the next key pressed (Escape leaves it as it was; a
+  // key already used, or kept by the game, is refused, and says so).
+  keysPart() {
+    const g = this.game, K = g.keys;
+    const said = h('p', { class: 'words keysaid', 'aria-live': 'polite' });
+    const rows = K.actions.map(([a, words, , short]) => {
+      const cap = h('kbd', {});
+      const b = h('button', { type: 'button', class: 'rebind', 'aria-label': `${words}: change its key`, onclick: () => {
+        b.classList.add('listening'); cap.textContent = 'press a key';
+        said.textContent = `Press the key for ${words.split(';')[0]}, or Escape to leave it.`;
+        K.listen(a, (code, why) => {
+          b.classList.remove('listening');
+          said.textContent = code ? `${words.split(';')[0]}: ${K.label(code)}.` : why === 'unchanged' ? 'Left as it was.' : `Not changed: ${why}.`;
+          this.update(); b.focus();
+        });
+      } }, cap, h('span', { class: 'change' }, 'change'));
+      this.refresh.push(() => { if (!b.classList.contains('listening')) cap.textContent = K.label(K.get()[a]); });
+      return h('div', { class: 'bind', title: words }, h('span', { class: 'what' }, short), b);
+    });
+    const reset = h('button', { type: 'button', onclick: () => { K.cancel(); K.reset(); said.textContent = 'The keys are back as they were.'; this.update(); } }, icon('auto', 15), h('span', {}, 'reset the keys'));
+    this.refresh.push(() => { reset.disabled = K.isDefault(); });
+    return h('div', { class: 'keysown' }, h('h3', { class: 'part' }, 'your keys'), h('div', { class: 'binds' }, rows), h('div', { class: 'inline' }, reset, said));
   }
 
   // (phase 5a) What is saved for this world: a line saying what, a backup
@@ -437,6 +503,7 @@ export class Menu {
   }
 
   hide() {
+    if (this.game.keys) this.game.keys.cancel();
     if (!this.open) return;
     this.open = false;
     this.root.classList.remove('shown', 'on');

@@ -195,6 +195,8 @@ export const CHOICE = { yes: 'I will do it', no: 'Another time' };
 // road where you stand with the first favour.
 
 export const START_LINE = 'Someone is waiting for you on the road.';
+// (phase 6) the title screen's line on a first visit: true from the start (they are on their way)
+export const START_FROM = 'Someone from {town} is walking up the road to meet you.';
 export const FIRST = {
   waiting: 'waiting on the road',
   // (where the first one to ask waits, when it is word to take and bring back)

@@ -54,6 +54,10 @@ const PATHS = {
   book: '<path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4"/>',
   paste: '<rect x="5" y="4.5" width="14" height="16" rx="1.75"/><path d="M9 4.5V3h6v1.5M9 10h6M9 13.5h6M9 17h4"/>',
   trash: '<path d="M4.5 6.5h15M9.5 6.5V4h5v2.5M6.5 6.5l1 13.5h9l1-13.5"/>',
+  // (phase 6) sharing, saving an image, full screen, keys
+  share: '<circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="6" r="2.5"/><circle cx="17.5" cy="18" r="2.5"/><path d="M8.7 10.8l6.6-3.6M8.7 13.2l6.6 3.6"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
+  expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
 };
 
 export function icon(name, size = 16) {

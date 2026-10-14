@@ -129,6 +129,8 @@ export class Wayfaring {
     // (the walk's stride, for the hands' sway)
     if (this.lastX !== undefined) this.walked = (this.walked || 0) + Math.hypot(player.x - this.lastX, player.z - this.lastZ);
     this.lastX = player.x; this.lastZ = player.z;
+    // (phase 6) where you stand, kept with the next save, for Continue
+    p.at = [Math.round(player.x * 10) / 10, Math.round(player.z * 10) / 10, Math.round(player.yaw * 100) / 100];
     this.maybeSave();
     const you = this.you(player);
     this.ms = performance.now() - t0;

@@ -47,7 +47,11 @@ export class Pacer {
     this.warm = 30;           // frames to show before judging: the very first are slow (start-up)
     this.sinceShown = 0;      // refreshes since a frame was last shown
     this.last = 0;
+    this.cap = 0;             // (phase 6) the frame rate held at most at this (frames a second), or 0
   }
+
+  // (phase 6) the fewest refreshes between frames the cap allows
+  get minEvery() { return this.cap ? Math.max(1, Math.round(1000 / this.cap / this.refresh)) : 1; }
 
   // Once per display refresh, with requestAnimationFrame's time.
   onRefresh(now) {
@@ -55,7 +59,7 @@ export class Pacer {
       this.gaps.push(now - this.last);
       if (this.gaps.length > 30) this.gaps.shift();
       this.refresh = quantile(this.gaps, 0.5);
-      if (!this.fixed) this.lag = this.minLag;
+      if (!this.fixed) { if (this.every < this.minEvery) this.every = this.minEvery; this.lag = this.minLag; }
     }
     this.last = now;
     this.tick++;
@@ -95,7 +99,7 @@ export class Pacer {
     let change = 0;
     if (this.every < MAX_EVERY && (mean(recentWorks) > this.every * R - 0.7 || wait > 0.5 * R)) change = 1;
     // (workers idling between frames run slower, so coming back allows a little)
-    else if (this.every > 1 && this.trips.length >= 60 && mean(this.works) < (this.every - 1) * R - 1.8 && mean(this.trips) - mean(this.works) < 0.2 * R) change = -1;
+    else if (this.every > this.minEvery && this.trips.length >= 60 && mean(this.works) < (this.every - 1) * R - 1.8 && mean(this.trips) - mean(this.works) < 0.2 * R) change = -1;
     if (change) {
       this.every += change;
       this.lag = this.minLag;

@@ -83,7 +83,7 @@ export class BenchRun {
     const get = (c, w) => this.rows.find((r) => r.cam === c && r.weather === w);
     const f = (v, d = 2) => (v === undefined || v !== v ? '-' : v.toFixed(d));
     const lines = [
-      `Land of Ascii v3 benchmark, ${inf.when || ''}`,
+      `Land of Ascii benchmark, ${inf.when || ''}`,
       `${inf.browser} · ${inf.workers} · shared memory ${inf.shared ? 'yes' : 'no'} · detail ${inf.detail} (${inf.cells}) · ${inf.scene}${inf.seed !== undefined ? ` seed ${inf.seed}` : ''} · screen ${inf.screen}`,
       'frame time = the slowest worker\'s time for a frame (ms), the median of 60',
       '',

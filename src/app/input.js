@@ -27,15 +27,27 @@ export class Input {
     this.sensitivity = 1;
     this.invert = false;
     this.filter = new MoveFilter();
+    // (phase 6) the player's own keys (src/app/keys.js): a pressed key as
+    // the default key of its action; '' for a default key moved elsewhere
+    this.remap = {};
+    this.listen = null;            // (Controls: the next key pressed goes here instead)
+    // (first, before the menu's own keys: Escape cancels)
+    addEventListener('keydown', (e) => {
+      if (!this.listen) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const f = this.listen; this.listen = null; f(e.code);
+    }, true);
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' || e.key === 'Escape') { if (!e.repeat && actions.escape) actions.escape(e); return; }
       if (this.blocked()) { if (actions.blockedKey) actions.blockedKey(e); return; }
-      if (e.repeat && !e.code.startsWith('Arrow') && !e.code.startsWith('Key')) return;
-      this.keys[e.code] = true;
-      if (!e.repeat) this.press(e);
-      if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+      const code = this.map(e.code);
+      if (!code) return;
+      if (e.repeat && !code.startsWith('Arrow') && !code.startsWith('Key')) return;
+      this.keys[code] = true;
+      if (!e.repeat) this.press({ code, shiftKey: e.shiftKey });
+      if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
     });
-    addEventListener('keyup', (e) => { this.keys[e.code] = false; });
+    addEventListener('keyup', (e) => { const code = this.map(e.code); if (code) this.keys[code] = false; });
     addEventListener('blur', () => { this.keys = {}; });
     target.addEventListener('mousedown', (e) => {
       if (e.button !== 0 || this.blocked()) return;
@@ -64,6 +76,9 @@ export class Input {
     });
     document.addEventListener('pointerlockerror', () => { this.locked = false; });
   }
+
+  // a pressed key as the game knows it (phase 6)
+  map(code) { return code in this.remap ? this.remap[code] : code; }
 
   press(e) {
     const a = this.actions;

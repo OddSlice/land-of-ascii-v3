@@ -32,6 +32,7 @@ export function freshProgress(seed, N) {
     sketches: [],       // { id, day, hour, place, weather, cols, rows, notable }
     nextSketch: 1,
     first: false,       // the first favour has been offered
+    at: null,           // (phase 6) where you last stood: [x, z, yaw (radians)], for Continue
   };
 }
 
@@ -112,6 +113,7 @@ export function toJSON(p, packed = null) {
     seen: packed ? packed.seen : packBits(p.seen, p.sn * p.sn), walked: packed ? packed.walked : packBits(p.walked, p.wn * p.wn),
     found: p.found, met: p.met, favours: p.favours, lantern: p.lantern, lit: p.lit,
     sketches: p.sketches, nextSketch: p.nextSketch, first: p.first,
+    ...(p.at ? { at: p.at } : {}),
   });
 }
 // Back from JSON, checked; null if it is not a record of this kind.
@@ -127,6 +129,8 @@ export function fromJSON(text, seed, N) {
   p.lantern = !!o.lantern; p.lit = !!o.lit && p.lantern; p.first = !!o.first;
   p.sketches = Array.isArray(o.sketches) ? o.sketches.filter((s) => s && Number.isInteger(s.id)) : [];
   p.nextSketch = Number.isInteger(o.nextSketch) ? o.nextSketch : 1 + Math.max(0, ...p.sketches.map((s) => s.id));
+  // (phase 6; older records have none)
+  if (Array.isArray(o.at) && o.at.length === 3 && o.at.every(Number.isFinite) && o.at[0] >= 0 && o.at[1] >= 0 && o.at[0] <= N && o.at[1] <= N) p.at = o.at.slice();
   return p;
 }
 

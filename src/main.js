@@ -42,7 +42,11 @@ import { MAX_PITCH } from './scene/cpu/view.js';
 import { weatherFor, forecastOf, mainKind, KINDS } from './weather.js';
 import { Menu, VERSION } from './app/menu.js';
 import { BenchRun, browserName } from './app/benchrun.js';
-import { loadDisplay, saveDisplay, seenCard, markCardSeen } from './app/settings.js';
+import { loadDisplay, saveDisplay, markCardSeen, nextVisit, reducedMotion, hasDisplay } from './app/settings.js';
+import { Title } from './app/title.js';
+import { loadKeys, saveKeys, remapOf, defaultKeys, refuse, keyLabel, ACTIONS, isDefault } from './app/keys.js';
+import { sketchCard, saveImage, copyImage, canCopyImage } from './app/share.js';
+import { missingFeatures, showUnsupported } from './app/support.js';
 import { moonLit } from './world/sky.js';
 // (phase 5a) wayfaring: discovery, the journal, sketches, favours, saving
 import { Wayfaring, clockOf } from './app/wayfaring.js';
@@ -50,7 +54,7 @@ import { toJSON as progressJSON, fromJSON as progressFrom, F as FAVOUR } from '.
 import { Journal } from './app/journal.js';
 import { Talk } from './app/talk.js';
 import { Sound } from './sound/engine.js';
-import { START_LINE, CHOICE } from './game/words.js';
+import { START_LINE, START_FROM, CHOICE } from './game/words.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -75,6 +79,7 @@ const THREADS = threadsParam !== null ? Math.max(0, parseInt(threadsParam, 10) |
 const SHARED = WORLD && ISOLATED && THREADS > 0;
 // The menu's Display choices, kept between visits (phase 2b); ?density= still wins.
 const display = loadDisplay();
+const DISPLAY_KEPT = hasDisplay();     // (phase 6: choices from an earlier visit are left alone)
 if (params.has('density')) display.density = Math.max(0, Math.min(3, (parseInt(params.get('density'), 10) || 3) - 1));
 // The tools run with the menu, the hint and the start card suppressed
 // (tools/lib/serve.mjs sets this before the page starts; lab.setQuiet too).
@@ -102,6 +107,13 @@ const state = {
 
 const lab = { errors: [] };
 window.lab = lab;
+
+// (phase 6) a browser that cannot run the game is told so plainly, naming
+// what it lacks, before anything is built
+{
+  const miss = missingFeatures();
+  if (miss.length) { showUnsupported($('error'), miss); lab.unsupported = miss; state.failed = true; await new Promise(() => {}); }
+}
 
 function fail(msg) {
   const el = $('error');
@@ -265,6 +277,15 @@ const start = STRESS || WORLD || YARD ? world.start : START;
 standAt(start.x, start.z, start.yaw, start.pitch);
 if (STRESS) state.camName = 'stress: start';
 if (WORLD) { state.camName = 'spawn'; state.cam = -1; }
+// (phase 6) a shared link's place and hour: ?at=x,z,yaw (metres, metres,
+// degrees) and ?hour=h; a place off the land is ignored
+const SHARED_AT = (() => {
+  if (!WORLD || !params.has('at')) return null;
+  const a = params.get('at').split(',').map(Number);
+  return a.length >= 2 && a.slice(0, 3).every(Number.isFinite) && a[0] >= 0 && a[1] >= 0 && a[0] <= world.N && a[1] <= world.N ? a : null;
+})();
+if (SHARED_AT) { standAt(SHARED_AT[0], SHARED_AT[1], SHARED_AT[2] || 0, 0); state.camName = 'shared'; }
+if (WORLD && params.has('hour')) { const hh = Number(params.get('hour')); if (hh >= 0 && hh < 24) state.hour = hh; }
 if (YARD) { state.camName = CAMS[0].name; state.cam = 0; }
 
 const input = new Input(canvas, {
@@ -315,7 +336,7 @@ const input = new Input(canvas, {
 });
 input.sensitivity = display.sensitivity;
 input.invert = display.invert;
-input.blocked = () => menu.open || card.up || journal.open || talk.open;
+input.blocked = () => menu.open || card.up || journal.open || talk.open || away;
 
 relayout();
 
@@ -350,7 +371,7 @@ function makeFrame() {
   } else if (people && people.on) lab.mainMs = people.updateMs;
   if (yardBeasts && yardBeasts.on) f.animals = yardBeasts.st;
   // (phase 5a) what you carry, your lantern, and the lost things
-  if (youNow) f.you = youNow;
+  if (youNow) f.you = reducedMotion(display) && youNow.walk ? { ...youNow, walk: 0 } : youNow;
   soundFrame = f;
   return f;
 }
@@ -389,7 +410,9 @@ function nearbyUI() {
     w.textContent = '';
     if (who) { w.append('talk to '); const b = document.createElement('b'); b.textContent = who.name; w.append(b); }
   }
-  pr.classList.toggle('on', i >= 0 && !hintOn);
+  // (phase 6: someone to greet matters more than the hint, which gives way)
+  if (i >= 0 && hintOn) hideHint();
+  pr.classList.toggle('on', i >= 0);
   // the signpost
   if (!signs) return;
   if (++signFrames % 20 === 0) signs.step();
@@ -437,15 +460,21 @@ function hideSay() { clearTimeout(sayTimer); $('say').classList.remove('on'); }
 
 // (phase 5a) The exchange's box, and what answering does.
 const talk = new Talk($('talk'), {
-  answer: (id, yes) => way.answer(id, yes, { day: state.day, hour: state.hour }),
+  answer: (id, yes) => {
+    // (phase 6) the first favour taken: once the exchange closes, where to look for it
+    if (yes && !Object.values(way.progress.favours).some((f) => f.s >= FAVOUR.TAKEN)) firstFavourNote = true;
+    return way.answer(id, yes, { day: state.day, hour: state.hour });
+  },
   gift: (kind) => { if (kind === 'lantern') showNote('The lantern is yours now. L lights it or puts it away.', 'L', 9000); },
   words: { yes: CHOICE.yes, no: CHOICE.no, on: 'go on', bye: 'farewell' },
   done: (recapture) => {
     $('veil').classList.remove('on');
     input.clear();
     if (recapture && talkHadMouse) input.capture();
+    if (firstFavourNote) { firstFavourNote = false; setTimeout(() => showNote(`Your journal (${keyLabel(keys.journal)}) keeps the favour. The map (${keyLabel(keys.map)}) shows north, south, east and west.`, keyLabel(keys.journal), 9000), 1200); }
   },
 });
+let firstFavourNote = false;
 // (phase 5b) an exchange stands the clock still, dims the world under it
 // and frees the mouse for its buttons
 let talkHadMouse = false;
@@ -579,16 +608,18 @@ function tick(now) {
   if (state.held && (k.KeyW || k.KeyA || k.KeyS || k.KeyD)) state.held = false;
   // (while the menu, the journal or an exchange is open the clocks and
   // movement stand still)
-  const paused = menu.open || journal.open || talk.open;
+  const paused = menu.open || journal.open || talk.open || away;
   if (!state.held && !paused) player.update(dt, k);
+  // (phase 6) the title screen's flyover: a slow turn at each spot
+  if (fly) flyTick(now);
   // (phase 5a) what you see and find, the lantern and what you carry
-  if (way && way.on && started) {
+  if (way && way.on && started && !card.up) {
     const aspect = grid.cols / (2 * grid.rows), hfov = 2 * Math.atan(Math.tan(LOOK.fovY * DEG / 2) * aspect);
     youNow = way.update(player, state.day, state.hour, hfov, people && people.on ? people.st : null);
     lab.wayMs = way.ms;
     for (const n of way.takeNotes()) { if (n.kind === 'say') showSay('', '', n.text); else showNote(n.text, 'J'); }
   } else youNow = undefined;
-  if (started && !QUIET) nearbyUI();
+  if (started && !QUIET && !card.up) nearbyUI();
   if (!state.frozen && !paused) {
     state.t += dt;
     if (state.running) {
@@ -606,7 +637,7 @@ function tick(now) {
       room: roomAt(world.kit, player.x, player.z, player.feet + 0.02), running: !!(input.keys.ShiftLeft || input.keys.ShiftRight),
       t: state.t, hour: state.hour, day: state.day, weather: sf ? sf.weather : weatherNow(),
       people: sf && sf.people, lit: sf && sf.lit, animals: sf && sf.animals,
-      paused: menu.open || journal.open ? 'menu' : talk.open ? 'talk' : null,
+      paused: menu.open || journal.open || away || card.up ? 'menu' : talk.open ? 'talk' : null,
     });
     lab.soundMs = sound.ms;
   }
@@ -629,7 +660,7 @@ function tick(now) {
       }
       if (res && pacer.late(res.tag) && pacer.sinceShown < 2 * pacer.lag + 2) { dropped++; res = null; }
       pacer.dropped = dropped;
-      if (res) { shownTag = res.tag; presentPool(res); pacer.sinceShown = 0; }
+      if (res) { shownTag = res.tag; presentPool(res); pacer.sinceShown = 0; if (fly && fly.next) flyNext(); }
       if (pacer.shouldSend(pool.inFlight + pool.finished.length)) { pool.submit(makeFrame(), pacer.tick); pacer.sent(); }
     }
   } catch (err) {
@@ -637,12 +668,14 @@ function tick(now) {
     return;
   }
   const timeName = keyName(state.hour);
+  // (phase 6) no statistics over the title screen
+  $('hud').style.visibility = card.up ? 'hidden' : '';
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
     threads: THREADS, hour: state.hour, day: state.day, night: state.look.night, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
     weather: WORLD || state.weather !== 'fair' ? weatherName() : null,
     stress: STRESS, buildMs: buildMs(), sweepMs: shadows ? shadows.sweepMs : light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
-    world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on) } : null,
+    world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on && !mapOver) } : null,
   });
   lookPanel.update(state.look);
   if (menu.open && now > menuNext) { menuNext = now + 250; menu.update(); }
@@ -662,7 +695,7 @@ function keyName(h) {
 const buildMs = () => (WORLD ? worldBuild.total : pool ? pool.buildMs : world.buildMs);
 // (with shared shadows, frames wait for the first sweep)
 const ready = (pool ? pool.whenReady : Promise.resolve()).then(() => (shadows ? (worldProgress('casting shadows', 0.98), shadows.first) : null))
-  .then(() => { started = true; $('progress').style.display = 'none'; if (!card.show()) showHint(); });
+  .then(() => { started = true; $('progress').style.display = 'none'; if (!showTitle()) showHint(); });
 
 // M: the overhead map, drawn in the same cells, instead of the view
 function presentMap() {
@@ -687,7 +720,15 @@ function setDisplay(k, v, keep = true) {
   presenter.glyphs = display.glyphs;
   if (k === 'hud') hud.setMode(display.hud);
   input.sensitivity = display.sensitivity; input.invert = display.invert;
+  applyUI();
   if (keep) saveDisplay(display);
+}
+// (phase 6) the text size, reduced motion and the frame-rate cap
+function applyUI() {
+  const r = document.documentElement;
+  r.style.setProperty('--ui-text', String(display.text));
+  r.classList.toggle('still', reducedMotion(display));
+  pacer.cap = display.cap;
 }
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -716,7 +757,7 @@ const game = {
   get look() { return state.look; },
   setLook(name, v) { state.look = lookFrom({ ...state.look, [name]: v }); },
   camera(i) { useCamera(i); },
-  newWorld(seed) { const q = new URLSearchParams(location.search); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
+  newWorld(seed) { const q = new URLSearchParams(location.search); q.delete('at'); q.delete('hour'); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
   goScene(sc) {
     const q = new URLSearchParams(location.search);
     q.delete('lab'); q.delete('stress'); q.delete('yard');
@@ -724,7 +765,30 @@ const game = {
     reload(q);
   },
   // A link to this exact world (its seed), to the clipboard.
-  copyLink() { return this.copyText(`${location.href.split(/[?#]/)[0]}?seed=${SEED}`); },
+  copyLink() { return this.copyText(shareLink(false)); },
+  // (phase 6) Share this world: the link, with where you stand and the hour if asked
+  shareLink(withPlace) { return shareLink(withPlace); },
+  share(withPlace) { return this.copyText(shareLink(withPlace)); },
+  // (phase 6) full screen, and the keys a player can change
+  fullscreen: () => toggleFullscreen(),
+  get isFullscreen() { return !!document.fullscreenElement; },
+  keys: {
+    actions: ACTIONS, label: keyLabel,
+    get: () => ({ ...keys }),
+    isDefault: () => isDefault(keys),
+    // the next key pressed binds `action`; done(code) or done(null, why)
+    listen(action, done) {
+      input.listen = (code) => {
+        if (code === 'Escape') { done(null, 'unchanged'); return; }
+        const why = refuse(keys, action, code);
+        if (why) { done(null, why); return; }
+        setKeys({ ...keys, [action]: code });
+        done(code);
+      };
+    },
+    cancel() { input.listen = null; },
+    reset() { setKeys(defaultKeys()); },
+  },
   // Some text to the clipboard (the benchmark's result too).
   async copyText(link) {
     try { await navigator.clipboard.writeText(link); return true; } catch { /* try the old way */ }
@@ -815,6 +879,19 @@ lab.version = VERSION;
 // lists them)
 // (0.5.5) the signposts, read: [{ x, z, arms: [{ a, to: [{ name, dist }] }] }]
 lab.signs = () => (signs ? signs.posts.map((P, i) => { signs.read(i); return { x: P.x, z: P.z, arms: P.arms.map((r) => ({ a: r.a, to: r.to.map((t) => ({ name: t.name, dist: Math.round(t.dist) })) })) }; }) : []);
+// (phase 6) the title screen, for the tools: is it up, is its panel
+// forward, its choices' words, what has focus, its foot and its note
+lab.titleState = () => (title ? {
+  up: title.up, shown: title.shown, choices: title.choices.map((c) => c.innerText.replace(/\s+/g, ' ').trim()),
+  focus: document.activeElement ? document.activeElement.innerText || document.activeElement.getAttribute('aria-label') || '' : '',
+  foot: title.foot.textContent, note: title.note.textContent, welcome: title.welcome.textContent, spots: lab.titleSpots || [], measuring: title.root.classList.contains('measuring'),
+} : null);
+// (and Play or Continue, as the focused choice would)
+lab.titlePlay = () => { if (!card.up) return false; leaveTitle(); return true; };
+lab.shareLink = (withPlace) => shareLink(withPlace);
+// (a sketch's share card, as a PNG data URL)
+lab.shareCard = async (id) => { const sk = way.progress.sketches.find((x) => x.id === id); const cells = sk && await way.sketchCells(id); return cells ? sketchCard(cells, sk.cols, sk.rows, SEED).toDataURL('image/png') : null; };
+lab.pace = () => ({ every: pacer.every, cap: pacer.cap, refresh: pacer.refresh });
 lab.people = {
   get count() { return people ? people.n : 0; },
   get on() { return !!(people ? people.on : yardFolk && yardFolk.on); },
@@ -930,10 +1007,21 @@ const journal = new Journal($('journal'), {
   cells: (id) => way.sketchCells(id),
   copy: (text) => game.copyText(text),
   close: () => closeJournal(),
+  // (phase 6) a sketch as an image: shared (copied) where the browser can, else saved
+  async image(cells, sk, mode) {
+    const c = sketchCard(cells, sk.cols, sk.rows, SEED);
+    const name = `land-of-ascii-seed-${SEED}-${String(sk.place || 'sketch').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.png`;
+    if (mode === 'share' && canCopyImage() && await copyImage(c)) return 'copied';
+    return (await saveImage(c, name)) ? 'saved' : null;
+  },
 });
 function toggleJournal() { if (journal.open) closeJournal(); else openJournal(); }
+let journalOpenedYet = false;
 function openJournal(tab) {
   if (!way || !way.on || QUIET || state.failed || card.up || menu.open || journal.open) return false;
+  // (phase 6) the first time, on the favour you are doing, if there is one
+  if (!tab && !journalOpenedYet && Object.values(way.progress.favours).some((f) => f.s === FAVOUR.TAKEN || f.s === FAVOUR.GOT)) tab = 'favours';
+  journalOpenedYet = true;
   input.clear();
   talk.close();
   journal.show(tab);
@@ -950,7 +1038,7 @@ function closeJournal(recapture = false) {
 let journalOpenedAt = 0;
 
 function openMenu() {
-  if (QUIET || state.failed || card.up || menu.open) return false;
+  if (QUIET || state.failed || menu.open) return false;
   input.clear();
   menu.show();
   menuOpenedAt = performance.now();
@@ -967,10 +1055,14 @@ function closeMenu(recapture = false) {
   game.bench.cancel();
   menu.hide();
   input.clear();
+  // (phase 6) back to the title screen, if it is up
+  if (card.up) { title.forward(); title.playBtn.focus({ preventScroll: true }); return; }
   if (recapture) input.capture();
 }
 function onEscape() {
-  if (card.up) { card.dismiss(false); return; }
+  // (phase 6) the title screen: Escape closes its menu, else nothing
+  if (card.up && !menu.open) return;
+  if (away) { comeBack(false); return; }
   // (phase 5a) an exchange: another time; the journal: its sketch, then itself
   if (talk.open) { talk.later(); return; }
   if (journal.open) {
@@ -989,48 +1081,224 @@ function onEscape() {
 // left): open the menu then too, so one press always works.
 function onUnlocked() {
   if (releasing) { releasing = false; return; }
+  if (card.up || away) return;
   // (the Escape that freed the mouse during an exchange answers it)
   if (talk.open) { talk.later(); return; }
   if (journal.open) return;
   openMenu();
 }
 
-// The start card, on the first visit only: the title, click to explore, the
-// essential keys.
-const card = {
-  el: $('card'),
-  up: false,
-  show() {
-    if (QUIET || !WORLD || state.failed || seenCard()) return false;
-    this.up = true;
-    // (phase 5a) in a first session, only this: someone is waiting on the road
-    if (way && way.meetOn) { this.el.querySelector('.go').textContent = START_LINE; this.el.querySelector('.sub').hidden = false; }
-    if (sound) this.el.querySelector('.snd').hidden = false;
-    this.el.classList.add('on');
-    requestAnimationFrame(() => this.el.classList.add('shown'));
-    this.el.focus({ preventScroll: true });
-    return true;
-  },
-  dismiss(capture) {
-    if (!this.up) return;
-    this.up = false;
-    markCardSeen();
-    this.el.classList.remove('shown', 'on');
-    if (capture) input.capture();
-    showHint();
-  },
-};
-card.el.addEventListener('click', () => card.dismiss(true));
-addEventListener('keydown', (e) => { if (card.up && e.key !== 'Escape' && e.key !== 'Tab' && !e.repeat) { e.preventDefault(); card.dismiss(true); } });
+// ---- (phase 6) the title screen ------------------------------------------------
+// Grown from the start card. Behind it the world drifts on the fixed
+// cameras (four spots from the world's own records: the lake at dawn, the
+// fort from the road at dusk, a village green at midday, a viewpoint in
+// rain), each held 20 s and cross-faded, the clock, the weather and the
+// people alive. Nothing of it touches the saved progress, the clock or where
+// you stand: those are put back as they were when Play or Continue is
+// chosen (Continue then stands you where you left off; a shared link's
+// place wins). The tools never see it.
+const FLY_SECS = 20, FLY_FADE = 1500;
+const title = WORLD ? new Title($('title'), {
+  play: () => leaveTitle(),
+  newWorld: (seed) => game.newWorld(seed),
+  settings: () => openMenu(),
+  share: () => game.share(false),
+}) : null;
+// (the rest of the game asks `card.up`)
+const card = { get up() { return !!(title && title.up); } };
+let home = null, fly = null;
+
+function flyoverSpots() {
+  const used = new Set();
+  const pick = (tests) => {
+    for (const t of tests) {
+      const c = CAMS.find((q) => !used.has(q) && (t instanceof RegExp ? t.test(q.name) : q.name === t));
+      if (c) { used.add(c); return c; }
+    }
+    return null;
+  };
+  const plan = [
+    [['main lake shore', 'the coast', 'river valley', /bridge from its bank/], LOOK.hours.dawn + 0.25, 'fair'],
+    [['the fort from the road', 'road approaching the fort', 'the wall walk over the valley'], LOOK.hours.dusk, 'fair'],
+    [[/\(green\), its centre/, /its centre/, /the road in/], 12.5, 'fair'],
+    [['ridge-top vista', 'forest edge across meadow', 'spawn view', /the road in/], 14, 'rain'],
+  ];
+  const out = [];
+  for (const [tests, hour, weather] of plan) { const c = pick(tests) || pick([/./]); if (c) out.push({ ...c, hour, weather }); }
+  return out;
+}
+function flySpot(k) {
+  const c = fly.spots[k];
+  fly.k = k; fly.at = performance.now(); fly.next = false;
+  standAt(c.x, c.z, c.yaw, c.pitch, c.y);
+  if (c.stand) player.feet = player.standOn(c.x, c.z, player.feet);
+  state.held = true;
+  fly.yaw0 = player.yaw;
+  state.hour = c.hour; state.running = true; state.rate = CLOCK_RATE; state.frozen = false;
+  state.weather = c.weather;
+  state.camName = `title: ${c.name}`;
+}
+function flyTick(now) {
+  const el = (now - fly.at) / 1000;
+  // (a slow turn across the view; still, with reduced motion)
+  if (!reducedMotion(display)) player.yaw = fly.yaw0 + (el / FLY_SECS - 0.5) * 9 * DEG;
+  if (el >= FLY_SECS) fly.next = true;
+}
+// (just after a frame is drawn: the picture as it is lies over the next spot's, fading)
+function flyNext() {
+  title.crossFade(canvas, reducedMotion(display) ? 0 : FLY_FADE);
+  flySpot((fly.k + 1) % fly.spots.length);
+}
+// What the title says of this world's progress: null for none yet.
+function titleProgress() {
+  if (!way || !way.on) return null;
+  const p = way.progress;
+  const any = Object.keys(p.found).length || Object.keys(p.met).length || p.sketches.length || Object.keys(p.favours).length;
+  if (!any) return null;
+  // where: the nearest place found to where you stood, else the last found
+  let where = null;
+  const list = way.places.list.filter((pl) => p.found[pl.id] && ['village', 'fort', 'viewpoint', 'bridge', 'lake', 'coast'].includes(pl.kind));
+  if (p.at && list.length) { let bd = Infinity; for (const pl of list) { const d = Math.hypot(pl.x - p.at[0], pl.z - p.at[1]); if (d < bd) { bd = d; where = pl.title; } } }
+  else if (list.length) where = list.slice().sort((a, b) => (p.found[b.id][0] - p.found[a.id][0]) || (p.found[b.id][1] - p.found[a.id][1]))[0].title;
+  return { standing: way.standing.title, where, at: p.at };
+}
+function showTitle() {
+  if (!title || QUIET || state.failed) return false;
+  home = { x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, hour: state.hour, day: state.day, running: state.running, rate: state.rate, frozen: state.frozen, weather: state.weather, held: state.held, camName: state.camName };
+  fly = { spots: flyoverSpots(), k: 0 };
+  if (!fly.spots.length) fly = null; else flySpot(0);
+  const prog = titleProgress();
+  title.show({ progress: prog, seed: SEED, version: VERSION, visit: nextVisit(), reduced: reducedMotion(display) });
+  if (!prog && way && way.meetOn) title.welcome.textContent = way.fav.meet && way.fav.meet.town ? START_FROM.replace('{town}', way.fav.meet.town) : START_LINE;
+  if (sound) title.foot.textContent += ' · sound starts with your first click or key';
+  lab.titleSpots = fly ? fly.spots.map((c) => ({ name: c.name, hour: c.hour, weather: c.weather })) : [];
+  if (wantAutoDetail()) autoDetail();
+  return true;
+}
+function leaveTitle() {
+  if (!card.up) return;
+  title.hide();
+  fly = null;
+  Object.assign(state, { hour: home.hour, day: home.day, running: home.running, rate: home.rate, frozen: home.frozen, weather: home.weather, held: home.held, camName: home.camName });
+  const prog = titleProgress();
+  if (!SHARED_AT && prog && prog.at) player.place(prog.at[0], prog.at[1], prog.at[2], 0);
+  else player.place(home.x, home.z, home.yaw, home.pitch);
+  markCardSeen();
+  input.clear();
+  input.capture();
+  // (a first walk: the keys that matter, a while longer; else only Escape)
+  showHint(!prog);
+}
+
+// (phase 6) On the first visit the detail level is chosen by measuring this
+// machine: behind the title, each level from medium up for a second and a
+// bit, the highest whose frames take the workers and the draw at most
+// 10.5 ms nine times in ten (sixty
+// frames a second with room to spare: a level that stutters is worse than
+// one a step lower). Kept; the menu's Display changes it.
+const AUTO_MS = 10.5;
+function wantAutoDetail() {
+  if (params.get('autodetail') === '1') return true;
+  return !display.auto && !DISPLAY_KEPT && !params.has('density') && !navigator.webdriver;
+}
+async function autoDetail() {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const measure = async (ms) => {
+    // (the workers' time for a frame and the page's draw, as the benchmark judges a frame)
+    const got = [], c = { push: (x) => got.push((x.worker || 0) + (x.draw || 0)) };
+    collectors.push(c);
+    await wait(ms);
+    collectors = collectors.filter((q) => q !== c);
+    got.sort((a, b) => a - b);
+    return got.length >= 8 ? got[Math.floor(got.length * 0.9)] : Infinity;
+  };
+  title.root.classList.add('measuring');
+  await wait(1000);             // (the world's first second is slower: let it pass)
+  const was = display.density, tried = [];
+  let chosen = 0;
+  for (const lv of [1, 2, 3]) {
+    setDisplay('density', lv, false);
+    await wait(700);
+    const p90 = await measure(1300);
+    tried.push({ level: DETAIL_NAMES[lv], p90: Math.round(p90 * 100) / 100 });
+    if (p90 <= AUTO_MS) chosen = lv; else break;
+  }
+  display.auto = true;
+  setDisplay('density', chosen, true);
+  title.root.classList.remove('measuring');
+  lab.autoDetail = { chosen: DETAIL_NAMES[chosen], tried, was: DETAIL_NAMES[was] };
+  title.say(`Detail set to ${DETAIL_NAMES[chosen]}: it keeps sixty frames a second on this machine. Settings, then Display, changes it.`, 10000);
+}
+
+// (phase 6) Paused while the window is elsewhere; a click (or Enter) goes on.
+let away = false;
+function goAway() {
+  if (!started || QUIET || state.failed || away || card.up || menu.open || journal.open || talk.open) return;
+  away = true;
+  input.clear();
+  $('away').classList.add('on');
+}
+function comeBack(capture) {
+  if (!away) return;
+  away = false;
+  $('away').classList.remove('on');
+  input.clear();
+  if (capture) input.capture();
+}
+addEventListener('blur', goAway);
+document.addEventListener('visibilitychange', () => { if (document.hidden) goAway(); });
+$('away').addEventListener('click', () => comeBack(true));
+addEventListener('keydown', (e) => { if (away && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); comeBack(true); } });
+
+// (phase 6) Full screen: F11 or the Display section's button. Leaving it
+// (Escape) frees the mouse too, as leaving the mouse does.
+function toggleFullscreen() {
+  const playing = () => !menu.open && !card.up && !journal.open && !talk.open && !away;
+  if (document.fullscreenElement) {
+    // (leaving it with F11 or the button is not leaving the game: the mouse
+    // it frees does not open the menu, and is taken again)
+    if (document.pointerLockElement) releasing = true;
+    document.exitFullscreen().then(() => { if (playing()) input.capture(); }).catch(() => {});
+    return;
+  }
+  const el = document.documentElement;
+  if (!el.requestFullscreen) { showNote('This browser cannot go full screen here.'); return; }
+  el.requestFullscreen({ navigationUI: 'hide' }).then(() => { if (playing()) input.capture(); }).catch(() => showNote('The browser would not go full screen here.'));
+}
+addEventListener('keydown', (e) => { if (e.code === 'F11' && !e.repeat && !QUIET) { e.preventDefault(); toggleFullscreen(); } }, true);
+document.addEventListener('fullscreenchange', () => { if (menu.open) menu.update(); });
+
+// (phase 6) the keys a player has changed
+let keys = loadKeys();
+function setKeys(b) { keys = b; saveKeys(b); input.remap = remapOf(b); }
+input.remap = remapOf(keys);
+applyUI();
+
+// (phase 6) the link that shares this world: its seed, and if asked where
+// you stand and the hour
+function shareLink(withPlace) {
+  const q = new URLSearchParams({ seed: String(SEED) });
+  if (withPlace) {
+    const yaw = Math.round((((player.yaw / DEG) % 360) + 360) % 360);
+    q.set('at', `${player.x.toFixed(1)},${player.z.toFixed(1)},${yaw}`);
+    q.set('hour', state.hour.toFixed(2));
+  }
+  return `${location.origin}${location.pathname}?${q}`;
+}
 
 // The hint that Escape opens the menu, fading after a few seconds.
 let hintTimer = 0;
-function showHint() {
+function showHint(keysToo = false) {
   if (QUIET || state.failed) return;
   const el = $('hint');
+  // (phase 6) on a first walk, the keys that matter (as the player has them), for longer
+  const cap = (k) => `<kbd>${keyLabel(k).replace(/[<&]/g, '')}</kbd>`;
+  el.innerHTML = keysToo
+    ? `${cap(keys.forward)}${cap(keys.left)}${cap(keys.back)}${cap(keys.right)}walk · click the picture to look round · ${cap(keys.greet)}greet · <kbd>Esc</kbd>menu`
+    : '<kbd>Esc</kbd>menu and controls';
   el.classList.add('on');
   clearTimeout(hintTimer);
-  hintTimer = setTimeout(() => el.classList.remove('on'), 4000);
+  hintTimer = setTimeout(() => el.classList.remove('on'), keysToo ? 10000 : 4000);
 }
 function hideHint() { clearTimeout(hintTimer); $('hint').classList.remove('on'); }
 
@@ -1072,7 +1340,7 @@ Object.assign(lab, {
   // The menu, the hint and the start card suppressed (the tools), or not.
   setQuiet(on) {
     QUIET = !!on;
-    if (QUIET) { closeMenu(false); if (card.up) { card.up = false; card.el.classList.remove('shown', 'on'); } hideHint(); }
+    if (QUIET) { closeMenu(false); if (card.up) leaveTitle(); hideHint(); }
     // (the tools' pictures carry no statistics unless they ask: lab.setHud)
     hud.setMode(QUIET ? 'none' : display.hud);
   },

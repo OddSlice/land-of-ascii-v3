@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Land of Ascii v3</title>
+<title>Land of Ascii</title>
 <link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0e12; overflow: hidden; }
@@ -44,6 +44,69 @@
     font: 13px/1.5 var(--mono); color: var(--ink); background: rgba(13, 14, 18, .78); border: 1px solid var(--line); border-radius: 6px;
     pointer-events: none; opacity: 0; transition: opacity 260ms ease; text-align: center; }
   #say.on { opacity: 1; }
+
+
+  /* (phase 6) your keys, in Controls; the share line's box */
+  .menu .keysown { margin-bottom: 12px; }
+  .menu .binds { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 18px; margin: 4px 0 8px; }
+  .menu .bind { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 1px 0; border-bottom: 1px solid var(--line-soft); }
+  .menu .bind .what { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu .bind .what { color: var(--quiet); }
+  .menu .rebind { display: inline-flex; align-items: center; gap: 8px; padding: 2px 6px; background: none; border: 1px solid transparent; border-radius: 4px; cursor: pointer; color: var(--quiet); font: 11px var(--mono); }
+  .menu .rebind:hover { background: var(--hover); border-color: var(--line); }
+  .menu .rebind kbd { margin: 0; min-width: 2.2em; }
+  .menu .rebind .change { opacity: 0; }
+  .menu .rebind:hover .change, .menu .rebind:focus-visible .change { opacity: 1; }
+  .menu .rebind.listening kbd { color: var(--on-accent); background: var(--accent); border-color: #000; }
+  .menu .keysaid { margin: 0 0 0 10px; }
+  .menu .check { display: inline-flex; align-items: center; gap: 6px; color: var(--quiet); cursor: pointer; }
+  .menu .check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  /* (phase 6) the title screen (src/app/title.js): the world drifting behind,
+     a panel framed in glyph stone and timber, the name in glyph lettering */
+  #title { position: fixed; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; font: 13px/1.5 var(--mono); color: var(--ink); }
+  #title[hidden] { display: none; }
+  #title::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(13, 14, 18, .15) 30%, rgba(13, 14, 18, .62) 100%); pointer-events: none; transition: background 600ms ease; }
+  #title.measuring::before { background: rgba(13, 14, 18, .9); }
+  #title .xfade { position: fixed; pointer-events: none; opacity: 0; image-rendering: pixelated; }
+  #title .panel { position: relative; opacity: 0; transform: translateY(8px); transition: opacity 900ms ease, transform 900ms var(--ease); max-width: calc(100vw - 24px); }
+  #title.shown .panel { opacity: 1; transform: none; transition-duration: 220ms; }
+  #title .frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+  #title .inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 46px 40px 40px; width: min(600px, calc(100vw - 72px)); box-sizing: border-box; zoom: var(--ui-text, 1); }
+  #title .name { display: block; max-width: 100%; }
+  #title .welcome { margin: 2px 0 8px; text-align: center; color: var(--quiet); font-style: italic; }
+  #title .choices { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 360px; }
+  #title .choice { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 8px 14px 9px; font: 600 14px/1.3 var(--mono); color: var(--head); text-align: left;
+    background: rgba(29, 30, 36, .85); border: 1px solid var(--line); border-radius: 5px; cursor: pointer; }
+  #title .choice .more { font: 400 11.5px/1.35 var(--mono); color: var(--quiet); }
+  #title .choice:hover { background: var(--hover); border-color: #55555f; }
+  #title .choice.main { color: var(--on-accent); background: var(--accent); border-color: #000; }
+  #title .choice.main .more { color: rgba(29, 20, 9, .78); }
+  #title .choice.main:hover { background: var(--accent-hi); }
+  #title button:focus-visible, #title input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #title .choice.main:focus-visible { outline-color: var(--head); }
+  #title .newrow { display: flex; gap: 6px; padding: 2px 0 4px; }
+  #title .newrow[hidden] { display: none; }
+  #title .newrow input { flex: 1; min-width: 0; padding: 6px 9px; font: 13px var(--mono); color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 4px; }
+  #title .small { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; font: 12px var(--mono); color: var(--ink); background: var(--cap); border: 1px solid var(--cap-line); border-radius: 4px; cursor: pointer; }
+  #title .small:hover { background: var(--hover); }
+  #title .small svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  #title .note { min-height: 1.4em; margin: 2px 0 0; max-width: 360px; text-align: center; font-size: 12px; color: var(--accent-hi); }
+  #title .foot { position: absolute; left: 0; right: 0; bottom: 10px; margin: 0; text-align: center; font-size: 11px; color: var(--quiet); text-shadow: 0 1px 2px #000; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  /* (phase 6) paused while the window is elsewhere */
+  #away { position: fixed; inset: 0; z-index: 7; display: none; align-items: center; justify-content: center; background: rgba(13, 14, 18, .55); cursor: pointer; }
+  #away.on { display: flex; }
+  #away .box { display: flex; flex-direction: column; gap: 4px; padding: 14px 20px; font: 13px/1.5 var(--mono); color: var(--ink); text-align: center;
+    background: rgba(13, 14, 18, .9); border: 1px solid var(--line); border-radius: 6px; zoom: var(--ui-text, 1); }
+  #away b { color: var(--head); } #away span { color: var(--quiet); font-size: 12px; }
+  /* (phase 6) a browser that cannot run the game */
+  #error.unsupported { background: #0d0e12; color: var(--ink); white-space: normal; max-width: 640px; margin: 0 auto; font: 14px/1.6 var(--mono); padding: 48px 24px; }
+  #error.unsupported h1 { font: 600 18px/1.4 var(--mono); color: var(--head); margin: 0 0 12px; }
+  #error.unsupported li { color: var(--accent-hi); }
+  /* (phase 6) the text size: the menu's and the journal's pages, what is said, the prompts */
+  .menu [role="tabpanel"], .menu .viewer .bar, #say, #prompt, #sign, #talk, #note, #hint { zoom: var(--ui-text, 1); }
+  /* (phase 6) reduced motion: nothing slides, pulses or drifts */
+  html.still *, html.still *::before, html.still *::after { transition-duration: 0ms !important; animation: none !important; }
 
   /* (0.5.5) the map's drawn layer (src/app/mapover.js): the compass, the
      places and their names, a legend, a scale and you, over the glyph map */
@@ -135,7 +198,7 @@
   #say .who b { color: var(--head); font-weight: 600; }
   #hint kbd, #card kbd, .menu kbd { display: inline-block; min-width: 1.9em; padding: 0 5px; margin-right: 3px; font: 600 11px/1.6 var(--mono);
     color: var(--head); text-align: center; background: var(--cap); border: 1px solid var(--cap-line); border-bottom-width: 2px; border-radius: 4px; }
-  #hint kbd { margin-right: 8px; }
+  #hint kbd { margin-right: 4px; }
   #card { position: fixed; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; cursor: pointer;
     background: rgba(13, 14, 18, .35); opacity: 0; transition: opacity 200ms ease; }
   #card.on { display: flex; }
@@ -367,22 +430,8 @@
 <div id="note" role="status" aria-live="polite"></div>
 <div id="veil" aria-hidden="true"></div>
 <div id="talk" role="dialog" aria-live="polite" aria-label="talking" hidden></div>
-<div id="card" role="dialog" aria-labelledby="card-title" tabindex="-1">
-  <div class="box">
-    <h1 id="card-title">Land of Ascii</h1>
-    <p class="go">click to explore</p>
-    <p class="sub" hidden>click to begin</p>
-    <p class="snd" hidden>Sound starts with your first click.</p>
-    <dl>
-      <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>walk (Shift runs)</dd>
-      <dt><kbd>mouse</kbd></dt><dd>look</dd>
-      <dt><kbd>F</kbd></dt><dd>fly</dd>
-      <dt><kbd>E</kbd></dt><dd>greet someone</dd>
-      <dt><kbd>J</kbd></dt><dd>your journal</dd>
-      <dt><kbd>Esc</kbd></dt><dd>menu: every control and option</dd>
-    </dl>
-  </div>
-</div>
+<div id="title" hidden></div>
+<div id="away" role="dialog" aria-label="paused"><div class="box"><b>Paused</b> while the window is elsewhere.<span>Click, or press Enter, to go on.</span></div></div>
 <div id="menu" class="menu" aria-hidden="true"></div>
 <div id="journal" class="menu journal" aria-hidden="true"></div>
 <div id="error"></div>

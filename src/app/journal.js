@@ -120,6 +120,8 @@ export class Journal {
     this.viewer = h('div', { class: 'viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'a sketch', hidden: true },
       h('div', { class: 'frame' }, this.canvas),
       h('div', { class: 'bar' }, this.caption, h('div', { class: 'inline' }, this.prevBtn, this.nextBtn,
+        h('button', { type: 'button', onclick: () => this.image('share') }, icon('share', 15), h('span', {}, 'share')),
+        h('button', { type: 'button', onclick: () => this.image('save') }, icon('download', 15), h('span', {}, 'save image')),
         h('button', { type: 'button', onclick: () => this.copy() }, icon('copy', 15), h('span', {}, 'copy as text')), this.copied,
         h('button', { type: 'button', class: 'shut', onclick: () => this.shutViewer() }, icon('close', 15), h('span', {}, 'close'), h('kbd', {}, 'Esc')))));
     this.root.append(this.back, this.panel, this.viewer);
@@ -222,6 +224,16 @@ export class Journal {
     const ok = await this.book.copy(sketchText(this.cells, s.cols, s.rows));
     this.copied.textContent = ok ? 'copied' : 'could not copy';
     setTimeout(() => { this.copied.textContent = ''; }, 2500);
+  }
+  // (phase 6) the sketch as an image with a thin frame, the game's name and
+  // the seed: shared to the clipboard where the browser allows an image
+  // there, else saved; or saved
+  async image(mode) {
+    const s = this.d.sketches[this.viewing];
+    if (!this.cells || !this.book.image) return;
+    const how = await this.book.image(this.cells, s, mode);
+    this.copied.textContent = how === 'copied' ? 'the image is copied' : how === 'saved' ? 'the image is saved' : 'the browser would not make the image';
+    setTimeout(() => { this.copied.textContent = ''; }, 3000);
   }
   shutViewer() {
     if (this.viewing === null) return false;
