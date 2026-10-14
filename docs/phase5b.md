@@ -542,3 +542,21 @@ The land alone is about −42 dB on a fair day and −27 dB in rain, so the musi
 The sound check with the music playing: 30 of 30 stops, loudest sample 0.171 after the limiter (0.104 before), at most 10 voices (the music is outside the cap), and the sound's main-thread work a median 0.060 ms a frame, 95% under 0.100 ms. 9 frames of 22,379 took 0.5 ms or more, the slowest 1.19 ms (7 and 0.93 ms in 0.5.2): a frame that starts a chord's pad makes its eight oscillators at once. The menu check (70 of 70) checks that the music starts a few seconds after the sound and that the slider is reached by Tab and kept.
 
 I couldn't listen to it. The levels and balance are measured; whether it is pleasant needs your ears.
+
+## 8. 0.5.4
+
+- **The music loops.** In 0.5.3 each piece ended and a long quiet followed before a new one. Now there are three fixed tracks, each beginning under the last one's closing chord, and round again (`SOUND.music.tracks`; the rules are in `docs/art-bible.md`, section 10).
+- **The sound starts at 90%** (was 80%). A volume already chosen in the menu is kept.
+
+`tools/music-check.mjs` now renders the whole loop and on into the first track again, to `shots/music/music-loop.wav`:
+
+| Starts | Track | Key | Length | Peak | Loudness |
+|---|---|---|---|---|---|
+| 0:00 | morning field | C major, 62 bpm, piano | 98 s | 0.136 | −34.1 dB |
+| 1:38 | still water | F Lydian, 57 bpm, flute | 107 s | 0.113 | −33.5 dB |
+| 3:25 | long road | G Mixolydian, 64 bpm, piano | 95 s | 0.173 | −33.9 dB |
+| 5:00 | morning field again | | | | |
+
+At each hand-off the quietest second is −38 to −39 dB, so there is no hole between tracks, and nothing peaks there (0.08 at most).
+
+The sound check at 90%: 30 of 30 stops, loudest sample 0.189 after the limiter (0.115 before), at most 10 voices; the sound's main-thread work a median 0.060 ms a frame, 95% under 0.110 ms, 10 frames of 22,379 at 0.5 ms or more (the slowest 1.17 ms). The menu check: 70 of 70.

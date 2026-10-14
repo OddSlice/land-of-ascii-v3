@@ -6,13 +6,14 @@
 // last chord, in one long room's echo (a convolution with a decaying noise
 // made here).
 //
-// A piece: a key and a mode (bright by day, darker by night and in rain), a
-// tempo, four chords, each held two bars. The pad holds the chords and the
+// Three tracks (SOUND.music.tracks), each a key and a mode, a tempo, four
+// chords, each held two bars; they play in turn, each beginning under the
+// last one's closing chord, and round again. The pad holds the chords and the
 // piano rolls through them; the first time round there is no tune, then a
 // short motif on the piano or the flute, its shape kept and its notes fitted
 // to each chord, closing on a long note; the last time round it is lighter,
-// and the piece ends on the home chord with a few bell notes. Then a long
-// quiet, and the next piece.
+// and the piece ends on the home chord with a few bell notes, under which
+// the next track begins.
 //
 // The palette's numbers are in src/sound/palette.js (SOUND.music).
 import { SOUND } from './palette.js';
@@ -65,21 +66,24 @@ const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ?
 
 // ---- writing a piece ---------------------------------------------------------------------
 
-// A piece for this hour and weather: its notes, [{ t (s from its start),
-// inst, midi (or a chord's midis), v, dur }], sorted, and its length.
-export function compose(seed, hour, rain) {
+// A piece: its notes, [{ t (s from its start), inst, midi (or a chord's
+// midis), v, dur }], sorted, its length, and when the next may begin
+// (`handoff`, as its last chord rings). Its key, mode, tempo, chords and
+// lead come from `spec` (one of SOUND.music.tracks) where given, and
+// otherwise from the hour and the weather; its tune and rolls from `seed`.
+export function compose(seed, hour, rain, spec = {}) {
   const r = rng(Math.imul(seed + 1, 2654435761) ^ 0x5bd1e995);
   const night = hour < 5.5 || hour >= 20.5, dusk = !night && hour >= 17, dawn = !night && hour < 8.5, wet = rain > 0.3;
-  const mode = night ? pick(r, wet ? ['aeolian', 'dorian'] : ['dorian', 'aeolian', 'dorian'])
+  const mode = spec.mode || (night ? pick(r, wet ? ['aeolian', 'dorian'] : ['dorian', 'aeolian', 'dorian'])
     : dusk ? pick(r, wet ? ['dorian', 'aeolian'] : ['mixolydian', 'dorian', 'ionian'])
-      : dawn ? pick(r, ['lydian', 'ionian', 'ionian']) : wet ? pick(r, ['dorian', 'mixolydian']) : pick(r, ['ionian', 'lydian', 'mixolydian', 'ionian']);
+      : dawn ? pick(r, ['lydian', 'ionian', 'ionian']) : wet ? pick(r, ['dorian', 'mixolydian']) : pick(r, ['ionian', 'lydian', 'mixolydian', 'ionian']));
   const scale = MODES[mode], penta = PENTA[mode];
   // (the key: the piano's roll starts round C3 to G3, lower at night)
-  const root = pick(r, night ? [45, 47, 48, 50] : [48, 50, 52, 53, 55]);
-  const bpmR = night ? M.bpm.night : M.bpm.day, bpm = bpmR[0] + r() * (bpmR[1] - bpmR[0]), beat = 60 / bpm;
-  const cycles = night ? M.cycles.night : M.cycles.day;
-  const prog = pick(r, PROGS[mode]);
-  const lead = r() < (night ? 0.5 : 0.4) ? 'flute' : 'keys';
+  const root = spec.root || pick(r, night ? [45, 47, 48, 50] : [48, 50, 52, 53, 55]);
+  const bpmR = night ? M.bpm.night : M.bpm.day, bpm = spec.bpm || bpmR[0] + r() * (bpmR[1] - bpmR[0]), beat = 60 / bpm;
+  const cycles = spec.cycles || (night ? M.cycles.night : M.cycles.day);
+  const prog = spec.prog || pick(r, PROGS[mode]);
+  const lead = spec.lead || (r() < (night ? 0.5 : 0.4) ? 'flute' : 'keys');
   const rhythm = pick(r, RHYTHMS), roll = pick(r, ROLLS), roll2 = pick(r, ROLLS);
   // a degree's pitch, and a tune index's degree (five to an octave)
   const pitch = (deg, base = root) => base + scale[mod(deg, 7)] + 12 * Math.floor(deg / 7);
@@ -131,7 +135,7 @@ export function compose(seed, hour, rain) {
   [0, 4, 7, 9].forEach((up, i) => add(t + i * beat * 0.75, 'keys', pitch(up, root), 0.36, beat * 4));
   [14, 16, 18].forEach((up, i) => { if (r() < 0.8) add(t + beat * (3 + i * 1.5), 'bell', pitch(up, root), 1, beat * 3); });
   notes.sort((a, b) => a.t - b.t);
-  return { notes, length: t + C * 1.2 + M.pad.release * 2, mode, bpm, lead, root };
+  return { notes, length: t + C * 1.2 + M.pad.release * 2, handoff: t + C * M.handoff, mode, bpm, lead, root, name: spec.name || null };
 }
 
 // ---- the instruments ----------------------------------------------------------------------
@@ -172,31 +176,47 @@ export class Music {
   }
   level(v, tc) { this.out.gain.setTargetAtTime(v, this.ctx.currentTime, tc); }
 
-  // Each frame: write the next piece when its time comes, and schedule the
-  // notes falling due. `hour`, `rain`: the world's, for the next piece.
+  // Each frame: start the next track when its time comes, and schedule the
+  // notes falling due. The tracks (SOUND.music.tracks) play in turn, each
+  // starting as the last one's home chord rings, and round again.
+  // `hour`, `rain`: the world's, for the tone (darker by night and in rain).
   update(now, hour, rain, audible) {
     if (!this.piece) {
       if (now < this.nextAt) return 0;
       if (!audible) { this.nextAt = now + 5; return 0; }
-      this.piece = compose(this.seed * 1009 + this.n++, hour, rain);
-      this.start = now + 0.1; this.idx = 0;
-      const night = hour < 5.5 || hour >= 20.5;
-      this.tone.frequency.setTargetAtTime(rain > 0.3 ? M.tone.rain : night ? M.tone.night : M.tone.day, now, 2);
+      this.begin(Math.max(now + 0.1, this.nextAt), hour, rain, now);
     }
+    let k = this.flush(now + M.lookahead, now);
+    // (the hand-off: what is left of this track is already on the audio
+    // clock; the next begins under its last chord)
+    const P = this.piece;
+    if (now + M.lookahead >= this.start + P.handoff) {
+      k += this.flush(Infinity, now);
+      const at = this.start + P.handoff;
+      if (audible) { this.begin(at, hour, rain, now); k += this.flush(now + M.lookahead, now); }
+      else { this.piece = null; this.nextAt = now + 5; }
+    }
+    this.played += k;
+    return k;
+  }
+  begin(at, hour, rain, now) {
+    const T = M.tracks, tr = T[this.n++ % T.length];
+    this.piece = compose(tr.seed, 12, 0, tr);
+    this.start = at; this.idx = 0; this.track = tr.name;
+    const night = hour < 5.5 || hour >= 20.5;
+    this.tone.frequency.setTargetAtTime(rain > 0.3 ? M.tone.rain : night ? M.tone.night : M.tone.day, now, 2);
+    if (this.starts) this.starts.push({ name: tr.name, at });
+  }
+  // schedule this track's notes due before `until`
+  flush(until, now) {
     const P = this.piece;
     let k = 0;
-    while (this.idx < P.notes.length && this.start + P.notes[this.idx].t < now + M.lookahead) {
+    while (this.idx < P.notes.length && this.start + P.notes[this.idx].t < until) {
       const nt = P.notes[this.idx++], at = this.start + nt.t;
       if (at < now - 0.15) continue;   // (a stalled frame: let a late note go)
       this.note(nt, Math.max(at, now + 0.01));
       k++;
     }
-    if (this.idx >= P.notes.length && now > this.start + P.length) {
-      this.piece = null;
-      const r = rng(this.seed * 31 + this.n * 977);
-      this.nextAt = now + M.gap[0] + r() * (M.gap[1] - M.gap[0]);
-    }
-    this.played += k;
     return k;
   }
   // (the menu, a tool: start the next piece now)

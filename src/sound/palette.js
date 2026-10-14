@@ -20,7 +20,7 @@
 
 export const SOUND = {
   // ---- the whole ----------------------------------------------------------------
-  master: 0.8,                  // the default master volume (the menu changes it)
+  master: 0.9,                  // the default master volume (the menu changes it)
   limit: { threshold: -10, knee: 6, ratio: 12, attack: 0.003, release: 0.25 },   // a soft limiter at the end: nothing clips
   voices: 16,                   // at most this many sounding at once, the loudest at the ear kept
   fade: { hidden: 0.5, menu: 0.35, talk: 0.6, unhide: 0.8 },   // seconds: fading out (tab hidden, menu or journal), the exchange's duck, fading back
@@ -117,19 +117,25 @@ export const SOUND = {
   latch: { level: 0.04, ref: 4, reach: 40 },                   // a door's latch as someone goes in or out
 
   // ---- music (0.5.3) ------------------------------------------------------------------
-  // Slow, soft pieces made in code as the land plays (src/sound/music.js):
-  // a warm pad, a felt-piano roll under it, now and then a melody on the
-  // piano or a soft flute, all in a long room's echo. Each piece is written
-  // when it starts, from a seeded generator, to the hour and the weather
-  // (bright modes by day, darker and slower by night and in rain), plays a
-  // minute or two, and leaves a long quiet after it, as the land's own sound
-  // is the point. It is not of the world: not placed, not in the voices, and
-  // it plays on (softer) under the menu and an exchange.
+  // Slow, soft music made in code (src/sound/music.js): a warm pad, a
+  // felt-piano roll under it, now and then a melody on the piano or a soft
+  // flute, all in a long room's echo. Three tracks run one into the next
+  // and round again (0.5.4). It is not of the world: not placed, not in
+  // the voices, and it plays on (softer) under the menu and an exchange;
+  // it is darker by night and in rain.
   music: {
     level: 0.16,                // the bus at full, of the master volume
     default: 0.7,               // the menu's music slider to start with
     first: 4,                   // seconds after the sound starts before the first piece
-    gap: [50, 120],             // seconds of quiet between pieces
+    // three tracks, each running into the next (C major, F Lydian, G
+    // Mixolydian: each a step that leads on, the last back to the first),
+    // then round again; each track's tune and rolls from its seed
+    tracks: [
+      { name: 'morning field', seed: 11, mode: 'ionian', root: 48, bpm: 62, lead: 'keys', prog: [0, 5, 3, 4], cycles: 3 },
+      { name: 'still water', seed: 23, mode: 'lydian', root: 53, bpm: 57, lead: 'flute', prog: [0, 1, 5, 4], cycles: 3 },
+      { name: 'long road', seed: 37, mode: 'mixolydian', root: 55, bpm: 64, lead: 'keys', prog: [0, 6, 3, 0], cycles: 3 },
+    ],
+    handoff: 0.7,               // the next track begins this far (of a chord) into the last one's home chord
     lookahead: 0.6,             // seconds of notes scheduled ahead
     bpm: { day: [58, 68], night: [48, 56] },
     cycles: { day: 3, night: 2 },   // times round the four chords

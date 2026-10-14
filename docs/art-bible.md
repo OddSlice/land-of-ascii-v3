@@ -716,11 +716,11 @@ The world has a voice, and (since 0.5.3) quiet music between its sounds. Every s
 
 Slow, soft pieces in the spirit of a quiet field at rest: a warm pad holding the chords, a felt piano rolling through them, and now and then a short tune on the piano or a soft flute, in a long room's echo. They are written in code as they start (`src/sound/music.js`), none of them a recording or a borrowed tune.
 
-- **Written to the hour and the weather.** Bright modes by day (major, Lydian at dawn), Mixolydian or Dorian toward dusk, Dorian or Aeolian at night and in rain. Night pieces are slower (48 to 56 beats a minute, against 58 to 68) and lower, and the whole is darker by night and in rain.
-- **A piece:** four chords, each held two bars, three times round by day and twice by night. The first time round has no tune. The tune is one motif, its shape kept and its notes fitted to each chord, closing on a long note. The last time round is lighter. It ends on the home chord with a few bell notes.
-- **Long quiet between.** After a piece, 50 to 120 seconds of only the land, and the first piece a few seconds after the sound starts. Each visit the pieces come in a new order.
+- **Three tracks, one into the next, round again** (0.5.4): *morning field* (C major, 62 beats a minute, the piano's tune), *still water* (F Lydian, 57, the flute's) and *long road* (G Mixolydian, 64, the piano's). All three use the same seven notes, so where one's closing chord rings under the next one's first, nothing clashes; and the last leads home to the first. The loop is five minutes. The tone is darker by night and in rain.
+- **A track:** four chords, each held two bars, three times round. The first time round has no tune. The tune is one motif, its shape kept and its notes fitted to each chord, closing on a long note. The last time round is lighter. It ends on the home chord with a few bell notes, and the next track begins under it, with its pad alone.
+- **The first track** begins a few seconds after the sound starts.
 - **Not of the world.** It is not placed or faded by distance, not counted in the sixteen voices, and plays on, softer, under the menu (60%) and an exchange (80%). Muting the sound mutes it. The menu's music slider sets its share.
-- **Level:** about −35 dB at the default settings, against −42 dB for the land on a fair day and −27 dB in rain; its loudest sample is 0.14 (`tools/music-check.mjs`, which renders whole pieces offline to WAV to listen to).
+- **Level:** about −34 dB at the default settings, against about −41 dB for the land on a fair day and −26 dB in rain; its loudest sample is 0.17 (`tools/music-check.mjs`, which renders the whole loop offline to a WAV to listen to).
 
 ### Never do this
 
@@ -740,4 +740,4 @@ S7. **Never let a sound clip, and never play more than sixteen at once.** `tools
 
 S8. **Never judge sound by the numbers alone.** Listen with headphones.
 
-S9. **Never let the music fill the land.** No piece runs into the next, nothing is quick or bright, and no tune is borrowed from another game.
+S9. **Never let the music crowd the land.** Nothing is quick or bright, every track keeps to the same seven notes so the hand-offs never clash, and no tune is borrowed from another game.
