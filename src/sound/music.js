@@ -97,7 +97,14 @@ export function compose(seed, hour, rain, spec = {}) {
   // a chord's pad: its four notes folded into one octave and a fifth over the key
   const padOf = (c) => {
     const lo = root + 7;
-    return [0, 2, 4, r() < 0.5 ? 6 : 8].map((k) => { let m = pitch(c + k); while (m < lo) m += 12; while (m >= lo + 14) m -= 12; return m; }).sort((a, b) => a - b);
+    const ms = [0, 2, 4, r() < 0.5 ? 6 : 8].map((k) => { let m = pitch(c + k); while (m < lo) m += 12; while (m >= lo + 14) m -= 12; return m; });
+    // (phase 6, after the listening pass: the colour note (the seventh or
+    // the ninth) never a semitone from another of the chord's notes: up an
+    // octave, where it opens out; a seventh just under its root was sour)
+    const rub = (m, i) => ms.some((o, j) => j !== i && Math.abs(o - m) === 1);
+    if (rub(ms[3], 3)) ms[3] += 12;
+    if (rub(ms[3], 3)) ms[3] = pitch(c + 8) + 12 * Math.round((lo + 7 - pitch(c + 8)) / 12);
+    return ms.sort((a, b) => a - b);
   };
   // the tune's index nearest a chord tone, from where it was
   const fit = (m, c) => { for (const dm of [0, 1, -1, 2, -2]) if (isChordTone(tuneDeg(m + dm), c)) return m + dm; return m; };
@@ -134,6 +141,21 @@ export function compose(seed, hour, rain, spec = {}) {
   add(t, 'bass', pitch(0, root - 12), 0.9, C);
   [0, 4, 7, 9].forEach((up, i) => add(t + i * beat * 0.75, 'keys', pitch(up, root), 0.36, beat * 4));
   [14, 16, 18].forEach((up, i) => { if (r() < 0.8) add(t + beat * (3 + i * 1.5), 'bell', pitch(up, root), 1, beat * 3); });
+  // (phase 6, after the listening pass) no note a semitone (or a semitone
+  // and an octave) from what the pad holds as it starts: moved to the
+  // nearest note of the mode that is clear of it, else left out
+  const inMode = new Set(scale.map((v) => (v + root) % 12));
+  const pads = notes.filter((n) => n.inst === 'pad').sort((a, b) => a.t - b.t);
+  const rubs = (m, pad) => pad.midi.some((o) => { const d = Math.abs(m - o); return d === 1 || d === 13; });
+  for (const n of notes) {
+    if (n.inst === 'pad') continue;
+    let pad = null;
+    for (const q of pads) { if (q.t <= n.t + 0.05) pad = q; else break; }
+    if (!pad || !rubs(n.midi, pad)) continue;
+    const alt = [-1, 1, -2, 2, -3, 3].map((d) => n.midi + d).find((m) => inMode.has(((m % 12) + 12) % 12) && !rubs(m, pad));
+    if (alt !== undefined) n.midi = alt; else n.drop = true;
+  }
+  for (let i = notes.length - 1; i >= 0; i--) if (notes[i].drop) notes.splice(i, 1);
   notes.sort((a, b) => a.t - b.t);
   return { notes, length: t + C * 1.2 + M.pad.release * 2, handoff: t + C * M.handoff, mode, bpm, lead, root, name: spec.name || null };
 }
