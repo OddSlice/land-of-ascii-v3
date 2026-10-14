@@ -196,6 +196,9 @@ async function buildings(seed) {
     { label: 'lab wall: turning by the gate', world: lab, x: 256, z: 145, yaw: 0, pitch: 2, ...TURN },
     { label: 'fort: walking the road to the gate', world: w, x: f.front.x + o[0] * 14, z: f.front.z + o[1] * 14, yaw: deg(Math.atan2(-o[0], -o[1])), pitch: 2, ...F },
     { label: 'fort: walking the wall walk', world: w, x: wc.x, z: wc.z, y: wc.y, yaw: deg(Math.atan2(best.dx, best.dz)), pitch: -3, ...F },
+    // (phase 5b) toward the curtain wall between the first two towers, from
+    // 25 m, square on: the range its head joints are now drawn to
+    ...(() => { const tw = w.fortDesc.pieces.filter((p) => p.kind === 'tower'); const mx = (tw[0].at[0] + tw[1].at[0]) / 2, mz = (tw[0].at[1] + tw[1].at[1]) / 2; let nx = -(tw[1].at[1] - tw[0].at[1]), nz = tw[1].at[0] - tw[0].at[0]; const l = Math.hypot(nx, nz); nx /= l; nz /= l; if (nx * (mx - f.x) + nz * (mz - f.z) < 0) { nx = -nx; nz = -nz; } return [{ label: 'fort: walking toward the wall from 25 m', world: w, x: mx + nx * 25, z: mz + nz * 25, yaw: deg(Math.atan2(-nx, -nz)), pitch: 4, ...F }, { label: 'fort: walking along the wall 20 m out', world: w, x: mx + nx * 20 - nz * 2, z: mz + nz * 20 + nx * 2, yaw: deg(Math.atan2(-nx, -nz)), pitch: 4, ...W }]; })(),
     { label: 'fort: turning in the courtyard', world: w, x: yc.x, z: yc.z, y: pl.standOn(yc.x, yc.z, yc.y - 1.7) + 1.7, yaw: yc.yaw, pitch: yc.pitch, ...TURN },
   ];
   // (phase 3b) the villages: walking into each along its road, walking a
@@ -308,7 +311,9 @@ async function peopleSet(seed) {
   if (sv >= 0) {
     const rd = w.roads.find((q) => q.to === `village ${sv + 1}`), lines = [rd, ...(w.sites.villages[sv].plan.lanes || [])];
     let best = null;
-    for (let hq = 6 * 4; hq <= 20 * 4; hq++) {
+    // (phase 5b: --street-hour 11.5 holds it to one hour, as phase 4a's run)
+    const h0 = a['street-hour'] ? Math.round(Number(a['street-hour']) * 4) : 6 * 4, h1 = a['street-hour'] ? h0 : 20 * 4;
+    for (let hq = h0; hq <= h1; hq++) {
       const s = stAt(0, hq / 4);
       for (const L of lines) for (let i = 10; i < L.n - 10; i += 6) {
         const fx = L.x[i - 10] - L.x[i], fz = L.z[i - 10] - L.z[i], fl = Math.hypot(fx, fz) || 1;
@@ -325,6 +330,7 @@ async function peopleSet(seed) {
         if (!best || k > best.k) best = { k, hour: hq / 4, x: L.x[i], z: L.z[i], yaw: deg(Math.atan2(fx, fz)) };
       }
     }
+    if (a.where) console.log(`street walk from ${best.x.toFixed(2)},${best.z.toFixed(2)} yaw ${best.yaw.toFixed(2)} at ${best.hour}`);
     const hh = Math.floor(best.hour), mm = Math.round((best.hour - hh) * 60);
     RUNS.push({ label: `village ${sv + 1}: walking its street at ${hh}:${String(mm).padStart(2, '0')}, past people (${best.k} ahead)`, x: best.x, z: best.z, yaw: best.yaw, pitch: 0, hour: best.hour, ...F });
   }

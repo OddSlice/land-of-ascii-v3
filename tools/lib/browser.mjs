@@ -8,7 +8,9 @@ import fs from 'node:fs';
 
 export const ENGINES = { chromium, firefox, webkit };
 
-export async function launch(name = 'chromium', { headless = true } = {}) {
+// (`audio`, phase 5b: sound allowed without a click first, for the sound
+// check and the video)
+export async function launch(name = 'chromium', { headless = true, audio = false } = {}) {
   const opts = { headless };
   if (name === 'firefox') {
     // macOS 27 protects ~/Library/Application Support/Firefox; point Firefox at a cache folder instead.
@@ -16,7 +18,8 @@ export async function launch(name = 'chromium', { headless = true } = {}) {
     fs.mkdirSync(home, { recursive: true });
     opts.env = { ...process.env, CFFIXED_USER_HOME: home };
   }
-  if (name === 'chromium') opts.args = ['--enable-gpu', '--ignore-gpu-blocklist'];
+  if (name === 'chromium') opts.args = ['--enable-gpu', '--ignore-gpu-blocklist', ...(audio ? ['--autoplay-policy=no-user-gesture-required'] : [])];
+  if (name === 'firefox' && audio) opts.firefoxUserPrefs = { 'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0 };
   return ENGINES[name].launch(opts);
 }
 

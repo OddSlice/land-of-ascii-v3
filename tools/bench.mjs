@@ -19,6 +19,9 @@
 // --lantern (phase 5a) turns progress on (nothing kept) and lights the
 // player's lantern for every camera: its cost, against the same run
 // without it.
+// --sound (phase 5b) turns the world's sound on for every camera (the
+// browser allowing it without a click): its cost against the same run
+// without it, and the sound's own main-thread time per frame (`soundMs`).
 //
 // "worker" is the slowest stripe's march + resolve in a frame; "verdict" is
 // that plus the main thread's draw, per frame (the phase 0b decision rule).
@@ -68,7 +71,7 @@ const { server, url } = await serve(a.root || ROOT);
 const rows = [];
 try {
   for (const name of browsers) {
-    const browser = await launch(name, { headless: name === 'webkit' });
+    const browser = await launch(name, { headless: name === 'webkit', audio: !!a.sound });
     for (const threads of threadCounts) {
       for (const scene of scenes) {
         const stress = scene === 'stress';
@@ -78,6 +81,7 @@ try {
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));
         if (a.lantern) await page.evaluate(() => { window.lab.progress.enable({ store: false }); window.lab.progress.setLit(true); });
+        if (a.sound) await page.evaluate(() => window.lab.sound.enable());
         const ncams = await page.evaluate(() => window.lab.cameras.length);
         const camNames = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
         const world = await page.evaluate(() => ({ buildMs: window.lab.world.buildMs, sweepMs: window.lab.world.sweepMs }));
@@ -105,6 +109,8 @@ try {
             await page.evaluate(() => window.lab.whenIdle());
             await page.evaluate(() => window.lab.timings(60));            // warm up, and let the stripes settle
             const t = await page.evaluate((n) => window.lab.timings(n), frames);
+            // (phase 5b) the sound's main-thread time, over the next 120 frames
+            const sm = a.sound ? await page.evaluate((n) => new Promise((res) => { const out = []; const f = () => { out.push(window.lab.soundMs || 0); if (out.length < n) requestAnimationFrame(f); else res(out); }; requestAnimationFrame(f); }), 120) : null;
             await lab.check();
             const st = await page.evaluate(() => ({ ...window.lab.state(), visible: document.visibilityState }));
             if (st.visible !== 'visible') console.log(`warning: page was ${st.visible} while timing`);
@@ -120,6 +126,7 @@ try {
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
               isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
               weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null, lantern: !!a.lantern,
+              sound: !!a.sound, ...(sm ? { soundMs: r2(med(sm)), soundMax: r2(Math.max(...sm)) } : {}),
               ...(stress || scene === 'world' ? world : {}),
             };
             rows.push(row);

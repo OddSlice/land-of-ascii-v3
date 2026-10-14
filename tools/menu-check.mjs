@@ -101,7 +101,7 @@ try {
   await tabTo(page, /^Controls$/);
   const names = [], tabsSeen = [];
   let allReached = true;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     s = await st(page);
     tabsSeen.push(s.m.tab);
     w = await walk();
@@ -112,7 +112,7 @@ try {
     await page.waitForTimeout(150);
   }
   s = await st(page);
-  check('the arrow keys move between the four sections, round again', tabsSeen.join(' ') === 'controls display world advanced' && s.m.tab === 'controls', tabsSeen.join(' '));
+  check('the arrow keys move between the five sections, round again', tabsSeen.join(' ') === 'controls display sound world advanced' && s.m.tab === 'controls', tabsSeen.join(' '));
   check('in every section Tab reaches all its controls and stays inside', allReached);
   await page.keyboard.press('ArrowDown');           // to Display, for the options below
   await page.waitForTimeout(150);
@@ -302,11 +302,26 @@ try {
     await jp.waitForTimeout(250);
     const ha = await jp.evaluate(() => getComputedStyle(document.querySelectorAll('#talk button')[1]).backgroundColor);
     check('an exchange\'s buttons change on hover', hb !== ha, `${hb} -> ${ha}`);
+    // (phase 5b) the exchange stands the clock still, dims the world, frees the mouse
+    await jp.evaluate(() => window.lab.unfreeze());
+    const pz = await jp.evaluate(async () => {
+      const t0 = window.lab.state().t; await new Promise((r) => setTimeout(r, 500));
+      return { t0, t1: window.lab.state().t, veil: getComputedStyle(document.getElementById('veil')).opacity, locked: !!document.pointerLockElement, open: !!window.lab.progress.talk.read() };
+    });
+    check('while an exchange is open the clock stands still', pz.open && pz.t1 === pz.t0, `t ${pz.t0} -> ${pz.t1}`);
+    check('the world dims under an exchange, and the mouse is free for its buttons', Number(pz.veil) > 0.9 && !pz.locked, `veil ${pz.veil}, locked ${pz.locked}`);
+    await jp.mouse.click(500, 200);
+    await jp.waitForTimeout(150);
+    check('a click on the picture during an exchange does not take the mouse', !(await jp.evaluate(() => !!document.pointerLockElement)) && !!(await jp.evaluate(() => window.lab.progress.talk.read())));
     await jp.click('#talk button.yes');
     await jp.waitForTimeout(250);
     const took = await jp.evaluate(() => window.lab.progress.favours().find((f) => f.first).state);
     check('clicking "I will do it" takes the favour', took === 2, `state ${took}`);
-    await jp.keyboard.press('KeyE'); await jp.waitForTimeout(200);
+    const stay = await jp.evaluate(async () => { await new Promise((r) => setTimeout(r, 400)); return !!window.lab.progress.talk.read(); });
+    check('its last line waits to be read (no timer)', stay);
+    await jp.keyboard.press('KeyE'); await jp.waitForTimeout(500);
+    const after = await jp.evaluate(async () => { const t0 = window.lab.state().t; await new Promise((r) => setTimeout(r, 400)); return { open: !!window.lab.progress.talk.read(), t0, t1: window.lab.state().t, veil: getComputedStyle(document.getElementById('veil')).opacity }; });
+    check('E closes it: the clock runs again and the world comes back', !after.open && after.t1 > after.t0 && Number(after.veil) < 0.1, JSON.stringify(after));
     await jp.keyboard.press('KeyK'); await jp.waitForTimeout(500);
     await jp.evaluate(async () => { const L = window.lab; L.camera(6); await L.whenIdle(); });
     await jp.keyboard.press('KeyK'); await jp.waitForTimeout(500);
@@ -392,6 +407,45 @@ try {
     check('no emoji in the menu, the exchange or the start card', !emo);
     await J.check();
     await J.ctx.close();
+  }
+
+  // ---- (phase 5b) the Sound section, at 1024 x 640 ----
+  {
+    const Sd = await openLab(browser, url, { built: true, scene: 'world', threads: 4, quiet: false, width: 1024, height: 640, dpr: 1 });
+    const sp = Sd.page;
+    const silent = await sp.evaluate(() => ({ on: window.lab.sound.on, line: document.querySelector('#card .snd') && !document.querySelector('#card .snd').hidden ? document.querySelector('#card .snd').textContent : '' }));
+    check('the page starts silent, and the start card says sound starts with the first click', !silent.on && /first click/.test(silent.line), JSON.stringify(silent));
+    await sp.mouse.click(500, 300); await sp.waitForTimeout(400);
+    check('the first click starts the sound', await sp.evaluate(() => window.lab.sound.on));
+    await sp.keyboard.press('Escape'); await sp.waitForTimeout(300);
+    if (!(await sp.evaluate(() => window.lab.menu.read().open))) { await sp.keyboard.press('Escape'); await sp.waitForTimeout(300); }
+    await sp.evaluate(() => document.querySelector('#menu-tab-sound').click());
+    await sp.waitForTimeout(250);
+    const sec = await sp.evaluate(() => {
+      const pane = document.querySelector('#menu .pane'), sec2 = document.querySelector('#menu-panel-sound');
+      return { sliders: sec2.querySelectorAll('input[type="range"]').length, toggles: sec2.querySelectorAll('[role="switch"]').length, fit: pane.scrollWidth <= pane.clientWidth && document.documentElement.scrollWidth <= innerWidth, text: sec2.innerText };
+    });
+    check('the Sound section: on or off, the volume and five kinds of sound', sec.toggles === 1 && sec.sliders === 6, JSON.stringify({ sliders: sec.sliders, toggles: sec.toggles }));
+    check('the Sound section fits at 1024 x 640 with no sideways scrolling', sec.fit);
+    const named = [];
+    for (let k = 0; k < 12; k++) { await sp.keyboard.press('Tab'); named.push(await focusName(sp)); }
+    const want = ['sound', 'volume', 'wind and rain', 'water', 'birds and beasts', 'your footsteps', 'fires, wells, bells and doors'];
+    check('Tab reaches every Sound control', want.every((w2) => named.some((n) => n && n.includes(w2))), want.filter((w2) => !named.some((n) => n && n.includes(w2))).join(', '));
+    // the volume down by the arrow keys, kept after a reload
+    await sp.focus('#menu-panel-sound input[type="range"]');
+    for (let k = 0; k < 6; k++) await sp.keyboard.press('ArrowLeft');
+    const vol = await sp.evaluate(() => window.lab.sound.settings.master);
+    await sp.keyboard.press('Escape'); await sp.waitForTimeout(250);
+    await sp.keyboard.press('KeyN'); await sp.waitForTimeout(200);
+    const muted = await sp.evaluate(() => ({ m: window.lab.sound.settings.muted, note: document.getElementById('note').textContent }));
+    check('N turns the sound off, and says so', muted.m === true && /Sound off/.test(muted.note), JSON.stringify(muted));
+    await sp.reload(); await sp.waitForFunction(() => window.lab && window.lab.ready); await sp.waitForTimeout(500);
+    const kept = await sp.evaluate(() => window.lab.sound.settings);
+    check('after a reload the Sound choices are back', Math.abs(kept.master - vol) < 1e-9 && kept.muted === true && vol < 0.8, JSON.stringify(kept));
+    await sp.keyboard.press('KeyN'); await sp.waitForTimeout(150);
+    check('N turns it on again', (await sp.evaluate(() => window.lab.sound.settings.muted)) === false);
+    await Sd.check();
+    await Sd.ctx.close();
   }
 
   console.log(`menu check: ${results.filter((r) => r.ok).length} of ${results.length} passed\n`);
