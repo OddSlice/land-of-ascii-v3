@@ -24,6 +24,7 @@ A text-rendered explorer, rebuilt from the ground up. Every frame is a grid of m
 - **People and animals (4a, 4b):** villagers, the fort's watch and travellers, with flocks, herds, hens, dogs, deer and birds, all living by the clock.
 - **Wayfaring (5a):** the map fills in as you go; a journal (J) of places, people and sketches (K); villagers' favours, with standing and a lantern (L); progress kept for each world. The rules are in [docs/design.md](docs/design.md).
 - **Sound and polish (5b):** the land's sound, all made in code: wind, rain, water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, N turns it off, and the menu has a Sound section. Also a round of fixes from the earlier phases.
+- **People, the map and signposts (0.5.5):** people read front from back (a face, hair behind, boots forward), E greets from any side within 3 m with a prompt naming who, the map names what you have found and shows the compass, a legend, a scale and your heading, and signposts say where each road goes and how far.
 - **Music (0.5.3, 0.5.4):** three slow, quiet tracks made in code, each running into the next, round again. Footsteps sound every other step, and the sound starts at 90%.
 - The version is shown in the menu.
 

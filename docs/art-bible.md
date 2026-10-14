@@ -404,6 +404,8 @@ People live in the villages and keep the fort: 10 to 20 villagers to a village, 
 
 **The figure:** a few upright boxes in the kit's own system (`figure.js`): legs, a tunic, arms and hands, a head with hair, a hat, a hood, a cap or a helmet, and what the role carries: a hoe, a rod, a broom, a staff, a pack, a spear; a lantern or a torch after dusk (18.4 h) and before dawn (6.1 h) out of doors. Walking swings the legs and arms by the distance walked (a cycle every 1.3 m), never by the clock; standing, working, fishing, sweeping, sitting on a real bench or bed's edge and lying in a real bed are still poses. A head turns toward you when you come within 5 m.
 
+(0.5.5) **Front and back.** Near (under 14 m) the head is round (an ellipsoid) on a neck, the hair over its crown and down its back, as wide as the head so their outlines meet; a face shows only from the front, and the eyes as two dark marks when each is at least two and a half cells. The boots' toes reach forward. A belt with its buckle and the tunic's neck opening are drawn at their true size while each is at least a row and a half. In the middle distance (14 to 40 m) the head is a box with the hair behind it, held whole at a row and never faded (it was stretched to two rows and faded, a pale ghost against the sky), and a tool's shaft fades out from 15 to 21 m. Someone standing turns to you as you come within 4.5 m.
+
 **The colours** (each a shift of a colour already in the palette; the cloth is muted dye, never bright):
 
 | Material | Glyphs | Day, lit / shade | Dusk, lit | Night (bright moon), lit | Worn by |
@@ -534,6 +536,8 @@ Hens, dogs and small birds wear colours the people's cloth already has (russet, 
 The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort's walls (all the way round, phase 3a), `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
 
 (Phase 5a) In play the map shows only what you have seen (`docs/design.md`, section 3). Land not yet seen is plain dark paper a step above the frame (`map.unknown` `#17181d`), with a faint dot (`map.unknownInk`) every fourth column of every other row, so it reads as paper not yet drawn on rather than a hole. A road not yet walked is drawn as the land under it. A site's mark appears once found. The tools see the whole map, as before.
+
+(0.5.5) **The drawn layer.** The page draws over the glyph map, in the menu's monospace and colours: the compass (N in the accent on the frame's top, S, E and W in cream; a rose with an accent needle), each found place's mark in a round chip (villages cream, the fort accent, the rest small and quiet) with its name on a dark tab beside it (villages and the fort bold, hills and springs italic), the water's names in a pale blue italic, a legend of the marks and the land's colours, a scale, and you as an accent arrow in a ring with your view's wedge. The one-glyph marks for villages, viewpoints, the spawn and you are drawn only in the tools' pictures now; the fort's walls stay in the cells.
 
 (Phase 5b) What counts as seen is narrower:
 - **Forests and villages stand in the way,** at the height of their crowns and roofs.

@@ -560,3 +560,53 @@ I couldn't listen to it. The levels and balance are measured; whether it is plea
 At each hand-off the quietest second is −38 to −39 dB, so there is no hole between tracks, and nothing peaks there (0.08 at most).
 
 The sound check at 90%: 30 of 30 stops, loudest sample 0.189 after the limiter (0.115 before), at most 10 voices; the sound's main-thread work a median 0.060 ms a frame, 95% under 0.110 ms, 10 frames of 22,379 at 0.5 ms or more (the slowest 1.17 ms). The menu check: 70 of 70.
+
+## 9. 0.5.5: people, the map and signposts
+
+Asked for after 0.5.4: people should read front from back, as they did in v2; greeting should work from any side; the map should name places and show the compass, a legend and a better player mark; signposts should say where their roads go.
+
+### People
+
+- **Front and back** (`src/world/people/figure.js`). Near, a round head on a neck, the hair over its crown and down its back, as wide as the head; the face shows only from the front, with two dark eyes when each is two and a half cells or more (talking distance). The boots' toes reach forward. A belt, its buckle and the tunic's neck opening are drawn while each is at least a row and a half tall.
+- **The middle distance.** The head and its hair or hat are held whole at a row, never faded. Before, a head under a row was stretched to two rows and faded to its share, a pale ghost against the sky; a tool's shaft likewise, so a farmer with a hoe at 24 m stood beside a tall pale bar. Shafts now fade out from 15 to 21 m.
+- **Greeting** (`src/app/people.js`). E greets the person within 3 m on your level, from any side of them, the one nearest the middle of your view if there are several; before, they had to be within 2.3 m, in front of you and facing you. A prompt at the foot of the screen names who E would greet. Someone standing turns to you as you come within 4.5 m (a function of where you are, so every thread agrees; `src/world/people/meet.js`).
+- **Tried and taken out:** round arms and legs (cylinders) and a tunic flared below the belt. Both raised the street walk's flicker: the street at 15:30 went to 1.095% glyph flips.
+
+The yard's row of eight from in front and behind at 4, 9 and 24 m (`tools/figures-look.mjs`):
+
+![before](../shots/figures/before.jpg)
+![after](../shots/figures/after.jpg)
+
+| Flicker on the still figures' cells (glyph / colour) | 0.5.4 | 0.5.5 |
+|---|---|---|
+| turning on the green at midday (the bar: 0.177% / 0.097%) | 0.125% / 0.065% | **0.161% / 0.100%** |
+| the street at 11:30, past 5 people | 0.178% / 0.142% | **0.188% / 0.386%** |
+| the street at 15:30, past 7 people | 0.741% / 0.512% | 0.717% / 0.659% |
+
+**Not met.** The two-tone head costs colour flips walking past people. On the street at 11:30, 26 of the colour flips are one cell going from face to hair to the wall behind in three frames: a head two or three cells wide sweeping past at more than a column a frame, with the wall's plaster near the skin's tone. Making the hair exactly as wide as the head removed the strip that blinked beside the face. What is left is the front-and-back difference itself. The green is 0.003% over the colour bar.
+
+### The map
+
+The glyph map is as it was; the page draws over it (`src/app/mapover.js`): N, E, S and W on the frame and a rose; each place found, with a mark for its kind and its name, no two names overlapping (the next side is tried); the lake's and the rivers' names once seen; you as an arrow in a ring with your view's wedge; a legend (the marks, the land's colours, places found); a scale; which way you face and the nearest village or the fort you know. At 1024 × 640 the legend and the readout sit in the margins either side of the map.
+
+![the map, just arrived](../shots/map/after-arrived-1280x720.png)
+![after walking the village roads](../shots/map/after-walked-1280x720.png)
+![the same at 1024 x 640](../shots/map/after-walked-1024x640.png)
+
+### Signposts
+
+Each village's signpost (where its road meets the main road) now says, while you stand within 4.5 m: for each arm, the places its road leads to, nearest first, the compass way, the distance by road, and an arrow turned as you turn (`src/game/signs.js`). The way to each place is the people's road network; an arm names the places whose way leaves along it. An arm leading only to the spawn names nothing and is left off. Each post takes 1 to 5 ms to read, done when the page has a moment.
+
+On seed 3, the post at the Elmswick junction reads: Elmswick, north, 240 m; Fennick, west, 1.0 km; Dunholme and the fort, east, 310 m and 930 m.
+
+### Checks
+
+| Check | Result |
+|---|---|
+| Menu check (now with greeting from behind, the prompt, a signpost, and the map's layer at 1024 × 640) | 78 of 78 |
+| World check, seed 3 | pass (47 of 47 fort places, 58 of 58 village places walked) |
+| Save check | 35 of 35 |
+| Identity, world | 112 of 112 |
+| Identity, yard | 61 of 61 (60 of 61 once, the deer view as in 5b; 61 on two reruns) |
+| Bench, slowest camera (Chromium ≤ 10, Firefox ≤ 12.5 ms) | Chromium 8.19, Firefox 10.72, WebKit 7.94 ms (all the main lake shore) |
+| Regression lookbook | 33 frames changed, all with people in them (the yard's people, the greens and streets, guards on the wall and at the gate, where the guard now turns to the camera and moves their torch's light); saved again, 276 of 276 identical |

@@ -10,7 +10,7 @@ You arrive on a rise by a road in a land you do not know. The map shows nothing 
 
 - **Walk, and see.** The map fills in with the land you have seen and the roads you have walked.
 - **Find the places.** The journal lists every place the land has, and notes each the first time you come near it and can see it.
-- **Meet people.** Greet them (E). The journal remembers everyone you have greeted.
+- **Meet people.** Greet them (E) from any side, within 3 m; a prompt names who E would greet (0.5.5). Someone standing turns to you as you come up. The journal remembers everyone you have greeted.
 - **Sketch views.** K keeps the view in front of you, as it is. A few views are notable, and the journal ticks them off.
 - **Do favours.** Some people have a favour to ask when you greet them. Each one sends you across the land to a named person or a described place, with directions a villager would give and no marker.
 - **Earn standing.** Each favour done raises how the land knows you, from a stranger to a wayfarer and on. People greet you by it. It unlocks nothing.
@@ -41,7 +41,17 @@ At the start the map is plain dark paper. It fills in from three things, tracked
 - **Where you have walked.** The squares within 24 m of your feet count as seen. The 8 m squares you walk on are remembered, and a road is drawn on the map only where you have walked it.
 - **Viewpoints.** Standing within 8 m of a viewpoint shows the land within 700 m of it.
 
-A site's mark (the fort's walls, a village, a viewpoint) appears once you have found it. The spawn and you are always marked.
+A site's mark (the fort's walls, a village, a viewpoint) appears once you have found it. You are always marked.
+
+(0.5.5) Over the glyph map the page draws what cells cannot say (`src/app/mapover.js`):
+- **The compass:** N, E, S and W on the frame, and a rose.
+- **The places you have found,** each with a mark for its kind (a house, the fort, a hill, a bridge, a river's head) and its name beside it; the lake's and the rivers' names in the water's ink once you have seen them.
+- **You:** an arrow the way you face, a ring, and the wedge of your view.
+- **A legend** of the marks and the land's colours, how many places you have found, a scale, which way you face and the nearest village or the fort you know, with its distance and direction.
+
+### Signposts (0.5.5)
+
+Each village has a signpost where its road meets the main road. Standing by one (within 4.5 m) shows what it says: each arm names the places its road leads to, nearest first, with the distance by road and the compass way, and an arrow turned as you turn (up is the way you face). The places are the villages and the fort; the way to each is the people's own road network (`src/game/signs.js`).
 
 ### Places (the journal)
 
