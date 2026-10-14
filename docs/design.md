@@ -15,6 +15,7 @@ You arrive on a rise by a road in a land you do not know. The map shows nothing 
 - **Do favours.** Some people have a favour to ask when you greet them. Each one sends you across the land to a named person or a described place, with directions a villager would give and no marker.
 - **Earn standing.** Each favour done raises how the land knows you, from a stranger to a wayfarer and on. People greet you by it. It unlocks nothing.
 - **Walk at night.** The first favour you finish earns a lantern (L), which lights your way as the villagers' lanterns light theirs.
+- **Listen** (phase 5b). The land has a voice made in code, from where each thing is: the wind and the rain, the water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, and N or the menu's Sound section turns it off (`docs/art-bible.md`, section 10).
 
 Nothing here can be lost or failed. There is no combat, hunger, health, money, inventory grid or crafting, and no door opens that did not before.
 
@@ -35,6 +36,8 @@ People and animals live by the clock, as they have since phases 4a and 4b. Where
 At the start the map is plain dark paper. It fills in from three things, tracked on the coarse squares the renderer already marches over, never per cell:
 
 - **What was in view.** Each frame a few rays cross your view, over the land's 16 m squares, out to 480 m. A square counts as seen when its highest point rises above everything nearer on the ray.
+  - (Phase 5b) A square mostly under trees or roofs stands in the way at their height, and is seen by its crowns and roofs.
+  - Past 160 m a square counts only if it stands out: a slope or a hill rising 12 m over its neighbours, water, or buildings. Flat land seen far off from a road stays unknown until you come nearer.
 - **Where you have walked.** The squares within 24 m of your feet count as seen. The 8 m squares you walk on are remembered, and a road is drawn on the map only where you have walked it.
 - **Viewpoints.** Standing within 8 m of a viewpoint shows the land within 700 m of it.
 
@@ -55,7 +58,7 @@ Every world lists the same kinds of place, from the generator's own records:
 | The head of each river | 50 | where it rises |
 | The foot of the mountains | 70 | where the low land ends nearest the middle of the land |
 
-A place is **found** the first time you are within its distance and a straight line from your eye to one of its points clears the land (the ground, or water's surface). Trees do not hide a place. The journal shows found against total for each group and in all, and says how much of the land you have seen.
+A place is **found** the first time you are within its distance and a straight line from your eye to one of its points clears the land (the ground, or water's surface), the trees' crowns and the buildings (phase 5b; before, sight was tested over the land only, so a place could be found across a forest). The places are checked one a frame, in turn. The journal shows found against total for each group and in all, and says how much of the land you have seen.
 
 Villages, hills, rivers and the lake take names from the seed (`src/game/words.js`). A village's name is learned as you find it.
 
@@ -110,12 +113,18 @@ A favour's walk, there for a carry and there and back for the others, is chosen 
 
 ### The words, and finding the way
 
-When you greet someone with a favour, they ask it in two or three lines. You answer **I will do it** (E, or the button) or **another time** (Escape, the button, or walking away). Asked again, they ask again.
+When you greet someone with a favour, they ask it in two or three lines. You answer **I will do it** (E, or the button) or **another time** (Escape, or the button). Asked again, they ask again.
+
+(Phase 5b) While an exchange is open:
+- **The clock stands still,** and the world dims under it.
+- **The mouse is free** to click its buttons.
+- **Every page waits to be read.** E or a button on the last one takes the mouse back for looking; Escape leaves it free.
+- **The sound fades down** but goes on.
 
 The journal's favours page keeps what to do in the words a villager would use. They name:
 
 - the person, with their role and village;
-- the village, and its direction from the giver's village ("Corwen lies west of Ashby, by the road"). Where two villages lie the same way, the words say which ("the farther of the two villages that way").
+- the village, and its direction from the giver's village ("Corwen lies west of Ashby, by the road"). Where two villages lie the same way, the words name the other (phase 5b): "Corwen lies west of Ashby, beyond Dunholme", "this side of Corwen", or "between Ashby and Corwen".
 - the landmark there ("by the well in Corwen", "in the fields on the north side of Corwen"), and when the person is usually there;
 - for a lost thing, the place ("by the wall of the pasture on the north-east side of Dunholme");
 - where to bring it back.

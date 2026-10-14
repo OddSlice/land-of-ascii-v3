@@ -20,9 +20,15 @@ A text-rendered explorer, rebuilt from the ground up. Every frame is a grid of m
 
 **Phase 3b, villages and bridges:** three villages on every seed, each composed from the land and never stamped (one strung along its road, one round a green with its well and market shelter, one on the shore with a jetty): cottages and larger houses with thatch or shingle roofs on stone footings, a chapel, a well, barns at the edge, lanterns and lit windows at night, a signpost where its road meets the main road, and a few houses you can go into (a hearth that glows at night, a table, a bed, a shelf). Fields in strips round them with fences, dry-stone walls and gate gaps, footpaths to the fields, the water and the nearest viewpoint, and bridges where the main roads cross rivers (timber over narrow crossings, stone with arches over wide ones). The fort's road now winds up to its gate, its passage torches are dimmer, its yard has a worn path, and its hall and one tower room are furnished. The menu has a benchmark (Advanced).
 
+**Phases 4a to 5b:**
+- **People and animals (4a, 4b):** villagers, the fort's watch and travellers, with flocks, herds, hens, dogs, deer and birds, all living by the clock.
+- **Wayfaring (5a):** the map fills in as you go; a journal (J) of places, people and sketches (K); villagers' favours, with standing and a lantern (L); progress kept for each world. The rules are in [docs/design.md](docs/design.md).
+- **Sound and polish (5b):** the land's sound, all made in code: wind, rain, water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, N turns it off, and the menu has a Sound section. Also a round of fixes from the earlier phases.
+- The version is shown in the menu.
+
 - Play: https://land-of-ascii-v3.vercel.app/ (shared memory). Also https://oddslice.github.io/land-of-ascii-v3/ (each worker its own copy, at most 4 workers).
 - A seed: `?seed=N` (the default is 3). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`. The building yard: `?yard=1` (since phase 3b with the village pieces too; the prototypes the kit was chosen by were removed).
-- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md), [docs/phase3b.md](docs/phase3b.md)
+- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md), [docs/phase3b.md](docs/phase3b.md), [docs/phase4a.md](docs/phase4a.md), [docs/phase4b.md](docs/phase4b.md), [docs/phase5a.md](docs/phase5a.md), [docs/phase5b.md](docs/phase5b.md)
 
 ```sh
 npm install
@@ -30,6 +36,6 @@ npm run dev      # http://localhost:5190/ (cross-origin isolated; NOISO=1 for wi
 npm run build    # the single-file index.html
 ```
 
-Esc opens the menu: every key explained, the display options (kept in the browser), the world (seed, time, weather) and the comparison tools of earlier phases, each a tab. Keys in the world: WASD walk (Shift runs) · Space jump · F fly (Space climbs) · M map · R new world · click or drag to look · 1 2 3 4 day, dusk, night, dawn · T time stops or runs (it runs in real time from the start) · C cameras · G glyphs off/on · − + density · L look panel (8 9 0 5 6 cycle its choices) · H statistics. In the lab and the stress scene, R shows the reference (local copies only) and X switches between them.
+Esc opens the menu: every key explained, the display and sound options (kept in the browser), the world (seed, time, weather, your progress) and the comparison tools of earlier phases, each a tab. Keys in the world: WASD walk (Shift runs) · Space jump · E greet · J journal · K sketch · L lantern · F fly (Space climbs) · M map · N sound on/off · R new world · click or drag to look · 1 2 3 4 day, dusk, night, dawn · T time stops or runs (it runs in real time from the start) · C cameras · G glyphs off/on · − + density · Shift L look panel (8 9 0 5 6 cycle its choices) · H statistics. In the lab and the stress scene, R shows the reference (local copies only) and X switches between them.
 
 Vanilla JavaScript in ES modules. The scene is marched on the CPU in module workers, and the cells are drawn with WebGL2 in one call. No runtime dependencies.

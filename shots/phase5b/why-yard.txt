@@ -1,0 +1,53 @@
+yard 1 gate, near: 1789 cells, columns 103-359, rows 22-74 of 360 x 112
+yard 2 square tower, near: 474 cells, columns 158-244, rows 12-73 of 360 x 112
+yard 3 round tower, near: 349 cells, columns 147-308, rows 14-72 of 360 x 112
+yard 4 keep, near: 560 cells, columns 117-295, rows 21-84 of 360 x 112
+yard 5 stair, near: 798 cells, columns 99-278, rows 25-76 of 360 x 112
+yard 6 house, near: no change
+yard 7 well, near: no change
+yard 8 torches, near: 13 cells, columns 110-155, rows 45-79 of 360 x 112
+yard 9 window, near: 1 cells, columns 161-161, rows 77-77 of 360 x 112
+yard 10 the yard, middle distance: no change
+yard 11 the yard, far: no change
+yard 12 the yard at night: 62 cells, columns 0-85, rows 35-68 of 360 x 112
+yard 13 inside the gate passage: no change
+yard 14 on the wall walk: 24 cells, columns 193-216, rows 49-60 of 360 x 112
+yard 15 cottage, near: no change
+yard 16 hall, near: no change
+yard 17 barn, near: no change
+yard 18 chapel, near: no change
+yard 19 chapel with a tower, near: no change
+yard 20 market shelter, near: no change
+yard 21 jetty, near: no change
+yard 22 fence and gate, near: no change
+yard 23 dry-stone wall, near: no change
+yard 24 haystack and bench, near: no change
+yard 25 signpost and lantern, near: no change
+yard 26 timber bridge, near: no change
+yard 27 stone bridge, near: no change
+yard 28 inside a cottage: no change
+yard 29 the village pieces at night: no change
+yard 30 people, near: 53 cells, columns 25-334, rows 51-60 of 360 x 112
+yard 31 people, middle distance: 15 cells, columns 138-204, rows 53-55 of 360 x 112
+yard 32 people, far: no change
+yard 33 people, very far: no change
+yard 34 people at night, with a lantern and a torch: 53 cells, columns 25-334, rows 51-60 of 360 x 112
+yard 35 someone asleep: no change
+yard 36 someone on the bench: 13 cells, columns 171-192, rows 58-76 of 360 x 112
+yard 37 wild ground detail, near: no change
+yard 38 a log, a stump and reeds, near: 153 cells, columns 4-59, rows 45-53 of 360 x 112
+yard 39 wild ground detail, far: 8 cells, columns 54-76, rows 53-54 of 360 x 112
+yard 40 animals, middle distance: no change
+yard 41 animals, far: 2 cells, columns 271-272, rows 60-60 of 360 x 112
+yard 42 animals, very far: no change
+yard 43 animals: sheep, near: no change
+yard 44 animals: cattle, near: no change
+yard 45 animals: hens, near: no change
+yard 46 animals: dog, near: 12 cells, columns 4-28, rows 42-44 of 360 x 112
+yard 47 animals: deer, near: 9 cells, columns 34-53, rows 44-45 of 360 x 112
+yard 48 animals: hare, near: 7 cells, columns 36-53, rows 28-29 of 360 x 112
+yard 49 animals: ducks, near: 3 cells, columns 74-83, rows 45-46 of 360 x 112
+yard 50 animals: gulls, near: 8 cells, columns 74-85, rows 52-53 of 360 x 112
+yard 51 animals: crows, near: 6 cells, columns 84-94, rows 52-53 of 360 x 112
+yard 52 animals: small birds, near: 19 cells, columns 92-202, rows 51-59 of 360 x 112
+yard 53 animals: large birds, near: 19 cells, columns 98-191, rows 51-59 of 360 x 112

@@ -500,6 +500,25 @@ Hens, dogs and small birds wear colours the people's cloth already has (russet, 
 
 **Rain:** sheep gather on their pasture's lee side, cattle on their field's, hens stay in, deer keep to their daytime cover, and gulls stand on the beach in heavy rain.
 
+### Phase 5b's polish
+
+- **Reed beds.** Each 0.6 m sector is a tuft with its own tone and height: taller tufts are paler, and each is level across its middle and eased to the next only near its sides. This gives a ragged top at the middle distance without peaks that a moving eye would sweep past a cell and back. Their glyphs are strokes on every rung (`' | ! I`), darker on lit stems, so a bed reads as stems from 10 m.
+- **Crows and small birds.**
+  - They grow by up to 80% toward the middle distance, and a perched one's body there is held at two rows and two columns.
+  - Far off, they are faded less than other animals.
+  - A far bird's mark is darker than its shaded colour, and it darkens its cell a little.
+- **Lost things** stand a little proud of the ground, a little bigger than true, and shine: they catch a lantern's light and the moon's.
+- **Things in the hand** use the kit's own shapes:
+  - a tied cloth bundle and a draped cloak (ellipsoids and pleats);
+  - shears with two blades;
+  - a cold lantern's iron cage round dark glass;
+  - jars, buckets and coils as cylinders.
+- **The fort's head joints** are drawn crisp near, as before. From about 10 m they are drawn by how much of a cell they cover, held 3.5 cells wide and darkened by their true share, on walls seen within about 45° of square on. They now last to about 25 m. Stronger joints blink (`docs/phase5b.md`).
+- **People.**
+  - The head reaches down into the body: there is no gap under the chin.
+  - Hair and hoods come to 4 mm short of the face.
+  - An arm hanging still is one sleeve, so its edge has no step.
+
 ### Sky
 
 - the gradient from horizon to high, with a glow round the sun;
@@ -515,6 +534,12 @@ Hens, dogs and small birds wear colours the people's cloth already has (russet, 
 The map is drawn in the same glyph cells, by the same resolve step and day palette, as the view: each cell gets a hit record for what lies under it, seen from straight above and lit by the day's sun from its slope (water, forest, road, snow, rock, sand or meadow). Only its marks are its own, set in `look.js` (`map`): `#` the fort's walls (all the way round, phase 3a), `o` village sites, `*` viewpoints, `+` the spawn, and `@` the player with two cells of `| / - \` pointing their way, in a pale cream (the player in torch orange) on a dark cell.
 
 (Phase 5a) In play the map shows only what you have seen (`docs/design.md`, section 3). Land not yet seen is plain dark paper a step above the frame (`map.unknown` `#17181d`), with a faint dot (`map.unknownInk`) every fourth column of every other row, so it reads as paper not yet drawn on rather than a hole. A road not yet walked is drawn as the land under it. A site's mark appears once found. The tools see the whole map, as before.
+
+(Phase 5b) What counts as seen is narrower:
+- **Forests and villages stand in the way,** at the height of their crowns and roofs.
+- **Past 160 m only what stands out counts:** a slope or a hill rising over its neighbours, water, buildings.
+
+So a walk along an open road no longer fills the plain on either side.
 
 ### Words and pages (phase 5a)
 
@@ -630,3 +655,76 @@ Also accepted from phase 0c: the forest-floor material, and narrower crowns in d
 The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`), and again in phase 2b after the five look fixes, with the weather held at fair (`docs/phase2b.md`).
 
 **Phase 2b's weather** is automatic by default (the forecast); the menu (Esc, World) holds any one kind.
+
+---
+
+## 10. Sound (phase 5b)
+
+The world has a voice, and no music. Every sound is made at runtime in code (`src/sound/`): oscillators, filtered noise made once from a seeded generator, and short envelopes. There are no audio files, and the build stays one HTML file. Every level, filter and envelope is in one data file, `src/sound/palette.js`, as the picture's are in `src/look.js`.
+
+### The rules
+
+- **Beds and events.**
+  - Wind, rain and water are beds: they run all the time and change slowly.
+  - Everything else is an event, short and occasional: a footstep, a bird's phrase, a call, a crackle, the bell.
+- **Quiet, filtered, sparse.**
+  - Nothing is bright: every source passes a filter.
+  - Levels are low, and a soft limiter at the end keeps anything from clipping.
+- **From where it is drawn.**
+  - A sound is placed at its source: the water's edge, a torch, the animal itself, the chapel.
+  - It is panned by its direction from the ear.
+  - It is faded by distance and dulled by the far air (a low-pass closing with distance), as the picture fades things into the air.
+  - Animals' calls come from the same positions the renderer draws them at.
+- **A function of the world, not of the frame.**
+  - What plays depends on the clock, where you are, the weather and what is near.
+  - An event falls due by the game's clock and is played on the audio clock, a quarter of a second ahead. A slow or fast frame rate changes nothing.
+  - When the clock stands still (the menu, the journal, an exchange), events stop. The beds go on, fainter.
+- **Footsteps keep the walk's stride.** Two steps to the stride the hands sway by (1.3 m walking, 1.7 m running), each sounding the ground under the foot:
+  - meadow, road and yard, sand, stone, timber, water (with a splash) and snow;
+  - a creak on stairs and now and then on a floor of boards indoors;
+  - a soft thud on landing a jump.
+- **At most sixteen voices.** Beds and events count alike, and the loudest at the ear are kept.
+- **Silent until asked.**
+  - The page starts silent, and the first click or key starts the sound (browsers refuse it before).
+  - The menu's Sound section and N turn it off. Its level, and each kind's, are kept as the Display choices are.
+  - It fades out when the tab is hidden, and fades down under the menu or an exchange, never stopping dead.
+- **The tools never hear it.** It is never made unless a tool asks (`lab.sound.enable()`), so no picture or measurement changes.
+
+### The palette's roles
+
+| Group (menu) | Source | Bed or event | Rule |
+|---|---|---|---|
+| Air (wind and rain) | wind | bed | Pink noise through a band-pass that opens with the gusts (three slow waves at their own rates, drifting over the land). It is louder with the weather's wind and with height, and a thin whistle comes over ridges. A forest or houses shelter it; indoors it is faint. |
+| | rain | bed | White noise between a high- and a low-pass, by the weather's rain. Softer under a roof or trees. |
+| | drips | event | Off leaves near you while it rains or the ground is wet: a short falling tone. |
+| Water | lake | bed | Brown noise, low-passed, lapping on two slow waves, from the nearest point of the shore. |
+| | river | bed | Pink noise, band-passed, from the nearest reach. Louder where it falls fast, and under a bridge. |
+| | sea | bed | Brown noise, lower, on a slower and deeper swell, from the nearest edge. |
+| Life (birds and beasts) | songbirds | event | Short whistled phrases (each tree its own tune) from trees at the edges of stands and copses. A dawn chorus and a dusk chorus, a few by day, none at night, fewer in rain. |
+| | gulls, crows, small birds | event | From the birds themselves, as drawn. |
+| | sheep, cattle, hens, ducks | event | Each animal's own call, now and then, from where it stands. |
+| | dog | event | One bark as you come within 14 m, again only after you have gone. |
+| | deer | event | A rustle and hooves as they break cover. |
+| Player (your footsteps) | footsteps | event | By the stride and the ground underfoot, louder running. A creak on stairs, a splash wading, a thud landing. In the fort's gate passage they echo. |
+| Places (fires, wells, bells, doors) | torches, hearths | bed and events | A soft low roar with pops. Torches by night; a hearth while someone is home. |
+| | well | event | The rope's creak and the bucket, when someone stands at the well. |
+| | chapel bell | event | Strikes the hour's count as the clock runs into it (6 to 21), heard across the village. |
+| | doors | event | A latch as someone goes in or comes out. |
+
+### Never do this
+
+S1. **Never add an audio file.** Every sound is made in code, and the build stays one file.
+
+S2. **Never let a sound depend on the frame rate**, or play it from a frame's timer. Use the game's clock to decide and the audio clock to play.
+
+S3. **Never let two loops beat.** Every slow wave has its own rate, none a multiple of another, and no two beds share one.
+
+S4. **Never let a sound come from somewhere it is not drawn**, or be louder far off than near.
+
+S5. **Never play anything before the first click, or in a tool.**
+
+S6. **Never stop a sound dead.** Fade it.
+
+S7. **Never let a sound clip, and never play more than sixteen at once.** `tools/sound-check.mjs` checks both.
+
+S8. **Never judge sound by the numbers alone.** Listen with headphones.

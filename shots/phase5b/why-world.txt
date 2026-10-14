@@ -1,0 +1,27 @@
+world 1 spawn view: 1 cells, columns 214-214, rows 55-55 of 360 x 112
+world 2 main lake shore: 11 cells, columns 247-267, rows 40-49 of 360 x 112
+world 3 inside a forest stand: no change
+world 4 forest edge across meadow: no change
+world 5 river valley: no change
+world 6 the coast: no change
+world 7 ridge-top vista: no change
+world 8 road approaching the fort: 2 cells, columns 151-187, rows 31-33 of 360 x 112
+world 9 the fort from the road: no change
+world 10 inside the gate passage, looking in: 9 cells, columns 146-219, rows 11-64 of 360 x 112
+world 11 the courtyard: 38 cells, columns 83-291, rows 7-81 of 360 x 112
+world 12 the wall walk over the valley: 229 cells, columns 11-129, rows 28-86 of 360 x 112
+world 13 village 1 (shore), the road in: 2 cells, columns 88-185, rows 50-54 of 360 x 112
+world 14 village 1 (shore), its centre: no change
+world 15 village 2 (green), the road in: no change
+world 16 village 2 (green), its centre: 22 cells, columns 0-319, rows 45-83 of 360 x 112
+world 17 village 3 (street), the road in: no change
+world 18 village 3 (street), its centre: 2 cells, columns 250-250, rows 63-64 of 360 x 112
+world 19 inside a house, by the hearth: no change
+world 20 the stone bridge from its bank: no change
+world 21 village 2 (green), at midday: 2 cells, columns 123-213, rows 51-58 of 360 x 112
+world 22 the wall walk at night, from the courtyard: 870 cells, columns 4-342, rows 43-86 of 360 x 112
+world 23 a traveller on the road: 2 cells, columns 76-188, rows 47-51 of 360 x 112
+world 24 a pasture with its flock: 11 cells, columns 48-341, rows 46-51 of 360 x 112
+world 25 deer at a forest edge, at dawn: 1 cells, columns 202-202, rows 49-49 of 360 x 112
+world 26 gulls on the coast: 1 cells, columns 176-176, rows 63-63 of 360 x 112
+world 27 crows on the wall walk: 314 cells, columns 2-345, rows 26-105 of 360 x 112

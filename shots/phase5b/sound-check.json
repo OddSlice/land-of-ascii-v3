@@ -1,0 +1,1100 @@
+{
+ "rows": [
+  {
+   "label": "a forest edge at dawn (the chorus)",
+   "want": [
+    "birdsong",
+    "step:meadow"
+   ],
+   "heard": {
+    "step:meadow": {
+     "n": 10,
+     "max": 0.05
+    },
+    "birdsong": {
+     "n": 8,
+     "max": 0.03147
+    },
+    "gull": {
+     "n": 1,
+     "max": 0.00347
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.0470094611935459,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.017744545854290795,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "the same edge at noon",
+   "want": [
+    "birdsong"
+   ],
+   "heard": {
+    "birdsong": {
+     "n": 1,
+     "max": 0.035
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.03860090377243205,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.016009736774438323,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "the same edge as rain arrives",
+   "want": [
+    "rain",
+    "drip"
+   ],
+   "heard": {
+    "drip": {
+     "n": 9,
+     "max": 0.00973
+    },
+    "gull": {
+     "n": 1,
+     "max": 0.00334
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.06267100756156352,
+     "bed": true
+    },
+    "rain": {
+     "n": 0,
+     "max": 0.077,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.01985207360030352,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "the lake shore",
+   "want": [
+    "lake"
+   ],
+   "heard": {
+    "wind": {
+     "n": 0,
+     "max": 0.0739999177667337,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.07,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.132,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.0021452693670138273,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "a river at its fastest reach",
+   "want": [
+    "river"
+   ],
+   "heard": {
+    "step:stone": {
+     "n": 1,
+     "max": 0.05
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.16792131492604953,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.132,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "the sea's edge",
+   "want": [
+    "sea"
+   ],
+   "heard": {
+    "wind": {
+     "n": 0,
+     "max": 0.0889082047124894,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.09,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "under a bridge",
+   "want": [
+    "river"
+   ],
+   "heard": {
+    "sheep": {
+     "n": 2,
+     "max": 0.00097
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.07759495355258315,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.07,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.108,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking the road",
+   "want": [
+    "step:road"
+   ],
+   "heard": {
+    "step:road": {
+     "n": 28,
+     "max": 0.085
+    },
+    "sheep": {
+     "n": 2,
+     "max": 0.00042
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.08093703779846108,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.026897480237111485,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking on sand",
+   "want": [
+    "step:sand"
+   ],
+   "heard": {
+    "step:sand": {
+     "n": 14,
+     "max": 0.05
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.08524765475658323,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.09,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "wading in the shallows",
+   "want": [
+    "step:water",
+    "splash"
+   ],
+   "heard": {
+    "step:water": {
+     "n": 12,
+     "max": 0.05
+    },
+    "splash": {
+     "n": 12,
+     "max": 0.06
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.0743099493198162,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.132,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.09,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking on snow",
+   "want": [
+    "step:snow"
+   ],
+   "heard": {
+    "step:snow": {
+     "n": 13,
+     "max": 0.05
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.14024489796589837,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking a jetty's planks",
+   "want": [
+    "step:timber"
+   ],
+   "heard": {
+    "step:timber": {
+     "n": 3,
+     "max": 0.05
+    },
+    "step:water": {
+     "n": 7,
+     "max": 0.05
+    },
+    "splash": {
+     "n": 7,
+     "max": 0.06
+    },
+    "well": {
+     "n": 1,
+     "max": 0.01517
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.08794378993054622,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.07,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking the courtyard's packed earth, and a jump",
+   "want": [
+    "step:road",
+    "land"
+   ],
+   "heard": {
+    "step:road": {
+     "n": 14,
+     "max": 0.05
+    },
+    "land": {
+     "n": 1,
+     "max": 0.08
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.08550497085210415,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking over the stone bridge",
+   "want": [
+    "step:stone"
+   ],
+   "heard": {
+    "step:road": {
+     "n": 1,
+     "max": 0.05
+    },
+    "step:stone": {
+     "n": 9,
+     "max": 0.05
+    },
+    "step:water": {
+     "n": 9,
+     "max": 0.05
+    },
+    "splash": {
+     "n": 9,
+     "max": 0.06
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.07071549507538248,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.07,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.06,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "climbing a stair to the wall walk",
+   "want": [
+    "step:stone",
+    "creak"
+   ],
+   "heard": {
+    "step:road": {
+     "n": 3,
+     "max": 0.05
+    },
+    "step:stone": {
+     "n": 15,
+     "max": 0.05
+    },
+    "creak": {
+     "n": 8,
+     "max": 0.03
+    },
+    "land": {
+     "n": 1,
+     "max": 0.08
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.09004888634951837,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "the fort gate at night: torches",
+   "want": [
+    "fire"
+   ],
+   "heard": {
+    "fire": {
+     "n": 0,
+     "max": 0.015662969664100298,
+     "bed": true
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.0974936129876354,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking through the gate passage (the echo)",
+   "want": [
+    "step:road",
+    "echo"
+   ],
+   "heard": {
+    "fire": {
+     "n": 0,
+     "max": 0.018965005560942938,
+     "bed": true
+    },
+    "step:road": {
+     "n": 17,
+     "max": 0.05
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.07763896603901643,
+     "bed": true
+    },
+    "echo": {
+     "n": 0,
+     "max": 0.55,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "inside a house by its hearth, evening",
+   "want": [
+    "fire"
+   ],
+   "heard": {
+    "fire": {
+     "n": 0,
+     "max": 0.03,
+     "bed": true
+    },
+    "well": {
+     "n": 1,
+     "max": 0.01015
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.012332329860898553,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.018583524266967178,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "40 m from a chapel as ten strikes",
+   "want": [
+    "bell"
+   ],
+   "heard": {
+    "bell": {
+     "n": 18,
+     "max": 0.05625
+    },
+    "well": {
+     "n": 11,
+     "max": 0.00808
+    },
+    "cattle": {
+     "n": 4,
+     "max": 0.00791
+    },
+    "gull": {
+     "n": 4,
+     "max": 0.01988
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.10418395135188938,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.0455449494300132,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "by a well, the keeper drawing water",
+   "want": [
+    "well"
+   ],
+   "heard": {
+    "well": {
+     "n": 7,
+     "max": 0.04
+    },
+    "cattle": {
+     "n": 4,
+     "max": 0.00548
+    },
+    "gull": {
+     "n": 3,
+     "max": 0.03
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.10368825242239597,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.037563341557013935,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "by a door as someone goes in (the latch)",
+   "want": [
+    "latch"
+   ],
+   "heard": {
+    "fire": {
+     "n": 0,
+     "max": 0.002770506983790487,
+     "bed": true
+    },
+    "well": {
+     "n": 9,
+     "max": 0.00987
+    },
+    "hens": {
+     "n": 8,
+     "max": 0.00367
+    },
+    "cattle": {
+     "n": 4,
+     "max": 0.00294
+    },
+    "gull": {
+     "n": 4,
+     "max": 0.01305
+    },
+    "sheep": {
+     "n": 1,
+     "max": 0.00024
+    },
+    "latch": {
+     "n": 2,
+     "max": 0.02443
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.1026102080258686,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.024116700647289567,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the flock",
+   "want": [
+    "sheep"
+   ],
+   "heard": {
+    "birdsong": {
+     "n": 3,
+     "max": 0.00133
+    },
+    "sheep": {
+     "n": 5,
+     "max": 0.01699
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.09775382823932183,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the herd",
+   "want": [
+    "cattle"
+   ],
+   "heard": {
+    "cattle": {
+     "n": 4,
+     "max": 0.02265
+    },
+    "gull": {
+     "n": 4,
+     "max": 0.00482
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.1083049951450817,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.00846121426519467,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.0015101805928757431,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the hens",
+   "want": [
+    "hens"
+   ],
+   "heard": {
+    "sheep": {
+     "n": 5,
+     "max": 0.00049
+    },
+    "hens": {
+     "n": 7,
+     "max": 0.01857
+    },
+    "cattle": {
+     "n": 4,
+     "max": 0.00232
+    },
+    "gull": {
+     "n": 3,
+     "max": 0.0044
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.1007699826642176,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.014257882606340805,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the ducks",
+   "want": [
+    "duck"
+   ],
+   "heard": {
+    "duck": {
+     "n": 2,
+     "max": 0.01675
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.10472258980710324,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.028716351162277977,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the gulls",
+   "want": [
+    "gull"
+   ],
+   "heard": {
+    "gull": {
+     "n": 5,
+     "max": 0.01106
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.0942328801001425,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.05461856530813812,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the crow",
+   "want": [
+    "crow"
+   ],
+   "heard": {
+    "crow": {
+     "n": 2,
+     "max": 0.01693
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.10157030351411045,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "beside the finches",
+   "want": [
+    "finch"
+   ],
+   "heard": {
+    "finch": {
+     "n": 85,
+     "max": 0.0172
+    },
+    "cattle": {
+     "n": 2,
+     "max": 0.01086
+    },
+    "birdsong": {
+     "n": 3,
+     "max": 0.03163
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.045944345539710635,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.022778900026658857,
+     "bed": true
+    },
+    "river": {
+     "n": 0,
+     "max": 0.0158239316522676,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking up to a dog (one bark)",
+   "want": [
+    "dog"
+   ],
+   "heard": {
+    "step:meadow": {
+     "n": 30,
+     "max": 0.085
+    },
+    "step:stone": {
+     "n": 1,
+     "max": 0.085
+    },
+    "sheep": {
+     "n": 2,
+     "max": 0.03388
+    },
+    "dog": {
+     "n": 1,
+     "max": 0.03077
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.09773876775751353,
+     "bed": true
+    },
+    "lake": {
+     "n": 0,
+     "max": 0.0015919550613550915,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  },
+  {
+   "label": "walking up to deer at dawn (breaking cover)",
+   "want": [
+    "deer"
+   ],
+   "heard": {
+    "step:sand": {
+     "n": 14,
+     "max": 0.085
+    },
+    "birdsong": {
+     "n": 3,
+     "max": 0.00957
+    },
+    "step:meadow": {
+     "n": 16,
+     "max": 0.085
+    },
+    "deer": {
+     "n": 1,
+     "max": 0.02531
+    },
+    "wind": {
+     "n": 0,
+     "max": 0.08310742477378066,
+     "bed": true
+    },
+    "sea": {
+     "n": 0,
+     "max": 0.03492891712546153,
+     "bed": true
+    }
+   },
+   "ok": true,
+   "missing": []
+  }
+ ],
+ "summary": {
+  "spikes": [
+   {
+    "ms": 0.77,
+    "events": 0,
+    "pending": 0,
+    "played": 0,
+    "voices": 1
+   },
+   {
+    "ms": 0.51,
+    "events": 1,
+    "pending": 0,
+    "played": 1,
+    "voices": 3
+   },
+   {
+    "ms": 0.68,
+    "events": 2,
+    "pending": 0,
+    "played": 12,
+    "voices": 3
+   },
+   {
+    "ms": 0.92,
+    "events": 1,
+    "pending": 0,
+    "played": 1,
+    "voices": 4
+   },
+   {
+    "ms": 0.66,
+    "events": 7,
+    "pending": 0,
+    "played": 5,
+    "voices": 8
+   },
+   {
+    "ms": 0.56,
+    "events": 4,
+    "pending": 0,
+    "played": 3,
+    "voices": 5
+   },
+   {
+    "ms": 0.77,
+    "events": 7,
+    "pending": 0,
+    "played": 27,
+    "voices": 6
+   }
+  ],
+  "marks": [
+   [
+    "a forest edge at dawn (the chorus)",
+    2
+   ],
+   [
+    "the same edge at noon",
+    3
+   ],
+   [
+    "the same edge as rain arrives",
+    3
+   ],
+   [
+    "the lake shore",
+    3
+   ],
+   [
+    "a river at its fastest reach",
+    3
+   ],
+   [
+    "the sea's edge",
+    3
+   ],
+   [
+    "under a bridge",
+    3
+   ],
+   [
+    "walking the road",
+    4
+   ],
+   [
+    "walking on sand",
+    4
+   ],
+   [
+    "wading in the shallows",
+    4
+   ],
+   [
+    "walking on snow",
+    4
+   ],
+   [
+    "walking a jetty's planks",
+    4
+   ],
+   [
+    "walking the courtyard's packed earth, and a jump",
+    4
+   ],
+   [
+    "walking over the stone bridge",
+    4
+   ],
+   [
+    "climbing a stair to the wall walk",
+    4
+   ],
+   [
+    "the fort gate at night: torches",
+    4
+   ],
+   [
+    "walking through the gate passage (the echo)",
+    4
+   ],
+   [
+    "inside a house by its hearth, evening",
+    4
+   ],
+   [
+    "40 m from a chapel as ten strikes",
+    5
+   ],
+   [
+    "by a well, the keeper drawing water",
+    5
+   ],
+   [
+    "by a door as someone goes in (the latch)",
+    6
+   ],
+   [
+    "beside the flock",
+    6
+   ],
+   [
+    "beside the herd",
+    6
+   ],
+   [
+    "beside the hens",
+    6
+   ],
+   [
+    "beside the ducks",
+    6
+   ],
+   [
+    "beside the gulls",
+    6
+   ],
+   [
+    "beside the crow",
+    6
+   ],
+   [
+    "beside the finches",
+    6
+   ],
+   [
+    "walking up to a dog (one bark)",
+    6
+   ],
+   [
+    "walking up to deer at dawn (breaking cover)",
+    7
+   ]
+  ],
+  "state": {
+   "peak": 0.15919947624206543,
+   "prePeak": 0.0966707170009613,
+   "maxVoices": 11,
+   "voices": 2,
+   "dropped": 0,
+   "ms": 0.12999999523162842,
+   "beds": {
+    "wind": 0.04700964823535166,
+    "rain": 0,
+    "lake": 0,
+    "river": 0,
+    "sea": 0.03492891712546153,
+    "fire": 0,
+    "echo": 0
+   },
+   "underfoot": "meadow",
+   "ctx": "running",
+   "time": 373.2853333333333
+  },
+  "frames": 22376,
+  "median": 0.06000000238418579,
+  "p95": 0.09000003337860107,
+  "max": 0.9249999523162842,
+  "over": 7
+ }
+}
