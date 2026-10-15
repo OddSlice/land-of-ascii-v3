@@ -203,6 +203,7 @@ function useCamera(i) {
   state.cam = i; state.camName = c.name;
   standAt(c.x, c.z, c.yaw, c.pitch, c.y);
   if (c.stand) player.feet = player.standOn(c.x, c.z, player.feet);
+  state.held = !!c.held;
   setTime(c.time);
 }
 const start = STRESS || WORLD || YARD ? world.start : START;

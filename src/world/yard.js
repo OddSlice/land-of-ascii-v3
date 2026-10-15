@@ -357,11 +357,12 @@ export function yardAnimalCameras(opts = {}) {
     cams.push({ name: 'wild ground detail, far', x: cx, z: WZ + 70, yaw: look(cx, WZ + 70, cx, WZ), pitch: -2, time: 'day' });
   }
   if (opts.animals !== false) {
-    // (all the rows from the south-east and above: every row seen)
+    // (all the rows from the south-east and above: every row seen; held in
+    // the air, as nothing is under them)
     const cx = AX0 + 6, cz = AZ0 + 5 * AROWS;
     for (const [name, d, h] of [['animals, middle distance', 40, 14], ['animals, far', 110, 22], ['animals, very far', 220, 30]]) {
       const x = cx + d * 0.8, z = cz + d * 0.6;
-      cams.push({ name, x, z, y: G0 + h, yaw: look(x, z, cx, cz), pitch: -Math.atan2(h, d) / D, time: 'day' });
+      cams.push({ name, x, z, y: G0 + h, held: true, yaw: look(x, z, cx, cz), pitch: -Math.atan2(h, d) / D, time: 'day' });
     }
     ROWS4B.forEach(([kind, poses], r) => {
       const z = AZ0 + r * AROWS, gap = Math.max(2.4, SPEC[kind].len * 2.2);
