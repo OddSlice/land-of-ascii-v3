@@ -1,5 +1,7 @@
 # QA report: 0.6.0 to 0.6.1
 
+(0.6.2, the same day, fixes F1, F2 and F4: section 3.)
+
 Written 15 Oct 2026. Phase 6.1 is a QA and engineering pass, with nothing new to see or play. It covers four things:
 - an audit of every system, with the game's own tools and with a new audit of what they don't cover (`tools/audit.mjs`);
 - a search for speed that leaves every cell unchanged;
@@ -69,16 +71,18 @@ Each fault with the seed, the hour, how to reach it and its cause.
 
 | | Fault | Seed, hour, steps | Cause | Now |
 |---|---|---|---|---|
-| F1 | A restored backup whose `met` names someone not in this world makes the journal throw, and the page stops. | Any seed and hour. Menu, then World, Restore a backup, with a `met` entry whose id is not a person here. Open the journal. | `journal()` reads the person's `village` without a check. | **Proposal** (saved progress): check each entry when a record is read (P1). |
-| F2 | A `met` entry that is `null` throws in the wayfaring step and in the journal's sort. The record is already saved, so the game fails near that person after every reload, and after the failure the menu can't open. The player is locked out until the site's data is cleared. | As F1, with `null` for a `met` entry. | `fromJSON` keeps entries it can't use. | **Proposal** (saved progress): P1. |
+| F1 | A restored backup whose `met` names someone not in this world makes the journal throw, and the page stops. | Any seed and hour. Menu, then World, Restore a backup, with a `met` entry whose id is not a person here. Open the journal. | `journal()` reads the person's `village` without a check. | **Fixed in 0.6.2** (P1, agreed by Martin): each entry is checked when a record is read, and one that names nothing in this world is left out. |
+| F2 | A `met` entry that is `null` throws in the wayfaring step and in the journal's sort. The record is already saved, so the game fails near that person after every reload, and after the failure the menu can't open. The player is locked out until the site's data is cleared. | As F1, with `null` for a `met` entry. | `fromJSON` keeps entries it can't use. | **Fixed in 0.6.2** (P1): an entry not of its kind is left out. |
 | F3 | At the largest text on a 1024 × 640 window, the title's version line sat on the title's panel (the panel is 664 px tall in 640). | Seed 3, any hour. Settings, Text: largest; resize to 1024 × 640. | The title's layout had no rule for short windows. | **Fixed** (`6528f26`): tighter spacing below 700 px of height. |
-| F4 | A stored record the game can't read (from another version, or damaged) is replaced by a fresh one at the first save, so it is lost. | Edit the stored record in the browser's storage, then play. | The progress store treats an unreadable record as none. | **Proposal** (saved progress): set an unreadable record aside under another key (P2). |
+| F4 | A stored record the game can't read (from another version, or damaged) is replaced by a fresh one at the first save, so it is lost. | Edit the stored record in the browser's storage, then play. | The progress store treats an unreadable record as none. | **Fixed in 0.6.2** (P2, agreed by Martin): it is kept aside under a key of its own, and the menu says so once. |
 | F5 | The building yard's three animal cameras in the air (14, 22 and 30 m up) changed on every frame with every clock frozen, so their pictures depended on when a tool read them. | `?yard=1`, cameras 40 to 42, any hour, `?threads=0` too. | The cameras were not held, so the eye fell under gravity, 9.5 cm in the first frame. | **Fixed** (`39a5211`): the cameras are held in the air, as `lab.setCamera` with a height already was. Their frames are steady and equal to the Node render; the nine affected frames of the regression set were saved again. A tools' scene only: the game is unchanged. |
 
-Quirks found while restoring backups, all harmless today and all saved progress, so left as they are:
-- a restore accepts 200 sketches (the game keeps 60);
-- it accepts a seed above 2³², stored under a key the game can't open;
-- it accepts `seen: '!!!!'`, which reads as an empty map.
+Quirks found while restoring backups, all harmless, and all saved progress:
+- a restore accepted 200 sketches (the game keeps 60): **fixed in 0.6.2**, the first 60 are kept;
+- it accepted a seed above 2³², stored under a key the game can't open: **fixed in 0.6.2**, refused;
+- it accepts `seen: '!!!!'`, which reads as an empty map: left as it is.
+
+0.6.2's audit checks each of these cases, and what is left out of each (`node tools/audit.mjs --only backup`: 20 of 20).
 
 Faults in the tools, fixed in the tools:
 - the audit pressed Enter before the title's panel had come forward, which failed the key and menu areas falsely;
@@ -366,12 +370,12 @@ The splits moved code without changing it. The proof is that the regression set 
 
 ## 7. Proposals
 
-Each needs a change this phase rules out, so none was made. Each waits for a yes.
+Each needed a change this phase ruled out, so none was made in 0.6.1. Martin agreed to P1 and P2, which are made in 0.6.2; the rest wait for a yes.
 
 | | Proposal | What it touches | Why |
 |---|---|---|---|
-| P1 | Check each entry of a record when it is read: drop `met`, `found` and `favours` entries that are malformed or name nothing in this world; cap sketches at 60; refuse a seed outside 0 to 2³². | saved progress | F1 and F2: a bad backup can lock a player out. |
-| P2 | Keep an unreadable stored record aside under another key, instead of writing over it. | saved progress | F4: nothing is lost silently. |
+| P1 (done in 0.6.2) | Check each entry of a record when it is read: drop `met`, `found` and `favours` entries that are malformed or name nothing in this world; cap sketches at 60; refuse a seed outside 0 to 2³². | saved progress | F1 and F2: a bad backup can lock a player out. |
+| P2 (done in 0.6.2) | Keep an unreadable stored record aside under another key, instead of writing over it. | saved progress | F4: nothing is lost silently. |
 | P3 | A view distance of 2,000 m. | the look, the generator's spawn choice | about 1% slower; 0.17% of cells change; needs the sky test, the far readability check and the backdrop re-run. |
 | P4 | A service worker on GitHub Pages that adds the isolation headers, so Pages shares one copy of the world. | the build, the Pages copy | three fewer copies of the world there, and 8 workers instead of 4; a reload on the first visit. |
 | P5 | Build the ground stage across the idle render workers. | the generator's running | about a second off a first visit. |

@@ -2,6 +2,12 @@
 
 Land of Ascii v3, newest first. The version is in `package.json` and shows in the menu and on the title screen. The middle number is the phase, and the last number counts releases within it. Before 0.5.1 the phases carried no version. Each phase's full record is in `docs/`.
 
+## 0.6.2 (15 Oct 2026): saved progress made safe
+
+Two fixes from the 0.6.1 audit (`docs/qa-0.6.md`, F1, F2 and F4):
+- **A damaged backup can no longer lock a player out.** When a record is read, an entry that is not of its kind, or that names a person, place or favour not in this world, is left out, so one bad entry never stops the rest. A record keeps at most 60 sketches, and a backup for a world number the game can't open is refused.
+- **A saved record the game can't read is kept aside**, under a key of its own, instead of being written over at the first save. The menu says so once.
+
 ## 0.6.1 (15 Oct 2026): a QA and engineering pass
 
 There is nothing new to see or play.

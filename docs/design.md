@@ -197,7 +197,7 @@ Progress is kept for each world (each seed) in the browser's local storage:
 
 **When it is written:** every change within four seconds, and a favour, a sketch or the lantern at once. In play a save is spread over four frames (the seen squares, the walked squares, the record made, the record written), so no frame pays for all of it. Leaving the page writes what is left at once. The record is a few hundred characters to a few kilobytes: the seen and walked squares as runs of bits. Each sketch is its own entry (its cells deflated), written once.
 
-**When it is read:** on load. A plain visit to the default seed resumes it. A record it cannot read (another version, or damaged) is set aside: the world starts fresh, and the first save writes over it. A new world from a new seed starts fresh, and the first world's record is kept.
+**When it is read:** on load. A plain visit to the default seed resumes it. A record it cannot read (another version, or damaged) is kept aside under a key of its own, and the menu says so once: the world starts fresh, and nothing is written over (phase 6.2). In a record it can read, an entry that is not of its kind, or that names a person, place or favour not in this world, is left out, so one bad entry never stops the rest. A record keeps at most 60 sketches, and a world's number runs from 0 to 2³² − 1. A new world from a new seed starts fresh, and the first world's record is kept.
 
 **The World section of the menu** shows:
 
@@ -221,7 +221,7 @@ Progress is kept for each world (each seed) in the browser's local storage:
 - the first giver reaches the spawn's road within two game minutes of the start, by a way that can be walked, and stands at its edge clear of the spawn;
 - a scripted player who knows only the words does one favour of each kind, and then every other favour, each in four to twelve minutes of walking.
 
-`tools/progress-check.mjs` plays a session, loads the page again, restores a backup in a fresh profile, runs without storage, and clears. `tools/audit.mjs --only backup,storage` restores backups cut short, altered or hand-made with wrong kinds of value, and runs with every storage call failing (phase 6.1).
+`tools/progress-check.mjs` plays a session, loads the page again, restores a backup in a fresh profile, runs without storage, and clears. `tools/audit.mjs --only backup,storage` restores backups cut short, altered or hand-made with wrong kinds of value (checking what is left out), keeps an unreadable stored record aside, and runs with every storage call failing (phases 6.1 and 6.2).
 
 ## 9. Arriving, and coming back (phase 6)
 

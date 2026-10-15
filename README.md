@@ -7,7 +7,7 @@ This is the third build of the game, hence the repository's name; the game is ca
 - **Front page:** https://land-of-ascii-v3.vercel.app/
 - **The game:** https://land-of-ascii-v3.vercel.app/play.html. On Vercel the workers share one copy of the world.
 - **The same on GitHub Pages:** https://oddslice.github.io/land-of-ascii-v3/ (without shared memory, so at most four workers).
-- **Version:** 0.6.1. The history is in [CHANGELOG.md](CHANGELOG.md).
+- **Version:** 0.6.2. The history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Run it
 
@@ -67,7 +67,7 @@ How these tools share their pages is in [docs/architecture.md](docs/architecture
 | [docs/scale.md](docs/scale.md) | the numbers the world is built to |
 | [docs/design.md](docs/design.md) | the rules of play |
 | [docs/facts.md](docs/facts.md) | true numbers about the game, each with how it was measured |
-| [docs/qa-0.6.md](docs/qa-0.6.md) | the 0.6.1 audit, its faults and the known limitations |
+| [docs/qa-0.6.md](docs/qa-0.6.md) | the 0.6.1 audit, its faults (fixed in 0.6.2) and the known limitations |
 | `docs/phase0a.md` to `docs/phase6.md` | each phase's record, with pictures and measurements |
 
 The private `reference/` folder (other people's footage, used to judge the look) is never published, nor bundled into the page.
