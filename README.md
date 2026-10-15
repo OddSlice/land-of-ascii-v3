@@ -1,45 +1,73 @@
 # Land of Ascii
 
-A text-rendered explorer (the third build, hence the repository's name), rebuilt from the ground up. Every frame is a grid of monospace cells, each one glyph on a coloured background.
+A quiet walk through a land drawn in letters, in the browser. Every frame is a grid of monospace cells, each one glyph in an ink colour on a background colour. The picture is made by marching rays on the CPU in web workers and drawn with WebGL2 in one call. The land is generated from a seed: hills, rivers, a fort, three villages, their people and animals, the weather, day and night. You walk it, greet the villagers, do them small favours, sketch the views and find your way by the signposts. Its sound and music are made in code.
 
-**Phase 0a, the Look Lab:** one small, fixed valley (meadow, lake, conifers, a stone wall with a gate, a snowy ridge) at day, dusk and night, built to prove the look before any world is built.
+This is the third build of the game, hence the repository's name; the game is called Land of Ascii everywhere a player looks.
 
-**Phase 0b:** water that reflects and refracts, with ripples, and a 2 km stress scene (`?stress=1` or X) that measures the renderer. Verdict: the CPU backend stays, with density 3 as the default.
+- **Front page:** https://land-of-ascii-v3.vercel.app/
+- **The game:** https://land-of-ascii-v3.vercel.app/play.html. On Vercel the workers share one copy of the world.
+- **The same on GitHub Pages:** https://oddslice.github.io/land-of-ascii-v3/ (without shared memory, so at most four workers).
+- **Version:** 0.6.1. The history is in [CHANGELOG.md](CHANGELOG.md).
 
-**Phase 0c, the look pass:** three fixes (far torches, far treelines, the forest interior) and candidate treatments for conifers, clouds, the meadow and the shallows, chosen live in a look panel (L). The art bible: [docs/art-bible.md](docs/art-bible.md).
-
-**Phase 1, the world:** a 2 km land generated from a seed, with lowland, lakes, rivers, forest stands, roads, mountains to the north and east and the sea to the south and west. Built in its own worker; on Vercel the workers share one copy of it. The look is locked (conifers B, clouds B, meadow 2, blue shallows; since phase 3a the conifers are the tidy tiers, A, with no choice left). The scale it is built to: [docs/scale.md](docs/scale.md).
-
-**Phase 2a, air and far land:** aerial perspective that thins with height, so distance stays readable; far mountains with lit faces, shaded flanks, gullies and snow, and a backdrop range past the north and east edges; the moon's phases, moonlit and starlit nights, and a dawn of its own; a coast with a wet band, a foam line and a swell; copses in the open lowland; viewpoints at the brows of their hills. Each new rule can be switched back to phase 1's in the look panel (5 and 6).
-
-**Phase 2b, weather and the menu:** weather from a forecast that is a pure function of the seed, the day and the hour (clear, fair, overcast, rain and a morning mist that pools in the hollows and over the lakes, burning off as the sun climbs); rain streaks, rings on water and wet ground that dries; a menu on Escape with every control and option (since laid out as tabs with icons, with the frame rate and a few statistics on screen by default, and big screens drawn at the same cost as a 1440 × 900 window); five look fixes (a dark silhouette for the far range at dusk, warm far rock, no snow line along the crests, no specks in the dawn sky, a lake's wet band that follows its shore and a better coast camera).
-
-**Phase 3a, the building kit and the fort:** a kit of building pieces as data (curtain wall with its walk and crenellations, an arched gate passage, square and round towers with stairs inside, a keep with its hall, stairs to the walk, a timber house, a well, torches, lit windows), built from exact shapes that stand at any angle; the same shapes are drawn, cast shadows and are walked on. A fort built from it on every seed, on its rise by the lake and seen from the spawn: the road runs into its gate, and you can walk through the passage, round the courtyard, up onto the walls, into the towers and the keep; at night its torches and windows are lit. Every piece stands alone in the building yard (`?yard=1`).
-
-**After phase 3a:** the fort's stone has its own paler colour and dark course joints that show from further off; Space jumps (about 1.1 m: onto a parapet's breastwork, out through a crenel) and you can step off the wall walk; walking up stairs no longer stutters; the well is a dark hole; the clock runs in real time from the start; the conifers are the tidy tiers only; and Chromium is asked for the mouse's raw movement, so a fast flick no longer makes the view skip.
-
-**Phase 3b, villages and bridges:** three villages on every seed, each composed from the land and never stamped (one strung along its road, one round a green with its well and market shelter, one on the shore with a jetty): cottages and larger houses with thatch or shingle roofs on stone footings, a chapel, a well, barns at the edge, lanterns and lit windows at night, a signpost where its road meets the main road, and a few houses you can go into (a hearth that glows at night, a table, a bed, a shelf). Fields in strips round them with fences, dry-stone walls and gate gaps, footpaths to the fields, the water and the nearest viewpoint, and bridges where the main roads cross rivers (timber over narrow crossings, stone with arches over wide ones). The fort's road now winds up to its gate, its passage torches are dimmer, its yard has a worn path, and its hall and one tower room are furnished. The menu has a benchmark (Advanced).
-
-**Phases 4a to 5b:**
-- **People and animals (4a, 4b):** villagers, the fort's watch and travellers, with flocks, herds, hens, dogs, deer and birds, all living by the clock.
-- **Wayfaring (5a):** the map fills in as you go; a journal (J) of places, people and sketches (K); villagers' favours, with standing and a lantern (L); progress kept for each world. The rules are in [docs/design.md](docs/design.md).
-- **Sound and polish (5b):** the land's sound, all made in code: wind, rain, water, birds and beasts, your footsteps, fires, wells, the chapel's bell and doors. It starts with your first click, N turns it off, and the menu has a Sound section. Also a round of fixes from the earlier phases.
-- **People, the map and signposts (0.5.5):** people read front from back (a face, hair behind, boots forward), E greets from any side within 3 m with a prompt naming who, the map names what you have found and shows the compass, a legend, a scale and your heading, and signposts say where each road goes and how far.
-- **Music (0.5.3, 0.5.4):** three slow, quiet tracks made in code, each running into the next, round again. Footsteps sound every other step, and the sound starts at 90%.
-- **Front page, title screen and sharing (phase 6, 0.6.0):** a front page at the site's root (`index.html`, written by hand; its pictures are frames the game drew, saved as data); the game moved to `play.html`. A title screen over the drifting world: Play or Continue, New world, Settings, Share this world. The detail level is measured on a first visit; links share a world (and a place and an hour), sketches share as images; keys can be changed, the text made larger, motion reduced, the frame rate capped at 30 or 60; F11 for full screen; a pause when the window is left; a plain message where the browser cannot run it. See [docs/phase6.md](docs/phase6.md).
-- The version is shown in the menu and on the title screen.
-
-- The front page: https://land-of-ascii-v3.vercel.app/ (also https://oddslice.github.io/land-of-ascii-v3/). The game: `/play.html` (on Vercel the workers share memory; on GitHub Pages each worker has its own copy, at most 4). An old link with options (`/?seed=N`) goes on to `/play.html` with them.
-- A seed: `play.html?seed=N` (the default is 3); a place and an hour: `&at=x,z,yaw&hour=h` (what Share this world makes). The moon: `?day=N` (0 a bright moon, 15 a dark one). The lab: `?lab=1`. The stress scene: `?stress=1`. The building yard: `?yard=1` (since phase 3b with the village pieces too; the prototypes the kit was chosen by were removed).
-- How it works and what it measures: [docs/phase0a.md](docs/phase0a.md), [docs/phase0b.md](docs/phase0b.md), [docs/phase0c.md](docs/phase0c.md), [docs/phase1.md](docs/phase1.md), [docs/phase2a.md](docs/phase2a.md), [docs/phase2b.md](docs/phase2b.md), [docs/phase3a.md](docs/phase3a.md), [docs/phase3b.md](docs/phase3b.md), [docs/phase4a.md](docs/phase4a.md), [docs/phase4b.md](docs/phase4b.md), [docs/phase5a.md](docs/phase5a.md), [docs/phase5b.md](docs/phase5b.md), [docs/phase6.md](docs/phase6.md)
+## Run it
 
 ```sh
-npm install
-npm run dev      # http://localhost:5190/ (cross-origin isolated; NOISO=1 for without)
-npm run build    # the single-file play.html, and the front page index.html
-node tools/front.mjs        # the front page's pictures (src/front/data.json), from the game; --og the share image
+npm install            # esbuild and Playwright, for the build and the tools
+npm run dev            # http://localhost:5190/ is the game from the sources
 ```
 
-Esc opens the menu: every key explained, the display and sound options (kept in the browser), the world (seed, time, weather, your progress) and the comparison tools of earlier phases, each a tab. Keys in the world: WASD walk (Shift runs) · Space jump · E greet · J journal · K sketch · L lantern · F fly (Space climbs) · M map · N sound on/off · R new world · click or drag to look · 1 2 3 4 day, dusk, night, dawn · T time stops or runs (it runs in real time from the start) · C cameras · G glyphs off/on · − + density · Shift L look panel (8 9 0 5 6 cycle its choices) · H statistics. In the lab and the stress scene, R shows the reference (local copies only) and X switches between them.
+`NOISO=1 npm run dev` serves without cross-origin isolation, as GitHub Pages does. Then each worker holds its own copy of the world.
 
-Vanilla JavaScript in ES modules. The scene is marched on the CPU in module workers, and the cells are drawn with WebGL2 in one call. No runtime dependencies.
+URL options on `play.html`:
+
+| Option | What it does |
+|---|---|
+| `?seed=N` | another world (the default seed is 3) |
+| `&at=x,z,yaw&hour=h` | a place and an hour, as Share this world makes them |
+| `?day=N` | the day count, which the moon follows (0 a bright moon, 15 a dark one) |
+| `?density=1..4` | the detail level |
+| `?threads=N` | the number of render workers (0: everything on the page) |
+| `?lab=1`, `?stress=1`, `?yard=1` | the tools' scenes: the Look Lab, the stress scene, the building yard |
+
+Keys: WASD walk, the mouse (or the arrows) looks, E greets, J opens the journal, K sketches, M shows the map, N turns the sound off, Esc opens the menu with everything else. The player's keys can be changed in the menu (Controls).
+
+## Build and deploy
+
+```sh
+npm run build          # play.html (the game, one file) and index.html (the front page)
+node tools/front.mjs   # the front page's pictures, made by the game (src/front/data.json); --og the share image
+```
+
+The built `play.html` and `index.html` are committed, so build before committing. Pushing `main` publishes the repository's root on Vercel (`vercel.json`: the isolation headers, and redirects for old links) and on GitHub Pages. `.vercelignore` keeps `reference/` and `shots/` off Vercel. The version is `package.json`'s; raise it with each release.
+
+## Test it
+
+Every check runs from the command line, in Node or in Playwright's Chromium, Firefox and WebKit:
+
+| Command | What it checks |
+|---|---|
+| `node tools/world-check.mjs` | five seeds: the land, the roads and rivers, the sky test, the fort and the villages walked, people, animals, favours played from their words (`--fort-only --sweep 60`: sixty seeds) |
+| `node tools/identity.mjs --scene all --built` | every number of workers draws the same cells |
+| `node tools/lookbook.mjs --regress --built` | the fixed cameras of every scene against the saved set (`tools/regress/`), cell for cell |
+| `node tools/flicker.mjs --people` (`--animals`, `--buildings`, `--skyline`, `--set world`) | blinking cells while walking and turning |
+| `node tools/menu-check.mjs` | the menu, the title screen, the keys and the settings, by keyboard and mouse |
+| `node tools/progress-check.mjs --built --browser chromium` (or `firefox`, `webkit`) | saved progress, backups, no storage |
+| `node tools/sound-check.mjs --built` | the sound at every kind of source: nothing clips, the voices are held |
+| `node tools/audit.mjs` | what the others don't cover: resizing, switching detail, opening from disk, the Pages copy, a cold load, a month of game time, moved keys, the menu by keyboard, the largest text, broken storage, edited backups |
+| `node tools/bench.mjs --scene world --built --threads 8 --density 3` | frame times on every fixed camera (on a quiet machine) |
+
+How these tools share their pages is in [docs/architecture.md](docs/architecture.md), and what each other tool in `tools/` does is in its first lines.
+
+## Read more
+
+| Document | What it covers |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | how it is built: the pipeline, the threads, the world data, the kit, the people, the sound, the progress store |
+| [docs/art-bible.md](docs/art-bible.md) | the look's rules |
+| [docs/scale.md](docs/scale.md) | the numbers the world is built to |
+| [docs/design.md](docs/design.md) | the rules of play |
+| [docs/facts.md](docs/facts.md) | true numbers about the game, each with how it was measured |
+| [docs/qa-0.6.md](docs/qa-0.6.md) | the 0.6.1 audit, its faults and the known limitations |
+| `docs/phase0a.md` to `docs/phase6.md` | each phase's record, with pictures and measurements |
+
+The private `reference/` folder (other people's footage, used to judge the look) is never published, nor bundled into the page.
