@@ -6,7 +6,7 @@ True numbers about Land of Ascii 0.6.1, each with the command that produced it. 
 
 `play.html` is the whole game: one file, with no other request once it has loaded.
 - **Size:** 1,038,168 bytes (1,013.8 KB), before the host compresses it.
-- **The front page**, `index.html`: 37,377 bytes.
+- **The front page**, `index.html`: about 64 KB since 0.6.3 (it draws the title screen's stone frame with the game's own code); 37,377 bytes in 0.6.1.
 
 What each part adds, from esbuild's own account of the bytes each source file adds (`node tools/facts.mjs --size`). The renderer, the world code and the look data appear twice, once in the page and once in the render workers' code, which is carried in the same file.
 

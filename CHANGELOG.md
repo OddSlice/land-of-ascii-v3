@@ -2,6 +2,12 @@
 
 Land of Ascii v3, newest first. The version is in `package.json` and shows in the menu and on the title screen. The middle number is the phase, and the last number counts releases within it. Before 0.5.1 the phases carried no version. Each phase's full record is in `docs/`.
 
+## 0.6.3 (15 Oct 2026): a cleaner front page
+
+- **The front page** now wears the game's own look: the name centred, then the picture and the words inside the title screen's stone frame, set as the menu sets them (its keycaps and icons).
+- **Start exploring** is its one button, and Enter does the same.
+- **Removed:** the links out (the code, the inspiration), so the page can stand alone, on itch.io too.
+
 ## 0.6.2 (15 Oct 2026): saved progress made safe
 
 Two fixes from the 0.6.1 audit (`docs/qa-0.6.md`, F1, F2 and F4):
