@@ -22,3 +22,4 @@ shots/*
 !shots/phase6/
 !shots/audit/
 !shots/facts/
+dist/
