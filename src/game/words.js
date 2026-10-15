@@ -70,40 +70,40 @@ export const USUAL = {
 
 export const CARRY = [
   { id: 'nets', thing: 'a bundle of mended nets', short: 'the mended nets', shape: 'bundle',
-    ask: ['The nets are mended at last, and {dest} has waited long enough for them.', '{dest} {destIs}, {dir} of here. Would you carry them there for me?'],
-    got: ['Nets from {giver}. Good, these will see the summer out.', 'Tell {giver} the boat will be out again by morning.'] },
+    ask: ['I\'ve finally mended the nets, and {dest} has waited long enough for them.', '{dest} {destIs}, {dir} of here. Could you carry them over for me?'],
+    got: ['Nets from {giver}. Good, these\'ll see the summer out.', 'Tell {giver} the boat\'s going out again by morning.'] },
   { id: 'eggs', thing: 'a basket of eggs, packed in straw', short: 'the basket of eggs', shape: 'basket',
-    ask: ['The hens have laid more than we can eat, and {dest} has none to spare this year.', '{dest} {destIs}, {dir} of here. Would you take the basket? Walk gently with it.'],
-    got: ['Eggs, and not one cracked. You walk a careful road.', '{giver} is good to remember us.'] },
+    ask: ['Our hens have laid more than we can eat, and {dest} has none to spare this year.', '{dest} {destIs}, {dir} of here. Will you take the basket? Gently, mind.'],
+    got: ['Eggs, and not one cracked. You must walk a careful road.', 'It\'s good of {giver} to remember us.'] },
   { id: 'honey', thing: 'a jar of honey from the hives', short: 'the jar of honey', shape: 'jar',
-    ask: ['The bees did well by us. I promised a jar of it to {dest}.', '{dest} {destIs}, {dir} of here. Would you take it, if your way goes there?'],
-    got: ['Honey. I have thought of nothing else since {giver} spoke of it.', 'Thank you for bringing it all that way.'] },
+    ask: ['The bees did well by us, and I promised {dest} a jar.', '{dest} {destIs}, {dir} of here. If you\'re going that way, would you take it?'],
+    got: ['Honey. I\'ve thought of nothing else since {giver} mentioned it.', 'Thank you for bringing it all that way.'] },
   { id: 'rope', thing: 'a coil of new rope', short: 'the coil of rope', shape: 'rope',
-    ask: ['This rope is for {dest}. The old one frayed through last week.', '{dest} {destIs}, {dir} of here. It is not heavy, only awkward. Would you carry it?'],
-    got: ['New rope, and well laid. {giver} has good hands.', 'That will hold for years.'] },
+    ask: ['This rope\'s for {dest}. Their old one frayed through last week.', '{dest} {destIs}, {dir} of here. It isn\'t heavy, just awkward. Would you carry it?'],
+    got: ['New rope, and well laid. {giver} has good hands.', 'That\'ll hold for years.'] },
   { id: 'seed', thing: 'a sack of seed barley', short: 'the sack of seed barley', shape: 'sack',
-    ask: ['We kept back more seed than we need. {dest} lost theirs to the damp.', '{dest} {destIs}, {dir} of here. Would you take the sack to them?'],
-    got: ['Seed barley. That saves the field this year.', 'Tell {giver} we will repay it at harvest.'] },
+    ask: ['We kept back more seed than we need, and {dest} lost theirs to the damp.', '{dest} {destIs}, {dir} of here. Could you take them the sack?'],
+    got: ['Seed barley. That saves the field this year.', 'Tell {giver} we\'ll pay it back at harvest.'] },
   { id: 'letter', thing: 'a letter, folded and sealed', short: 'the sealed letter', shape: 'letter',
-    ask: ['I have written to {dest}, and the carter will not pass that way for a week.', '{dest} {destIs}, {dir} of here. Would you carry the letter?'],
-    got: ['A letter from {giver}. I know the hand.', 'I will read it by the fire tonight. Thank you.'] },
+    ask: ['I\'ve written to {dest}, and the carter won\'t pass that way for a week.', '{dest} {destIs}, {dir} of here. Would you carry the letter?'],
+    got: ['A letter from {giver}. I know the hand.', 'I\'ll read it by the fire tonight. Thank you.'] },
   { id: 'boots', thing: 'a pair of boots, newly soled', short: 'the boots', shape: 'bundle',
-    ask: ['{dest} left these boots with me to be soled, and they are done.', '{dest} {destIs}, {dir} of here. Would you take them back?'],
-    got: ['My boots. I have been walking in my old ones and feeling every stone.', 'Thank {giver} for me.'] },
+    ask: ['{dest} left these boots with me to be soled, and they\'re done.', '{dest} {destIs}, {dir} of here. Would you take them back?'],
+    got: ['My boots. I\'ve been in my old ones, feeling every stone.', 'Thank {giver} for me.'] },
   { id: 'salve', thing: 'a pot of salve for sore hands', short: 'the pot of salve', shape: 'jar',
-    ask: ['I made this salve for {dest}, whose hands crack in the cold.', '{dest} {destIs}, {dir} of here. Would you take the pot along?'],
-    got: ['Salve, from {giver}. My hands thank you already.', 'You are kind to carry it.'] },
+    ask: ['I made this salve for {dest}. Their hands crack in the cold.', '{dest} {destIs}, {dir} of here. Will you take the pot along?'],
+    got: ['Salve, from {giver}. My hands are grateful already.', 'You\'re kind to carry it.'] },
   { id: 'knife', thing: 'a knife, freshly ground', short: 'the knife', shape: 'knife',
-    ask: ['I ground this knife for {dest}. It will cut true again now.', '{dest} {destIs}, {dir} of here. Would you carry it to them? Mind the edge.'],
-    got: ['My knife, and sharper than it ever was.', 'Tell {giver} I owe a good turn.'] },
+    ask: ['I\'ve ground this knife for {dest}, and it\'ll cut true again now.', '{dest} {destIs}, {dir} of here. Would you carry it to them? Mind the edge.'],
+    got: ['My knife, and sharper than it ever was.', 'Tell {giver} I owe them a good turn.'] },
   { id: 'bread', thing: 'a loaf and a round of cheese, wrapped in cloth', short: 'the bread and cheese', shape: 'bundle',
-    ask: ['{dest} has been poorly, and I have baked more than enough.', '{dest} {destIs}, {dir} of here. Would you take this to them while it is fresh?'],
+    ask: ['{dest} has been poorly, and I\'ve baked more than enough.', '{dest} {destIs}, {dir} of here. Could you take this over while it\'s fresh?'],
     got: ['Bread and cheese, and still warm in the middle. {giver} remembered.', 'Thank you. Sit a moment if you like.'] },
   { id: 'oil', thing: 'a flask of lamp oil and a new wick', short: 'the lamp oil', shape: 'jar',
-    ask: ['{dest} has been sitting in the dark these last nights. I have oil to spare.', '{dest} {destIs}, {dir} of here. Would you carry the flask?'],
-    got: ['Oil for the lamp. The evenings will be easier now.', 'You have done me a kindness.'] },
+    ask: ['{dest} has sat in the dark these last few nights, and I\'ve oil to spare.', '{dest} {destIs}, {dir} of here. Would you carry the flask?'],
+    got: ['Oil for the lamp. That\'ll make the evenings easier.', 'You\'ve done me a kindness.'] },
   { id: 'cloak', thing: 'a cloak, mended at the hem', short: 'the mended cloak', shape: 'cloak',
-    ask: ['I have mended this cloak for {dest}. It tore on a gate.', '{dest} {destIs}, {dir} of here. Would you see it back to them?'],
+    ask: ['{dest} tore this cloak on a gate, and I\'ve mended it.', '{dest} {destIs}, {dir} of here. Would you see it back to them?'],
     got: ['My cloak, and you can hardly see the mend.', '{giver} has a fine needle.'] },
 ];
 
@@ -113,59 +113,59 @@ export const CARRY = [
 
 export const FIND = [
   { id: 'shears', thing: 'a pair of shears', short: 'the shears', shape: 'tool', doing: 'trimming the edges',
-    at: ['fieldwall', 'fold'], found: ['My shears. Where were they?', 'I would have looked a week and not found them. Thank you.'] },
+    at: ['fieldwall', 'fold'], found: ['My shears. Where were they?', 'I\'d have looked for a week and never found them. Thank you.'] },
   { id: 'lantern', thing: 'a lantern, cold and dark', short: 'the lantern', shape: 'oldlantern', doing: 'coming home late',
-    at: ['bridge', 'signpost'], found: ['My lantern. I set it down to rest my arm and walked on without it.', 'Thank you. I will mind it better.'] },
+    at: ['bridge', 'signpost'], found: ['My lantern. I put it down to rest my arm and walked off without it.', 'Thank you. I\'ll mind it better.'] },
   { id: 'whetstone', thing: 'a whetstone in a leather pouch', short: 'the whetstone', shape: 'pouch', doing: 'sharpening the scythe',
-    at: ['fieldwall', 'fold'], found: ['My whetstone. A blade is no use without it.', 'You have sharp eyes.'] },
+    at: ['fieldwall', 'fold'], found: ['My whetstone. A blade\'s no use without it.', 'You\'ve sharp eyes.'] },
   { id: 'hoe', thing: 'a hoe with an ash handle', short: 'the hoe', shape: 'hoe', doing: 'weeding along the edge',
-    at: ['fieldwall'], found: ['My hoe. I was sure someone had walked off with it.', 'Thank you. I will not leave it lying again.'] },
+    at: ['fieldwall'], found: ['My hoe. I was sure someone had walked off with it.', 'Thank you. I won\'t leave it lying about again.'] },
   { id: 'bucket', thing: 'a wooden bucket', short: 'the bucket', shape: 'bucket', doing: 'fetching water',
-    at: ['shore', 'jetty'], found: ['The bucket. I came back for it and could not think where I had put it down.', 'Thank you kindly.'] },
+    at: ['shore', 'jetty'], found: ['The bucket. I came back for it and couldn\'t think where I\'d put it down.', 'Thank you kindly.'] },
   { id: 'kindling', thing: 'a basket of kindling', short: 'the basket of kindling', shape: 'basket', doing: 'gathering sticks',
-    at: ['copse'], found: ['My kindling. The fire will thank you tonight.', 'You found the very spot. Thank you.'] },
+    at: ['copse'], found: ['My kindling. The fire\'ll thank you tonight.', 'You found the very spot. Thank you.'] },
   { id: 'knitting', thing: 'a bag of knitting', short: 'the bag of knitting', shape: 'pouch', doing: 'sitting a while',
     at: ['bench', 'chapel'], found: ['My knitting. Three rows from the end of the sleeve, too.', 'Thank you. Sit, if you like.'] },
   { id: 'line', thing: 'a coil of fishing line', short: 'the fishing line', shape: 'rope', doing: 'trying the water',
-    at: ['jetty', 'shore'], found: ['My line. A fisher without line is only a person standing by the water.', 'Thank you.'] },
+    at: ['jetty', 'shore'], found: ['My line. Without it a fisher\'s just someone standing by the water.', 'Thank you.'] },
   { id: 'cap', thing: 'a wool cap', short: 'the wool cap', shape: 'bundle', doing: 'looking at the view',
-    at: ['viewpoint'], found: ['My cap. The wind took it off my head and I was too tired to chase it.', 'You climbed all that way. Thank you.'] },
+    at: ['viewpoint'], found: ['My cap. The wind took it clean off my head, and I was too tired to chase it.', 'You climbed all that way. Thank you.'] },
   { id: 'sickle', thing: 'a sickle', short: 'the sickle', shape: 'tool', doing: 'cutting rushes',
     at: ['fieldwall', 'shore'], found: ['My sickle. I can get on with the rushes now.', 'Thank you. Mind the edge on it.'] },
   { id: 'salt', thing: 'a small sack of salt', short: 'the sack of salt', shape: 'sack', doing: 'coming back from the fort',
-    at: ['bridge', 'signpost'], found: ['The salt. I thought I had lost the whole week\'s worth.', 'Thank you. It would have been a bland supper.'] },
+    at: ['bridge', 'signpost'], found: ['The salt. I thought I\'d lost the whole week\'s worth.', 'Thank you. Supper would have been bland without it.'] },
   { id: 'staff', thing: 'a walking staff of blackthorn', short: 'the blackthorn staff', shape: 'staff', doing: 'walking up for the air',
-    at: ['viewpoint', 'copse'], found: ['My staff. I came down without it and my knees have told me so since.', 'Thank you.'] },
+    at: ['viewpoint', 'copse'], found: ['My staff. I came down without it, and my knees have been telling me so ever since.', 'Thank you.'] },
 ];
 
 // tell: go and tell someone something, and bring back their answer.
 // `msg`: what to say (a clause after "that"); `answer`: what they say back.
 
 export const TELL = [
-  { id: 'mill', msg: 'the mill wheel is mended', answer: 'Then I will bring the grain down on the next fair day.',
-    ask: ['Would you take word to {dest}, who {destIs}, {dir} of here?', 'Say that {msg}, and bring me back whatever answer comes.'] },
-  { id: 'calf', msg: 'the brown cow has calved, and both are well', answer: 'Good news. Tell them I will come and see the calf before the week is out.',
-    ask: ['There is news {dest} will want to hear. {dest} {destIs}, {dir} of here.', 'Would you tell them that {msg}? And bring back what they say.'] },
-  { id: 'wedding', msg: 'the wedding is fixed for the first fair day after harvest', answer: 'Tell them I will be there, and I will bring the fiddle.',
-    ask: ['Would you carry word to {dest}? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}, and bring back their answer.'] },
+  { id: 'mill', msg: 'the mill wheel is mended', answer: 'Then I\'ll bring the grain down on the next fair day.',
+    ask: ['Would you take word to {dest}, who {destIs}, {dir} of here?', 'Say that {msg}, and bring me back whatever answer you get.'] },
+  { id: 'calf', msg: 'the brown cow has calved, and both are well', answer: 'Good news. Tell them I\'ll come and see the calf before the week\'s out.',
+    ask: ['Here\'s news {dest} will want to hear. {dest} {destIs}, {dir} of here.', 'Would you tell them that {msg}? I\'d like to know what they say.'] },
+  { id: 'wedding', msg: 'the wedding is fixed for the first fair day after harvest', answer: 'Tell them I\'ll be there, and I\'m bringing the fiddle.',
+    ask: ['Would you carry word to {dest}? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}. They\'ll want to send an answer.'] },
   { id: 'roof', msg: 'the roof wants new thatch before the rains', answer: 'I can come in four days, if the weather holds. Tell them to have the straw ready.',
-    ask: ['{dest} {destIs}, {dir} of here, and knows thatch better than anyone.', 'Would you tell them that {msg}, and bring back what they say?'] },
-  { id: 'debt', msg: 'the debt is paid, and gladly', answer: 'Then there is nothing between us but good will. Tell them that.',
-    ask: ['I owe {dest} a word, and I would rather it went today.', '{dest} {destIs}, {dir} of here. Tell them that {msg}, and bring back their answer.'] },
-  { id: 'well', msg: 'the well water has gone sweet again', answer: 'That is good to hear. Tell them we will stop boiling ours too, then.',
-    ask: ['{dest} worried over the water when last we spoke.', '{dest} {destIs}, {dir} of here. Would you tell them that {msg}, and bring back what they say?'] },
-  { id: 'apples', msg: 'the apples are ripe, and there are more than we can pick', answer: 'Tell them I will come with two baskets on the next dry morning.',
-    ask: ['Would you take a message for me? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}. And bring back their answer.'] },
-  { id: 'sick', msg: 'the fever has broken and the child is sitting up', answer: 'Thank heaven. Tell them I will light a candle tonight all the same.',
-    ask: ['{dest} has asked after us every day this week.', '{dest} {destIs}, {dir} of here. Would you tell them that {msg}, and bring back what they say?'] },
-  { id: 'cart', msg: 'the cart will not come until the road dries', answer: 'Then we will wait. Tell them there is no hurry on our side.',
-    ask: ['Someone ought to tell {dest}, who {destIs}, {dir} of here.', 'Would you say that {msg}, and bring back their answer?'] },
-  { id: 'dog', msg: 'the old dog came home on its own after all', answer: 'I am glad of it. Tell them I looked for it along the river.',
-    ask: ['{dest} helped us look for the dog. They should know.', '{dest} {destIs}, {dir} of here. Tell them that {msg}, and bring back what they say.'] },
-  { id: 'bell', msg: 'the chapel bell has a crack and wants looking at', answer: 'I will come with my tools after the next market. Tell them to keep the bell still until then.',
-    ask: ['{dest} {destIs}, {dir} of here, and knows about such things.', 'Would you tell them that {msg}, and bring back their answer?'] },
-  { id: 'wool', msg: 'the wool is washed and ready for carding', answer: 'Good. Tell them I will send the carder over with the cart.',
-    ask: ['Would you take word to {dest}? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}, and bring back what they say.'] },
+    ask: ['Nobody knows thatch better than {dest}, who {destIs}, {dir} of here.', 'Could you tell them that {msg}? Then come and tell me when they can start.'] },
+  { id: 'debt', msg: 'the debt is paid, and gladly', answer: 'Then there\'s nothing between us but good will. Tell them that.',
+    ask: ['I owe {dest} a word, and I\'d rather it went today.', '{dest} {destIs}, {dir} of here. Tell them that {msg}, and let me know what they say.'] },
+  { id: 'well', msg: 'the well water has gone sweet again', answer: 'That\'s good to hear. Tell them we\'ll stop boiling ours too, then.',
+    ask: ['When I last spoke to {dest}, they were worried about the water.', '{dest} {destIs}, {dir} of here. Would you tell them that {msg}? Come back with their answer.'] },
+  { id: 'apples', msg: 'the apples are ripe, and there are more than we can pick', answer: 'Tell them I\'ll come with two baskets on the next dry morning.',
+    ask: ['Would you take a message for me? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}. Then come back and tell me what they said.'] },
+  { id: 'sick', msg: 'the fever has broken and the child is sitting up', answer: 'Thank heaven. Tell them I\'ll light a candle tonight all the same.',
+    ask: ['{dest} has asked after us every day this week.', '{dest} {destIs}, {dir} of here. Would you let them know that {msg}, and bring me their answer?'] },
+  { id: 'cart', msg: 'the cart will not come until the road dries', answer: 'Then we\'ll wait. Tell them there\'s no hurry on our side.',
+    ask: ['Someone ought to tell {dest}, who {destIs}, {dir} of here.', 'Would you say that {msg}? They may want to send word back.'] },
+  { id: 'dog', msg: 'the old dog came home on its own after all', answer: 'I\'m glad of it. Tell them I looked for it along the river.',
+    ask: ['{dest} helped us look for the dog, so they should know.', '{dest} {destIs}, {dir} of here. Tell them that {msg}, and bring back what they say.'] },
+  { id: 'bell', msg: 'the chapel bell has a crack and wants looking at', answer: 'I\'ll come with my tools after the next market. Tell them to leave the bell still until then.',
+    ask: ['Ask {dest}, who {destIs}, {dir} of here. They know about such things.', 'Could you tell them that {msg}, and see what they say?'] },
+  { id: 'wool', msg: 'the wool is washed and ready for carding', answer: 'Good. Tell them I\'ll send the carder over with the cart.',
+    ask: ['Would you take word to {dest}? {dest} {destIs}, {dir} of here.', 'Tell them that {msg}, and bring me back their answer.'] },
 ];
 
 // What the giver says when you have taken a favour and come back without it
@@ -173,21 +173,21 @@ export const TELL = [
 export const WAITING = {
   carry: ['Did you find {dest}? {where}, {when}.', 'No hurry. {dest} will be glad of it when you get there.'],
   find: ['No sign of it yet? I was {doing} {lost}.', 'Have a look {lost}, if you pass that way.'],
-  tell: ['Did you see {dest}? {where}, {when}.', 'I am still waiting on that answer, when you have it.'],
+  tell: ['Did you see {dest}? {where}, {when}.', 'I\'m still waiting on that answer, whenever you have it.'],
 };
 export const BACK = {
-  find: ['You found it.', 'Thank you. That is a weight off.'],
+  find: ['You found it.', 'Thank you. That\'s a weight off.'],
   tell: ['What did {dest} say?', '"{answer}" Well. Thank you for bringing it.'],
 };
 // What someone with a favour of their own adds, once you have done what you
 // came for (a chain): the first line before their ask.
-export const AND_ME = ['While you are here, there is something you could do for me too.', 'Since you are going about, perhaps you could help me as well.', 'You have been a help to them. Could you help me as well?'];
+export const AND_ME = ['While you\'re here, there\'s something you could do for me too.', 'If you\'re going about anyway, maybe you could help me as well.', 'You\'ve been a help to them. Could you help me too?'];
 // Saying no for now.
-export const LATER = ['Another time, then. I will be about.', 'No matter. Come back if your road turns this way.', 'Some other day, then.'];
+export const LATER = ['Another time, then. I\'ll be about.', 'No matter. Come back if your road turns this way.', 'Some other day, then.'];
 // Saying yes.
-export const YES = ['Thank you. Go safely.', 'Thank you. I will not forget it.', 'Thank you. Mind how you go.'];
+export const YES = ['Thank you. Go safely.', 'Thank you. I won\'t forget it.', 'Thank you. Mind how you go.'];
 // The buttons under an exchange.
-export const CHOICE = { yes: 'I will do it', no: 'Another time' };
+export const CHOICE = { yes: 'I\'ll do it', no: 'Another time' };
 
 // ---- the first meeting --------------------------------------------------------------
 // The first time you play, someone from the nearest village comes out to the
@@ -200,10 +200,10 @@ export const FIRST = {
   waiting: 'waiting on the road',
   // (where the first one to ask waits, when it is word to take and bring back)
   where: 'waiting on the road where you met', when: 'until the middle of the afternoon',
-  hello: ['There you are. I saw you on the rise and thought you might be walking our way.'],
+  hello: ['There you are. I saw you up on the rise and thought you might be coming our way.'],
 };
 // The first favour done: the lantern, from the one you brought it to.
-export const LANTERN_GIFT = ['Take this lantern for the road. The nights are long out here, and the lanes are dark.'];
+export const LANTERN_GIFT = ['Take this lantern for the road. Out here the nights are long and the lanes are dark.'];
 
 // ---- standing -----------------------------------------------------------------------
 // A title that grows with the favours done; it changes how people greet you
@@ -222,9 +222,9 @@ export const HAILS = [
   [],
   ['Good day, wayfarer.', 'Ah, the wayfarer.', 'Walking far today?'],
   ['They speak well of you on the road.', 'Welcome back, friend.', 'Good to see you on our side of the land.'],
-  ['I know your face. You have helped folk here.', 'Good to see you again.', 'Ah, it is you. Come and stand a while.'],
-  ['There is the one everyone asks for.', 'You are welcome here at any hour.', 'Good day to you, friend. We are glad of you.'],
-  ['The whole land knows your step by now.', 'Welcome, friend. You are one of us.', 'Ah, there you are. Sit, sit.'],
+  ['I know your face. You\'ve helped folk here.', 'Good to see you again.', 'Ah, it\'s you. Come and stand a while.'],
+  ['There\'s the one everyone asks for.', 'You\'re welcome here at any hour.', 'Good day to you, friend. We\'re glad of you.'],
+  ['The whole land knows your step by now.', 'Welcome, friend. You\'re one of us now.', 'Ah, there you are. Sit, sit.'],
 ];
 
 // ---- small lines --------------------------------------------------------------------

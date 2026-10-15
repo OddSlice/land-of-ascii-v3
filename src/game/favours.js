@@ -314,7 +314,7 @@ export function buildFavours(world, P, places) {
       if (f.spot.town !== undefined && f.spot.town !== home) { const b = townXZ(f.spot.town); Object.assign(sl, { spotTown: cap(townName(f.spot.town)), spotTownDir: compass(hx.x, hx.z, b.x, b.z), spotWhich: whichOf(hx, f.spot.town) }); }
     }
     f.slots = sl;
-    f.ask = t.ask ? t.ask.map((s) => cap(fill(s, sl))) : [cap(fill('I have lost {thing}. I had it when I was {doing} {lost}.', sl)), 'If you pass that way, would you look for it and bring it back to me?'];
+    f.ask = t.ask ? t.ask.map((s) => cap(fill(s, sl))) : [cap(fill('I\'ve lost {thing}. I had it when I was {doing} {lost}.', sl)), 'If you\'re passing that way, would you look for it and bring it back to me?'];
     f.got = (t.got || t.found || []).map((s) => cap(fill(s, sl)));
     f.answer = t.answer || null;
     list.push(f);
