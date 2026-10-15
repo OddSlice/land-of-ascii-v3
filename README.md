@@ -7,7 +7,7 @@ This is the third build of the game, hence the repository's name; the game is ca
 - **Front page:** https://land-of-ascii-v3.vercel.app/
 - **The game:** https://land-of-ascii-v3.vercel.app/play.html. On Vercel the workers share one copy of the world.
 - **The same on GitHub Pages:** https://oddslice.github.io/land-of-ascii-v3/ (without shared memory, so at most four workers).
-- **Version:** 0.6.3. The history is in [CHANGELOG.md](CHANGELOG.md).
+- **Version:** 0.6.4. The history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Run it
 

@@ -2,6 +2,15 @@
 
 Land of Ascii v3, newest first. The version is in `package.json` and shows in the menu and on the title screen. The middle number is the phase, and the last number counts releases within it. Before 0.5.1 the phases carried no version. Each phase's full record is in `docs/`.
 
+## 0.6.4 (15 Oct 2026): the words, rewritten
+
+Every line a player reads went through a humanizer pass, and every line that read like a machine was rewritten:
+- **The villagers** talk like people now, with contractions. Each line keeps its meaning and its time, weather and place.
+- **The favours** ask in more than one way, so a dozen asks no longer end the same.
+- **The menu, the journal, the title screen, the notes and the front page** lose their stiff fragments and passive phrasing.
+
+Every name, number and direction is unchanged, and the scripted player still does every favour from the journal's words alone.
+
 ## 0.6.3 (15 Oct 2026): a cleaner front page
 
 - **The front page** now wears the game's own look: the name centred, then the picture and the words inside the title screen's stone frame, set as the menu sets them (its keycaps and icons).
