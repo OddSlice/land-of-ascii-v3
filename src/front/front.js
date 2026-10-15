@@ -1,5 +1,7 @@
-// The front page (phase 6): the name in the game's lettering, and the
-// pictures, each a frame the game drew, saved as its cells
+// The front page (phase 6): the name in the game's lettering, the title
+// screen's stone frame round the picture and the words (after 0.6.2: the
+// same drawing, src/app/title.js), the menu's icons, and the pictures,
+// each a frame the game drew, saved as its cells
 // (tools/front.mjs) and drawn here once, cell by cell, as the game draws a
 // cell: its colour, its glyph in its ink. No game is loaded and nothing
 // runs after the pictures are drawn (they are drawn again only if the page
@@ -7,6 +9,8 @@
 //
 // ?og=1: the share image instead (1200 x 630), for tools/front.mjs --og.
 import { drawLettering, letteringSize } from '../app/lettering.js';
+import { drawFrame } from '../app/title.js';
+import { icon } from '../app/icons.js';
 import { FONT_STACK } from '../present/font.js';
 
 const $ = (s) => document.querySelector(s);
@@ -39,7 +43,29 @@ function drawCells(canvas, cells, cols, rows, cw, glyphs, dpr = 1) {
   }
 }
 
+// The stone frame round the stage: whole cells about 8 px wide, so it
+// meets the stage's edges, and the stage as tall as whole rows.
+function frameStage(dpr) {
+  const st = $('.stage'), c = $('.stage > .frame');
+  st.style.minHeight = '';
+  const w = st.clientWidth, cols = Math.max(12, Math.round(w / 8)), cw = w / cols;
+  const rows = Math.ceil(st.offsetHeight / (2 * cw));
+  st.style.minHeight = `${rows * 2 * cw}px`;
+  drawFrame(c, cols, rows, cw, dpr);
+}
+
 async function main() {
+  // the menu's icons, and Enter starts as the button says
+  for (const el of document.querySelectorAll('[data-icon]')) { const s = icon(el.dataset.icon, 16); s.classList.add('ic'); el.replaceWith(s); }
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLAnchorElement)) location.href = $('.play').getAttribute('href');
+  });
+  const dpr0 = Math.min(2, window.devicePixelRatio || 1);
+  let fw = 0;
+  const frame = () => { const w = $('.stage').clientWidth; if (w !== fw) { fw = w; frameStage(dpr0); } };
+  frame();
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => { fw = 0; frame(); }).observe($('.stage > .inner'));
+  addEventListener('resize', frame);
   const data = await load();
   if (typeof DecompressionStream === 'undefined') { document.documentElement.classList.add('nopics'); return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -55,7 +81,7 @@ async function main() {
     const lines = narrow ? ['LAND OF', 'ASCII'] : ['LAND OF ASCII'];
     const box = $('.name');
     const { cols } = letteringSize(lines);
-    const cw = Math.max(2, Math.min(4, Math.floor(Math.min(box.clientWidth || innerWidth - 32, 600) / cols)));
+    const cw = Math.max(2, Math.min(5, Math.floor(Math.min(box.parentElement.clientWidth || innerWidth - 32, 720) / cols)));
     const hw = $('.hero').clientWidth, hcw = Math.max(1.5, hw / hero.cols);
     const sw = $('.sketch').clientWidth, scw = Math.max(1.5, sw / sketches[0].cols);
     const key = `${lines.length},${cw},${hcw.toFixed(2)},${scw.toFixed(2)}`;

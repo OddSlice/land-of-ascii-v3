@@ -403,11 +403,11 @@ try {
       for (const m of ['getItem', 'setItem', 'removeItem', 'key', 'clear']) Storage.prototype[m] = () => { throw new DOMException('storage blocked', 'SecurityError'); };
       Object.defineProperty(Storage.prototype, 'length', { get() { throw new DOMException('storage blocked', 'SecurityError'); } });
     };
-    // the front page: Play, never Continue, and nothing stopped
+    // the front page: its button, and nothing stopped
     { const { ctx, page, errors } = await visit(`${url}/index.html`, { init: block });
       await page.waitForLoadState('load'); await wait(800);
-      const word = await page.evaluate(() => document.querySelector('.playword').textContent);
-      check('storage', 'the front page with every storage call failing: Play shows, no error', word === 'Play' && !errors.length, `${word}${errors.length ? ` ${errors.join(' | ')}` : ''}`);
+      const word = await page.evaluate(() => document.querySelector('.play').textContent.replace('Enter', '').trim());
+      check('storage', 'the front page with every storage call failing: its button shows, no error', word === 'Start exploring' && !errors.length, `${word}${errors.length ? ` ${errors.join(' | ')}` : ''}`);
       await ctx.close(); }
     const { ctx, page, errors } = await visit(`${url}/play.html`, { init: block });
     let ok = true; const notes = [];
