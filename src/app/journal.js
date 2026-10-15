@@ -144,20 +144,20 @@ export class Journal {
       g.list.push(...d.places.filter((p) => p.kind === kind));
     }
     put(this.sections.places, 
-      h('header', {}, h('h2', {}, 'Places'), h('p', { class: 'lead' }, `${found} of ${d.places.length} found. A place is noted the first time you come near it and can see it. You have seen ${Math.round(d.seen * 100)}% of the land.`)),
+      h('header', {}, h('h2', {}, 'Places'), h('p', { class: 'lead' }, `${found} of ${d.places.length} found. A place goes in the journal the first time you're near enough to see it. You've seen ${Math.round(d.seen * 100)}% of the land.`)),
       groups.filter((g) => g.list.length).map((g) => h('div', { class: 'group' }, h('h3', { class: 'part' }, `${g.head} (${g.list.filter((p) => p.found).length} of ${g.list.length})`),
         h('ul', { class: 'rows' }, g.list.map((p) => (p.found
           ? h('li', { class: 'row found' }, icon('tick', 14), h('div', {}, h('b', {}, p.title), h('span', { class: 'sub' }, p.where)), h('span', { class: 'when' }, when(p.found)))
           : h('li', { class: 'row' }, icon('open', 14), h('div', {}, h('b', {}, 'not yet found'), h('span', { class: 'sub' }, p.hint)), h('span', { class: 'when' }, ''))))))));
     // people
     put(this.sections.people, 
-      h('header', {}, h('h2', {}, 'People'), h('p', { class: 'lead' }, d.people.length ? `You have met ${d.people.length} ${d.people.length === 1 ? 'person' : 'people'}. Press E beside someone facing you to greet them.` : 'No one yet. Press E beside someone facing you to greet them.')),
+      h('header', {}, h('h2', {}, 'People'), h('p', { class: 'lead' }, d.people.length ? `You've met ${d.people.length} ${d.people.length === 1 ? 'person' : 'people'}. To greet someone, stand by them and press E.` : 'No one yet. To greet someone, stand by them and press E.')),
       h('ul', { class: 'rows' }, d.people.map((p) => h('li', { class: 'row found' }, icon('people', 14), h('div', {}, h('b', {}, p.name), h('span', { class: 'sub' }, p.town ? `${p.role}, ${p.town}` : p.role)), h('span', { class: 'when' }, `last seen ${when(p.seen)}`)))));
     // sketches
     const ticked = d.notables.filter((n) => n.sketch).length;
     this.thumbs = [];
     put(this.sections.sketches, 
-      h('header', {}, h('h2', {}, 'Sketches'), h('p', { class: 'lead' }, `Press K to sketch the view in front of you. ${ticked} of ${d.notables.length} notable views sketched.`)),
+      h('header', {}, h('h2', {}, 'Sketches'), h('p', { class: 'lead' }, `Press K to sketch whatever's in front of you. You've sketched ${ticked} of the ${d.notables.length} notable views.`)),
       h('h3', { class: 'part' }, 'notable views'),
       h('ul', { class: 'rows' }, d.notables.map((n) => h('li', { class: `row${n.sketch ? ' found' : ''}` }, icon(n.sketch ? 'tick' : 'open', 14), h('div', {}, h('b', {}, n.title)),
         n.sketch ? h('button', { type: 'button', class: 'link', onclick: () => this.view(n.sketch.id) }, 'open the sketch') : h('span', { class: 'when' }, 'not yet sketched')))),
@@ -174,7 +174,7 @@ export class Journal {
     const fav = (f) => h('li', { class: `fav ${f.state === 4 ? 'done' : ''}` }, h('div', { class: 'head' }, h('b', {}, f.giver), h('span', { class: 'sub' }, `${STATE[f.state]}, ${when(f.t)}`)), f.words.map((w) => h('p', {}, w)));
     const doing = by(2), asked = by(1), done = by(4);
     put(this.sections.favours,
-      h('header', {}, h('h2', {}, 'Favours'), h('p', { class: 'lead' }, `You are known as ${d.standing}. Some people have a favour to ask when you greet them.`)),
+      h('header', {}, h('h2', {}, 'Favours'), h('p', { class: 'lead' }, `People know you as ${d.standing}. When you greet them, some will have a favour to ask.`)),
       h('h3', { class: 'part' }, `on your way (${doing.length})`), doing.length ? h('ul', { class: 'favs' }, doing.map(fav)) : h('p', { class: 'words' }, 'Nothing at the moment.'),
       asked.length ? [h('h3', { class: 'part' }, `asked of you (${asked.length})`), h('ul', { class: 'favs' }, asked.map(fav))] : null,
       done.length ? [h('h3', { class: 'part' }, `done (${done.length})`), h('ul', { class: 'favs' }, done.map(fav))] : null,

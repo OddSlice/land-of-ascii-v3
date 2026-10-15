@@ -363,7 +363,7 @@ export async function playChecks({ browser, url, check, focusName, tabTo, st, ti
     await p6.goto(`${url}/play.html`);
     await p6.waitForSelector('#error.unsupported', { timeout: 20000 });
     const msg = await p6.evaluate(() => document.getElementById('error').innerText);
-    check('a browser without WebGL 2 is told so, naming it, instead of an error', /cannot run in this browser/.test(msg) && /WebGL 2/.test(msg), msg.split('\n')[0]);
+    check('a browser without WebGL 2 is told so, naming it, instead of an error', /can't run in this browser/.test(msg) && /WebGL 2/.test(msg), msg.split('\n')[0]);
     await ctx6.close();
   }
 }

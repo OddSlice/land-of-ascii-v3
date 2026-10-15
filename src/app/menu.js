@@ -94,9 +94,9 @@ function keyGroups(scene) {
 }
 
 const TABS = [
-  ['controls', 'Controls', 'keyboard', 'Every key, and what it does. The keys at the top can be changed.'],
-  ['display', 'Display', 'monitor', 'How the picture is drawn. Kept in this browser for your next visit.'],
-  ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go, and the music between. Kept in this browser for your next visit.'],
+  ['controls', 'Controls', 'keyboard', 'What each key does. You can change the ones at the top.'],
+  ['display', 'Display', 'monitor', 'How the picture is drawn. This browser remembers your choices for next time.'],
+  ['sound', 'Sound', 'speaker', 'The sounds of the land, made as you walk, and the music. This browser remembers your choices for next time.'],
   ['world', 'World', 'landscape', 'The time, the weather and the seed.'],
   ['advanced', 'Advanced', 'sliders', 'The fixed cameras, the other scenes, everyone in the world, and a benchmark.'],
 ];
@@ -184,9 +184,9 @@ export class Menu {
       h('h3', { class: 'part' }, 'comfort'),
       this.choice('text size', [[1, 'regular', 'the menu, the journal and what people say, at their usual size'], [1.15, 'large', 'a step larger'], [1.3, 'larger', 'two steps larger']],
         () => g.display.text, (v) => g.setDisplay('text', v)),
-      this.choice('motion', [['system', 'as the device asks', 'reduced if the device asks for less motion, else full'], ['reduced', 'reduced', 'nothing slides or pulses, what you carry does not sway, the title screen does not drift'], ['full', 'full', 'every movement, whatever the device asks']],
+      this.choice('motion', [['system', 'as the device asks', 'reduced if the device asks for less motion, else full'], ['reduced', 'reduced', 'no sliding or pulsing: what you carry stays still, and so does the title screen'], ['full', 'full', 'every movement, whatever the device asks']],
         () => g.display.motion, (v) => g.setDisplay('motion', v)),
-      this.choice('frame rate', [[0, 'as fast as it goes', 'up to the display\'s own rate'], [60, '60 at most', 'never more than 60 frames a second'], [30, '30 at most', 'never more than 30: a laptop on its battery lasts longer, the picture moves less smoothly']],
+      this.choice('frame rate', [[0, 'as fast as it goes', 'up to the display\'s own rate'], [60, '60 at most', 'never more than 60 frames a second'], [30, '30 at most', 'never more than 30. A laptop\'s battery lasts longer, but the picture moves less smoothly']],
         () => g.display.cap, (v) => g.setDisplay('cap', v)),
       g.fullscreen ? this.row('full screen', 'F11 too; Escape leaves it', h('button', { type: 'button', class: 'fs', onclick: () => { g.fullscreen(); setTimeout(() => this.update(), 300); } }, icon('expand', 15), h('span', { class: 'fsword' }, 'full screen'))) : null);
     if (g.fullscreen) this.refresh.push(() => { const w = this.root.querySelector('.fsword'); if (w) w.textContent = g.isFullscreen ? 'leave full screen' : 'full screen'; });
@@ -310,7 +310,7 @@ export class Menu {
     } }, icon('paste', 15), h('span', {}, 'restore from this text'));
     const otherBtn = h('button', { type: 'button', hidden: true }, icon('arrow', 15), h('span', {}, 'open that world'));
     const ask = h('div', { class: 'inline ask', hidden: true },
-      h('span', {}, 'Clear everything saved for this world? It cannot be undone.'),
+      h('span', {}, 'Clear everything saved for this world? You can\'t undo this.'),
       h('button', { type: 'button', class: 'danger', onclick: () => { g.progress.clear(); ask.hidden = true; clearBtn.hidden = false; tell('cleared'); this.update(); clearBtn.focus(); } }, h('span', {}, 'clear it')),
       h('button', { type: 'button', onclick: () => { ask.hidden = true; clearBtn.hidden = false; clearBtn.focus(); } }, h('span', {}, 'keep it')));
     const clearBtn = h('button', { type: 'button', onclick: () => { ask.hidden = false; clearBtn.hidden = true; ask.querySelector('.danger').focus(); } }, icon('trash', 15), h('span', {}, 'clear progress'));

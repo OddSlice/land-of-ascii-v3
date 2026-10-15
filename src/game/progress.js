@@ -214,7 +214,7 @@ export class Store {
     this.off = off;
     this.mem = new Map();
     this.ok = !off && Store.works();
-    this.note = this.ok || off ? '' : 'This browser is not keeping anything for this page, so what you do here lasts until you leave.';
+    this.note = this.ok || off ? '' : 'This browser is not keeping anything for this page, so your walk is lost when you leave.';
     this.failed = false;
   }
   static works() {
@@ -232,7 +232,7 @@ export class Store {
     if (!this.ok) return false;
     try { localStorage.setItem(this.key(name), value); return true; } catch {
       // (full, or taken away since): keep it for the session, and say so once
-      if (!this.failed) { this.failed = true; this.note = 'The browser would not keep the last change (its storage is full or blocked), so it lasts until you leave.'; }
+      if (!this.failed) { this.failed = true; this.note = 'The browser wouldn\'t save the last change (its storage is full or blocked), so it\'s lost when you leave.'; }
       return false;
     }
   }
@@ -244,7 +244,7 @@ export class Store {
     for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     const name = `unread.${(h >>> 0).toString(16).padStart(8, '0')}`;
     if (this.get(name) === null) this.set(name, text);
-    if (this.ok && !this.failed) this.note = 'A walk saved here before could not be read, so it is kept aside, not written over.';
+    if (this.ok && !this.failed) this.note = 'An earlier walk saved here couldn\'t be read. It\'s been kept aside, not written over.';
     return name;
   }
   remove(name) {

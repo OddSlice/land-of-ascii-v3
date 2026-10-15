@@ -24,7 +24,7 @@ export function showUnsupported(el, miss) {
   el.style.display = 'block';
   el.replaceChildren();
   const p = (t, c) => { const e = document.createElement('p'); e.textContent = t; if (c) e.className = c; el.append(e); return e; };
-  const h = document.createElement('h1'); h.textContent = 'Land of Ascii cannot run in this browser'; el.append(h);
+  const h = document.createElement('h1'); h.textContent = 'Land of Ascii can\'t run in this browser'; el.append(h);
   p('It needs:');
   const ul = document.createElement('ul');
   for (const m of miss) { const li = document.createElement('li'); li.textContent = m; ul.append(li); }

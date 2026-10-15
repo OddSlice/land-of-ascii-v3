@@ -17,11 +17,11 @@ import { icon } from './icons.js';
 
 // the welcome lines, one a visit, in turn
 const WELCOMES = [
-  'The road is open, and the weather is fair enough.',
+  'The road\'s open, and the weather\'s fair enough.',
   'Someone in the next village will want a word with you.',
-  'Walk where you like. The land remembers what you see.',
-  'There is a view worth sketching not far from here.',
-  'The fort keeps its watch. The villages keep their own hours.',
+  'Walk wherever you like. Your map fills in as you go.',
+  'There\'s a view worth sketching not far from here.',
+  'The fort keeps watch day and night, and each village keeps its own hours.',
   'Take the long way round. Nobody is waiting on you but the weather.',
 ];
 
@@ -210,7 +210,7 @@ export class Title {
   }
   async share() {
     const ok = await this.hooks.share();
-    this.say(ok ? 'A link to this world is copied. Whoever opens it walks the same land.' : 'The browser would not copy the link.');
+    this.say(ok ? 'Link copied. Anyone who opens it walks the same land.' : 'The browser wouldn\'t copy the link.');
   }
   say(text, ms = 5000) {
     this.note.textContent = text;

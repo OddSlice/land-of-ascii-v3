@@ -131,7 +131,7 @@ export function titleFlow(app) {
     app.setDisplay('density', chosen, true);
     app.title.root.classList.remove('measuring');
     app.lab.autoDetail = { chosen: app.DETAIL_NAMES[chosen], tried, was: app.DETAIL_NAMES[was] };
-    app.title.say(`Detail set to ${app.DETAIL_NAMES[chosen]}: it keeps sixty frames a second on this machine. Settings, then Display, changes it.`, 10000);
+    app.title.say(`Detail is on ${app.DETAIL_NAMES[chosen]}, the finest this machine draws at sixty frames a second. You can change it in Settings, under Display.`, 10000);
   }
 
   return { flyTick, flyNext, showTitle, leaveTitle, titleProgress };

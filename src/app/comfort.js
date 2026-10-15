@@ -41,8 +41,8 @@ export function toggleFullscreen() {
     return;
   }
   const el = document.documentElement;
-  if (!el.requestFullscreen) { showNote('This browser cannot go full screen here.'); return; }
-  el.requestFullscreen({ navigationUI: 'hide' }).then(() => { if (playing()) app.input.capture(); }).catch(() => showNote('The browser would not go full screen here.'));
+  if (!el.requestFullscreen) { showNote('This browser can\'t go full screen here.'); return; }
+  el.requestFullscreen({ navigationUI: 'hide' }).then(() => { if (playing()) app.input.capture(); }).catch(() => showNote('The browser wouldn\'t go full screen here.'));
 }
 
 // (phase 6) the link that shares this world: its seed, and if asked where
