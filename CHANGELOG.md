@@ -2,6 +2,11 @@
 
 Land of Ascii v3, newest first. The version is in `package.json` and shows in the menu and on the title screen. The middle number is the phase, and the last number counts releases within it. Before 0.5.1 the phases carried no version. Each phase's full record is in `docs/`.
 
+## 0.6.5 (15 Oct 2026): link previews
+
+- **The game page** (`play.html`) now has the same title, description and share image as the front page, so a shared world link or an old `/?seed=` link shows a proper preview. It also gets the `@` icon.
+- **The share image** (`og.png`) is drawn in the front page's look: the picture inside the title screen's stone frame, with the name centred.
+
 ## 0.6.4 (15 Oct 2026): the words, rewritten
 
 Every line a player reads went through a humanizer pass, and every line that read like a machine was rewritten:

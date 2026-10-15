@@ -1,17 +1,17 @@
 {
  "git": {
-  "commits": 142,
+  "commits": 153,
   "first": "2026-10-09T23:52:49+03:00",
-  "last": "2026-10-15T14:13:17+03:00",
-  "days": 5.6
+  "last": "2026-10-15T15:51:41+03:00",
+  "days": 5.7
  },
  "code": {
   "sourceFiles": 128,
-  "sourceLines": 27015,
+  "sourceLines": 27113,
   "byArea": {
    "page, menus and input": {
     "files": 38,
-    "lines": 6391
+    "lines": 6401
    },
    "renderer": {
     "files": 23,
@@ -19,11 +19,11 @@
    },
    "front page": {
     "files": 2,
-    "lines": 229
+    "lines": 284
    },
    "wayfaring": {
     "files": 7,
-    "lines": 1464
+    "lines": 1497
    },
    "look data": {
     "files": 2,
@@ -52,7 +52,7 @@
   },
   "tools": 33,
   "toolLibs": 10,
-  "toolLines": 7048,
+  "toolLines": 7069,
   "glyphs": 28,
   "materials": 61,
   "paletteHexColours": 617,
@@ -96,16 +96,16 @@
   "favourLines": 192
  },
  "size": {
-  "playHtmlBytes": 1038168,
+  "playHtmlBytes": 1039563,
   "page": {
-   "total": 664108,
+   "total": 665503,
    "g": {
     "look data": 20557,
     "renderer": 110169,
     "world, kit and scenes": 88251,
-    "people": 53557,
-    "page, menus and input": 164286,
-    "wayfaring": 46474,
+    "people": 53592,
+    "page, menus and input": 164688,
+    "wayfaring": 47432,
     "animals": 35258,
     "world generator": 108014,
     "sound and music": 37412
@@ -124,9 +124,9 @@
    }
   },
   "htmlAndCss": 37463,
-  "front": 37377
+  "front": 66003
  },
- "when": "2026-10-15T11:14:45.825Z",
+ "when": "2026-10-15T13:55:43.543Z",
  "world": {
   "seed3": {
    "seed": 3,
