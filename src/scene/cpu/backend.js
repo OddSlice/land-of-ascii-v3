@@ -7,7 +7,6 @@ import { Marcher } from './march.js';
 import { ObjectPass } from './objects.js';
 import { SkyPass } from './sky.js';
 import { HIT_STRIDE, REC, MAT_NONE } from '../../contract.js';
-import { ruleOf } from '../../look.js';
 import { backdropOf } from '../../world/backdrop.js';
 import { ZONE_ALL } from '../../world/kit.js';
 import { moversOf } from './figures.js';
@@ -34,7 +33,7 @@ export function createCpuBackend(world, opts = {}) {
     // for one frame.
     render(frame, c0, c1, hits) {
       const v = makeView(frame);
-      light.update(frame.hour, frame.t, frame.shadow, frame.day || 0, ruleOf(frame.look, 'night'), frame.weather);
+      light.update(frame.hour, frame.t, frame.shadow, frame.day || 0, frame.weather);
       rays.build(v, c0, c1);
       if (hits.length < rays.cells * HIT_STRIDE) throw new Error('hit buffer too small');
       // nothing met yet (so a record says only what this frame found), and no

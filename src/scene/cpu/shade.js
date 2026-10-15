@@ -247,12 +247,12 @@ const methods = {
       else tone = 0.75 * patch * fadeOf(5, fp) + 0.45 * fine * fadeOf(1.8, fp);
       // the far rule: on the range, gullies darken rock and snow (the coarse
       // normals miss them) and rock shows broad strata, both fixed to the land
-      if (this.farRule && T.form && (mat === MAT.ROCK || mat === MAT.SNOW)) {
+      if (T.form && (mat === MAT.ROCK || mat === MAT.SNOW)) {
         lam *= 1 - FAR.gully * this.gullyAt(T.form, x, z);
         if (mat === MAT.ROCK) tone += FAR.bands * Math.sin(y * 2 * Math.PI / FAR.strata + 2.5 * vnoise(x / 210, z / 210, SEED + 131)) * fadeOf(FAR.strata / 2, fp) * (1 - smooth(FAR.strata * 0.15, FAR.strata * 0.55, D * v.rowAngle));
       }
       // (judged by the cell's footprint along the view, where rows are tall)
-      if ((mat === MAT.GRASS || mat === MAT.PASTURE || mat === MAT.FLOWERA || mat === MAT.FLOWERB || mat === MAT.FLOWERC) && this.meadow > 0) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
+      if ((mat === MAT.GRASS || mat === MAT.PASTURE || mat === MAT.FLOWERA || mat === MAT.FLOWERB || mat === MAT.FLOWERC) ) tone += this.mottle(x, z, fp * v.rowAngle / v.colAngle);
       // (phase 4b) up close, a drift's flower heads
       if (mat === MAT.FLOWERA || mat === MAT.FLOWERB || mat === MAT.FLOWERC) tone += this.blooms(x, z, fp);
       // (phase 3b) a field's furrows, along its strips, by how much of the
@@ -270,7 +270,7 @@ const methods = {
   // into cells (blended over a band, so nothing pops as you walk).
   weight(A, AL, lv, L, beta, x, z, D) {
     const w0 = bilU8(A, x, z, this.N, this.NN);
-    if (!this.farRule || !AL || L === 0) return w0;
+    if (!AL || L === 0) return w0;
     const f = smooth(FAR.edgeFrom * 0.7, FAR.edgeFrom * 1.3, D);
     return f > 0 ? w0 + (this.thinW(AL, lv, L, beta, x, z) - w0) * f : w0;
   },
@@ -350,16 +350,15 @@ const methods = {
   // near the eye, sparse tufts, both fixed to the land and faded out as the
   // cell's footprint grows past them.
   mottle(x, z, fp) {
-    const k = this.meadow;
     let t = 0;
     const fPatch = fadeOf(7, fp);
-    if (fPatch > 0) t += MEADOW.patch[k] * fPatch * ((vnoise(x / 9.5, z / 7.3, SEED + 121) * 0.7 + vnoise(x / 4.1 + 13, z / 3.6, SEED + 122) * 0.3) * 2 - 1);
+    if (fPatch > 0) t += MEADOW.patch * fPatch * ((vnoise(x / 9.5, z / 7.3, SEED + 121) * 0.7 + vnoise(x / 4.1 + 13, z / 3.6, SEED + 122) * 0.3) * 2 - 1);
     // tufts: small dark clumps with an uneven outline, one in some of the
     // 1.2 m squares
     const fTuft = fadeOf(0.5, fp);
     if (fTuft > 0) {
       const gx = Math.floor(x / 1.2), gz = Math.floor(z / 1.2);
-      if (hash2(gx, gz, SEED + 123) < MEADOW.tufts[k]) {
+      if (hash2(gx, gz, SEED + 123) < MEADOW.tufts) {
         const cx = (gx + 0.25 + 0.5 * hash2(gx, gz, SEED + 124)) * 1.2, cz = (gz + 0.25 + 0.5 * hash2(gx, gz, SEED + 125)) * 1.2;
         const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz);
         const r = (0.13 + 0.12 * hash2(gx, gz, SEED + 126)) * (1 + 0.35 * (vnoise(Math.atan2(dz, dx) * 1.3 + gx * 7.1, gz * 3.3, SEED + 127) - 0.5));

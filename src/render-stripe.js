@@ -3,7 +3,6 @@
 // main thread with ?threads=0, so both give the same bytes.
 import { createCpuBackend } from './scene/cpu/backend.js';
 import { makePalette, resolveStripe } from './resolve.js';
-import { ruleOf } from './look.js';
 import { weatherParams, mistFloorOf } from './weather.js';
 import { HIT_STRIDE, CELL_STRIDE } from './contract.js';
 
@@ -22,7 +21,7 @@ export function createStripeRenderer(world, opts) {
       const cells = new Uint8Array(n * CELL_STRIDE);
       // (the mist's floor is built the first time there is mist)
       if (!env.mist && world.terrain && weatherParams(frame.weather).mist > 0) env.mist = mistFloorOf(world);
-      resolveStripe(makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night'), frame.weather), hits, cells, sw, frame.rows, c0, frame, env);
+      resolveStripe(makePalette(frame.hour, frame.day || 0, frame.weather), hits, cells, sw, frame.rows, c0, frame, env);
       const t2 = performance.now();
       return { cells, march: t1 - t0, resolve: t2 - t1, settled: backend.settled, sweepMs: backend.sweepMs };
     },

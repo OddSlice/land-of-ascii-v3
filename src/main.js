@@ -33,8 +33,6 @@ import { createStripeRenderer } from './render-stripe.js';
 import { Player } from './app/player.js';
 import { Input } from './app/input.js';
 import { Hud } from './app/hud.js';
-import { RefView } from './app/refview.js';
-import { LookPanel, lookFrom, nextOption } from './app/lookpanel.js';
 import { Pacer } from './app/pace.js';
 import { CAMERAS } from './app/cameras.js';
 import { layout, cellWidth, TARGETS } from './app/grid.js';
@@ -97,8 +95,6 @@ const state = {
   // density 3 by default (the phase 0b verdict); ?density=1..4 or −/+ for the others
   preset: display.density,
   cam: 0, camName: CAMERAS[0].name,
-  // the look candidates in use (LOOK.choices), from the URL or the defaults
-  look: lookFrom(Object.fromEntries(Object.keys(LOOK.choices).map((k) => [k, params.get(k)]))),
   // the weather (phase 2b): 'auto', the world's forecast, or one kind held
   // (the lab and the stress scene keep fair, as before weather)
   weather: WORLD ? 'auto' : 'fair',
@@ -231,8 +227,6 @@ const presenter = new Presenter(canvas);
 presenter.glyphs = display.glyphs;
 const hud = new Hud($('hud'));
 hud.setMode(QUIET ? 'none' : display.hud);
-const ref = new RefView($('ref'));
-const lookPanel = new LookPanel($('look'));
 const map = WORLD ? new MapView(world) : null;
 // (0.5.5) the map's drawn layer: names, compass, legend, you (not in the tools' pictures)
 const mapOver = WORLD && !QUIET ? new MapOverlay(world, $('mapover')) : null;
@@ -246,13 +240,11 @@ for (let p = 0; p < TARGETS.length; p++) atlasFor(cellWidth(p, dpr));
 
 let grid = null;
 function relayout() {
-  const w = Math.max(64, innerWidth - ref.width());
-  grid = layout(state.preset, w, innerHeight, dpr, innerWidth * innerHeight);
+  grid = layout(state.preset, Math.max(64, innerWidth), innerHeight, dpr, innerWidth * innerHeight);
   presenter.resize(grid.cols, grid.rows, atlasFor(grid.cw), dpr);
   full = new Uint8Array(grid.cells * CELL_STRIDE);
 }
 let full = null;
-ref.onResize = relayout;
 addEventListener('resize', relayout);
 
 // (`eyeY`: a camera's own eye height, for a place under a roof or arch)
@@ -271,7 +263,6 @@ function useCamera(i) {
   standAt(c.x, c.z, c.yaw, c.pitch, c.y);
   if (c.stand) player.feet = player.standOn(c.x, c.z, player.feet);
   setTime(c.time);
-  if (ref.on && c.ref) ref.show(c);
 }
 const start = STRESS || WORLD || YARD ? world.start : START;
 standAt(start.x, start.z, start.yaw, start.pitch);
@@ -294,13 +285,10 @@ const input = new Input(canvas, {
   nextCamera: () => useCamera((state.cam + 1) % CAMS.length),
   jump: () => player.jump(),
   toggleGlyphs: () => setDisplay('glyphs', !display.glyphs),
-  // R: in the lab, the reference frame (the stress scene has none); in the
-  // world, a new world from a new seed (the page reloads with it, so the
-  // old world's memory is freed)
-  toggleRef: () => {
-    if (WORLD) { const q = new URLSearchParams(location.search); q.set('seed', String((Math.random() * 1e6) >>> 0)); location.search = q.toString(); return; }
-    if (STRESS) return;
-    ref.toggle(CAMERAS[state.cam]); relayout();
+  // R: in the world, a new world from a new seed (the page reloads with it,
+  // so the old world's memory is freed)
+  newWorld: () => {
+    if (WORLD) { const q = new URLSearchParams(location.search); q.set('seed', String((Math.random() * 1e6) >>> 0)); location.search = q.toString(); }
   },
   toggleScene: () => {
     if (WORLD) return;
@@ -328,8 +316,6 @@ const input = new Input(canvas, {
   sketch: () => sketch(),
   lantern: () => (WORLD ? lantern() : false),
   toggleHud: () => hud.toggle(),
-  toggleLook: () => lookPanel.toggle(),
-  cycleLook: (name) => { state.look = nextOption(state.look, name); },
   density: (d) => setDisplay('density', Math.max(0, Math.min(3, state.preset + d))),
   escape: () => onEscape(),
   unlocked: () => onUnlocked(),
@@ -348,7 +334,6 @@ function makeFrame() {
     fovY: LOOK.fovY * DEG,
     aspect: grid.cols / (2 * grid.rows),
     hour: state.hour, t: state.t, day: state.day,
-    look: state.look,
     weather: weatherNow(),
   };
   // which shared shadow store this frame reads
@@ -627,7 +612,7 @@ function tick(now) {
       if (state.hour >= 24) { state.hour -= 24; state.day++; }
     }
   }
-  if (shadows) shadows.update(state.hour, state.day, state.look.night);
+  if (shadows) shadows.update(state.hour, state.day);
   // (phase 5b) the sound, every display frame, from the newest frame's people
   // and animals
   if (sound && sound.on) {
@@ -672,12 +657,11 @@ function tick(now) {
   $('hud').style.visibility = card.up ? 'hidden' : '';
   hud.update(now, {
     ...timing, cols: grid.cols, rows: grid.rows, cells: grid.cells, preset: state.preset,
-    threads: THREADS, hour: state.hour, day: state.day, night: state.look.night, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
+    threads: THREADS, hour: state.hour, day: state.day, timeName, running: state.running, frozen: state.frozen, camName: state.camName,
     weather: WORLD || state.weather !== 'fair' ? weatherName() : null,
     stress: STRESS, buildMs: buildMs(), sweepMs: shadows ? shadows.sweepMs : light.sweepMs, settled: light.settled, pace: local ? 1 : pacer.every,
     world: WORLD ? { seed: SEED, shared: SHARED, isolated: ISOLATED, buildMs: worldBuild.total, mode: player.mode, map: !!(map && map.on && !mapOver) } : null,
   });
-  lookPanel.update(state.look);
   if (menu.open && now > menuNext) { menuNext = now + 250; menu.update(); }
   requestAnimationFrame(tick);
 }
@@ -754,8 +738,6 @@ const game = {
   get weather() { return state.weather; },
   setWeather(m) { state.weather = m; },
   setTime(name) { setTime(name); },
-  get look() { return state.look; },
-  setLook(name, v) { state.look = lookFrom({ ...state.look, [name]: v }); },
   camera(i) { useCamera(i); },
   newWorld(seed) { const q = new URLSearchParams(location.search); q.delete('at'); q.delete('hour'); q.set('seed', String(seed !== undefined ? seed : (Math.random() * 1e6) >>> 0)); reload(q); },
   goScene(sc) {
@@ -807,7 +789,7 @@ const game = {
     return {
       clock: clockText(), timeName: keyName(state.hour), day: state.day, running: state.running,
       preset: ['dawn', 'day', 'dusk', 'night'].find((k) => Math.abs(state.hour - LOOK.hours[k]) < 1e-9) || null,
-      moon: state.look.night === 'moon' ? Math.round(100 * moonLit(state.hour, state.day)) : null,
+      moon: Math.round(100 * moonLit(state.hour, state.day)),
       weather: WORLD || state.weather !== 'fair' ? weatherName() : 'fair',
     };
   },
@@ -1351,16 +1333,9 @@ Object.assign(lab, {
     isOpen() { return menu.open; },
     read() { return { ...menu.read(), quiet: QUIET, card: card.up, hint: $('hint').classList.contains('on'), hud: hud.shown, display: { ...display } }; },
   },
-  setRef(on) { if (ref.on !== !!on) { ref.toggle(CAMERAS[state.cam]); relayout(); } },
-  // The look candidates: setLook({ tree, cloud, meadow, shallows }) (any of
-  // them), resetLook() back to the defaults, look() the ones in use;
-  // setLookPanel(on) shows the panel.
-  setLook(look) { state.look = lookFrom(look, state.look); return { ...state.look }; },
-  resetLook() { state.look = lookFrom({}); return { ...state.look }; },
   // Hold the frame pacing: a frame every `every` refreshes, each shown `lag`
   // refreshes after it was asked for (setPace() for adaptive again).
   setPace(every, lag = every) { pacer.fixed = every ? [every, lag] : null; if (every) { pacer.every = every; pacer.lag = lag; } },
-  look() { return { ...state.look }; },
   // The weather: setWeather('auto') for the forecast, or one kind held
   // ('clear', 'fair', 'overcast', 'rain', 'mist'); weather() what it is now
   // (the mode, the kind that applies most, the frame's mix, wetness and
@@ -1373,14 +1348,13 @@ Object.assign(lab, {
     return state.weather;
   },
   weather() { const w = weatherNow(); return { mode: state.weather, kind: mainKind(w), ...w, forecast: forecastOf(SEED, state.day) }; },
-  setLookPanel(on) { if (lookPanel.on !== !!on) lookPanel.toggle(); },
   state() {
     return {
       x: player.x, z: player.z, eye: player.eye, yaw: player.yaw / DEG, pitch: player.pitch / DEG,
       hour: state.hour, t: state.t, day: state.day, frozen: state.frozen, running: state.running,
       preset: state.preset, cols: grid.cols, rows: grid.rows, cells: grid.cells, cw: grid.cw, dpr,
       threads: THREADS, presented: state.presented, camName: state.camName, settled: light.settled,
-      isolated: !!self.crossOriginIsolated, shared: SHARED, look: { ...state.look }, mode: player.mode, flying: player.flying,
+      isolated: !!self.crossOriginIsolated, shared: SHARED, mode: player.mode, flying: player.flying,
       pace: local ? 1 : pacer.every, lag: local ? 0 : pacer.lag, refresh: pacer.refresh,
       weather: state.weather, menu: menu.open, rate: state.running ? state.rate : 0,
       glyphs: presenter.glyphs, sensitivity: input.sensitivity, invert: input.invert,

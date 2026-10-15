@@ -12,15 +12,7 @@ export function sunDir(hour) {
   return [-Math.sin(th), Math.cos(th) * Math.cos(LAT), -Math.cos(th) * Math.sin(LAT)];
 }
 
-// The moon runs thirteen hours behind the sun, a little higher in the sky:
-// below the horizon at dusk, high in the south-east late at night.
-export function moonDir(hour) {
-  const th = (hour - 12 - 13) / 24 * Math.PI * 2;
-  const lat = LAT - 0.18;
-  return [-Math.sin(th), Math.cos(th) * Math.cos(lat), -Math.cos(th) * Math.sin(lat)];
-}
-
-// The moon's phase (phase 2a, night rule 'moon'): 0 new, 0.5 full, from the
+// The moon's phase (phase 2a): 0 new, 0.5 full, from the
 // day count and the hour, so it moves on smoothly as time runs. Day 0 at
 // 23:00 is the moon above (13 hours behind the sun, nearly full).
 const MONTH = 29.53, PHASE0 = 13 / 24 - (23 / 24) / MONTH;
@@ -39,9 +31,6 @@ export function moonDirOn(hour, day = 0) {
   const lat = LAT - 0.18;
   return [-Math.sin(th), Math.cos(th) * Math.cos(lat), -Math.cos(th) * Math.sin(lat)];
 }
-
-// The moon for a frame, by its night rule (phase 1's, or the phases').
-export function moonFor(hour, day, night) { return night === 'p1' ? moonDir(hour) : moonDirOn(hour, day); }
 
 export const WIND = [2.4, 0];          // metres a second, due east
 export const CLOUD_SPAN = 7600;        // clouds wrap east-west over this width

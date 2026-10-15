@@ -137,9 +137,8 @@ export class MapView {
         w8(o, mat, lam, tone, 1);
       }
     }
-    const look = { cloud: 'B', meadow: 0, shallows: 'blue' };
     const cells = new Uint8Array(cols * rows * CELL_STRIDE);
-    resolveStripe(makePalette(LOOK.hours.day), hits, cells, cols, rows, 0, look);
+    resolveStripe(makePalette(LOOK.hours.day), hits, cells, cols, rows, 0);
     // (phase 5a) the roads' cells drawn as the land under them, for the map
     // of what you have seen
     const plain = new Uint8Array(cols * rows * CELL_STRIDE);
@@ -147,7 +146,7 @@ export class MapView {
       const cx = r % this.w, cy = (r - cx) / this.w, o = ((this.y0 + cy) * cols + this.x0 + cx) * HIT_STRIDE;
       hits.set(hits2.subarray(o, o + HIT_STRIDE), o);
     }
-    resolveStripe(makePalette(LOOK.hours.day), hits, plain, cols, rows, 0, look);
+    resolveStripe(makePalette(LOOK.hours.day), hits, plain, cols, rows, 0);
     this.plain = plain; this.roadCells = roads;
     // round the map: plain frame colour
     const fr = hex(M.frame);

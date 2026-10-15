@@ -21,7 +21,7 @@
 // sorted by slope. The direct view is one row set; each water level seen in
 // the plane gives one mirrored row set, whose rows only start at their water.
 import { weatherParams } from '../../weather.js';
-import { LOOK, ruleOf } from '../../look.js';
+import { LOOK } from '../../look.js';
 import { LEVELS } from '../../world/terrain.js';
 import { SPAN_MERLON, SPAN_ARCH, archY, spanAt } from '../../world/spans.js';
 import { installShading } from './shade.js';
@@ -137,12 +137,9 @@ export class Marcher {
     this.v = v; this.rays = rays; this.hits = hits; this.torches = torches; this.t = frame.t;
     this.wp = weatherParams(frame.weather);
     if (!this.tg) this.buildTorchGrid(torches);
-    this.meadow = (frame.look && frame.look.meadow) || 0;
-    // the far rule (air 'aerial'): far snow lines and rock, gullies, strata, the skyline's fade
-    this.farRule = ruleOf(frame.look, 'air') === 'aerial';
     // with the backdrop, the march past the north and east edges stops at its
     // first ridgeline (the sky pass draws the ridgelines beyond)
-    this.bdD = this.farRule && this.world.backdrop ? this.world.backdrop.layers[0].D : Infinity;
+    this.bdD = this.world.backdrop ? this.world.backdrop.layers[0].D : Infinity;
     this.dEnd = [];
     for (let L = 0; L < LEVELS; L++) this.dEnd.push((1 << L) / (LOD_Q * v.colAngle));
     // merlons sink into the walkway before they get thinner than about two
@@ -255,7 +252,7 @@ export class Marcher {
     const ey = rs.ey;
     // the far rule: the skyline of this plane (the steepest the land rises
     // to as seen from the eye) and where, so the cell just above it can fade
-    const fringe = this.farRule, sigB = this.rays.sigB;
+    const sigB = this.rays.sigB;
     let sMax = -Infinity, sD = 0, sL = 0, sBeta = 0;
     // (phase 3a) rows a building has already met (rays.depth): open until the
     // march passes it, then closed, so no ground is marched behind a wall
@@ -264,7 +261,8 @@ export class Marcher {
     for (let r = 0; r < n; r++) { const dd = depth[rs.ord[off + r]]; if (dd < nextLim) nextLim = dd; }
     for (let i = 0; this.crossing(i); i++) {
       const d1 = this.cd[i], h1 = this.ch[i], L = this.cl[i], beta = this.cb[i];
-      if (fringe) { const st = (h1 - ey) / d1; if (st > sMax) { sMax = st; sD = d1; sL = L; sBeta = beta; } }
+      const st = (h1 - ey) / d1;
+      if (st > sMax) { sMax = st; sD = d1; sL = L; sBeta = beta; }
       // span cells entered before this crossing come first, splitting the ramp
       while (e < ev.n && ev.d[e] < d1) {
         const ds = ev.d[e];
@@ -287,11 +285,11 @@ export class Marcher {
       }
       const low = rs.find(0);
       if (low >= n) break;
-      // (under the far rule, on until nothing ahead can reach even the
-      // lowest open row's lower neighbour, or the skyline found so far if
-      // that is higher, so the skyline within the open row is exact)
-      if (fringe) { const sb = sigB[rs.ord[off + low]]; if (this.clearAhead(sMax > sb ? sMax : sb, ey, d1)) break; }
-      else if (this.clearAhead(sig[off + low], ey, d1)) break;
+      // (on until nothing ahead can reach even the lowest open row's lower
+      // neighbour, or the skyline found so far if that is higher, so the
+      // skyline within the open row is exact)
+      const sb = sigB[rs.ord[off + low]];
+      if (this.clearAhead(sMax > sb ? sMax : sb, ey, d1)) break;
       if (i === this.lastOut) {
         // past the edge of the map: nothing more to hit
         while (e < ev.n) { this.spanCell(rs, e); e++; }
@@ -301,7 +299,7 @@ export class Marcher {
     // the open rows the skyline reaches into from below: how much of each
     // the land covers (from the row below's centre to its own), and the land
     // at the skyline, kept in its third record for the sky pass
-    if (fringe && sMax > -Infinity) {
+    if (sMax > -Infinity) {
       for (let r = rs.find(0); r < n; r = rs.find(r + 1)) {
         const ci = rs.ord[off + r], s = sig[off + r], sb = sigB[ci];
         if (sb >= sMax) break;

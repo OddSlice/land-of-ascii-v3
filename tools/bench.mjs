@@ -9,9 +9,9 @@
 //
 //   node tools/bench.mjs [--browser chromium,firefox,webkit] [--threads 8,4] [--density 3,4]
 //                        [--scene lab|stress|both|world] [--seed N] [--frames 240] [--built] [--out file.json]
-//                        [--look cloud=B,meadow=2,shallows=blue] [--root DIR]
+//                        [--root DIR]
 //
-// --look sets the look candidates for every run; --root measures another
+// --root measures another
 // build's folder (for example a copy of an earlier phase) instead of this one.
 // --weather rain (phase 2b) holds a kind of weather for every run (the
 // default is fair, the look before weather); --hour 6.6 times every camera at
@@ -37,7 +37,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab, parseLook, ROOT } from './lib/serve.mjs';
+import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const browsers = (a.browser || 'chromium,firefox,webkit').split(',');
@@ -56,7 +56,6 @@ function browserRSS() {
   return { totalMB: Math.round(kb.reduce((p, q) => p + q, 0) / 1024), largestMB: Math.round(Math.max(0, ...kb) / 1024), processes: kb.length };
 }
 const TOP_CELLS = 52480;
-const look = parseLook(a.look);
 
 // What else is busy right now (the harness's own browsers are not up yet).
 const busy = execSync('ps -Ao %cpu,comm -r | head -8').toString().trim().split('\n').slice(1)
@@ -76,7 +75,7 @@ try {
       for (const scene of scenes) {
         const stress = scene === 'stress';
         const t0 = Date.now();
-        const lab = await openLab(browser, url, { built: !!a.built, threads, scene, look, seed: a.seed, extra: null });
+        const lab = await openLab(browser, url, { built: !!a.built, threads, scene, seed: a.seed, extra: null });
         const readyMs = Date.now() - t0;
         const { page } = lab;
         await page.evaluate(() => window.lab.setHud(false));
@@ -124,7 +123,7 @@ try {
               march: r2(med(t.map((x) => x.march))), resolve: r2(med(t.map((x) => x.resolve))),
               worker: r2(med(t.map((x) => x.worker))), draw: r2(med(t.map((x) => x.draw))),
               verdict: r2(med(t.map((x) => x.worker + x.draw))),
-              isolated: st.isolated, dpr: st.dpr, look: st.look || null, root: a.root || 'this build',
+              isolated: st.isolated, dpr: st.dpr, root: a.root || 'this build',
               weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null, lantern: !!a.lantern,
               sound: !!a.sound, ...(sm ? { soundMs: r2(med(sm)), soundMax: r2(Math.max(...sm)) } : {}),
               ...(stress || scene === 'world' ? world : {}),

@@ -1,4 +1,4 @@
-// What the remaining rays see: the sky gradient, cumulus clouds, the sun or
+// What the remaining rays see: the sky gradient, the clouds (banks), the sun or
 // moon disc, and stars. Clouds are clusters of puffs cut flat underneath;
 // their edges are stippled with a scattered threshold so they break up into cells
 // the way the reference footage does. Stars are projected from fixed
@@ -6,7 +6,7 @@
 import { MAT, MAT_NONE, HIT_STRIDE, REC } from '../../contract.js';
 import { lineAt, crossLine, profileAt, leanWindow, leanBlend } from '../../world/backdrop.js';
 import { SCALE } from '../../world/scale.js';
-import { LOOK, ruleOf } from '../../look.js';
+import { LOOK } from '../../look.js';
 import { clusterAt, cloudAmount } from '../../world/sky.js';
 import { weatherParams } from '../../weather.js';
 import { hash2, vnoise, fbm } from '../../world/noise.js';
@@ -147,23 +147,21 @@ export class SkyPass {
   }
 
   // Cloud positions and shapes for this frame (the same in every stripe):
-  // the treatment's puffs, and for banks the time of day's flattening.
+  // the banks' puffs, flattened and stretched by the time of day.
   prepare(frame) {
-    const t = frame.t, B = !!(frame.look && frame.look.cloud === 'B');
-    const pal = makePalette(frame.hour, frame.day || 0, ruleOf(frame.look, 'night'), frame.weather), k = pal.k;
-    this.illum = pal.night === 'p1' ? 1 : pal.illum;
-    this.farRule = ruleOf(frame.look, 'air') === 'aerial';
+    const t = frame.t;
+    const pal = makePalette(frame.hour, frame.day || 0, frame.weather), k = pal.k;
+    this.illum = pal.illum;
     this.t = frame.t;
-    this.treat = B ? LOOK.clouds.B : LOOK.clouds.A;
+    this.treat = LOOK.clouds;
     // the weather (phase 2b): how many clouds, how big, how flat and long,
     // how low, how far drifted; how much of the sun, moon and stars shows
     const P = weatherParams(frame.weather);
-    this.flat = (B ? k.cloudFlat : 1) * P.flat; this.stretch = (B ? k.cloudStretch : 1) * P.stretch;
+    this.flat = k.cloudFlat * P.flat; this.stretch = k.cloudStretch * P.stretch;
     this.disc = smooth(0.25, 0.9, P.sun);
     this.starK = P.stars; this.swellK = P.swell;
     // (under rain, how far a reflection looks for clouds)
     this.mirrorMax = P.rain > 0 ? LOOK.weather.rain.mirror.clouds / P.rain : Infinity;
-    this.streaky = B;
     this.cl = [];
     for (const c of this.world.clouds.clusters) {
       const [x, z, fade0] = clusterAt(c, t, this.world.center[0], P.drift);
@@ -173,7 +171,7 @@ export class SkyPass {
       const main = c.puffs[0][3], base = c.base * P.low;
       // each puff's centre, radii (scaled by the fade and the time of day)
       // and turn, worked out once per frame: 9 numbers a puff
-      const src = B ? c.puffsB : c.puffs;
+      const src = c.puffsB;
       const pp = new Float64Array(src.length * 9);
       src.forEach((pf, k) => {
         const a = pf[3] * fade * this.stretch, b = pf[4] * fade * this.flat, w = pf[5] * fade;
@@ -181,7 +179,7 @@ export class SkyPass {
       });
       // (puffs grown, stretched or lowered by the weather: bound them as they
       // are this frame, round the cluster's middle)
-      const R = B ? c.reachB : c.reach;
+      const R = c.reachB;
       let reach;
       if (P.fair) reach = R * fade + 40;
       else {
@@ -207,7 +205,7 @@ export class SkyPass {
 
   run(v, rays, m, frame) {
     const hits = m.hits;
-    const useBd = !!(this.bd && this.farRule);
+    const useBd = !!this.bd;
     if (useBd) this.backdropPlanes(v, rays);
     const K = this.bd ? this.bd.layers.length : 0;
     const light = this.light;

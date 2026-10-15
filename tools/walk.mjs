@@ -5,7 +5,7 @@
 // shots/walks/, which is kept out of git.
 //
 //   node tools/walk.mjs [--only lake,forest,stress-lake,ridge,world-road,world-fort,world-village,world-green-day,world-fort-night,world-flock-day,world-dawn-deer] [--threads 8] [--density 4] [--headed]
-//                       [--look cloud=B,meadow=2,shallows=blue] [--suffix name] [--seed N]
+//                       [--suffix name] [--seed N]
 //
 // Keys are held as a player would: WASD to walk and strafe, the arrows to
 // turn. Along the road, W is held and the arrows steer toward the road 15 m
@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, args, parseLook, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const OUT = path.join(ROOT, 'shots', 'walks');
@@ -93,7 +93,6 @@ try {
     const q = new URLSearchParams();
     if (a.threads) q.set('threads', String(a.threads));
     if (a.density) q.set('density', String(a.density));
-    for (const [k, v] of Object.entries(parseLook(a.look) || {})) q.set(k, v);
     if (w.stress) q.set('stress', '1');
     else if (w.world) { if (a.seed) q.set('seed', String(a.seed)); } else q.set('lab', '1');
     await page.goto(`${url}/?${q}`);

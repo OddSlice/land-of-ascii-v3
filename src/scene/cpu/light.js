@@ -2,7 +2,7 @@
 // from terrain, the wall and the trees (one sweep over the grid toward the
 // light), the cloud shadows, and the torch.
 import { LEVELS } from '../../world/terrain.js';
-import { sunDir, moonFor, WIND } from '../../world/sky.js';
+import { sunDir, moonDirOn, WIND } from '../../world/sky.js';
 import { fbm } from '../../world/noise.js';
 import { spanAt } from '../../world/spans.js';
 import { SEED } from '../../world/layout.js';
@@ -112,13 +112,13 @@ function downsampleRows(src, n, out, k0, k1) {
 
 // Cast shadows are recomputed when the light has moved by a step: 15 s of
 // game time on the lab's valley, 2 minutes on a big map. The key names the
-// step; every thread derives the same one from the hour (and, for the moon
-// under the night rule 'moon', the day, since its place follows its phase).
-export function lightKey(hour, N, day = 0, night = 'p1') {
+// step; every thread derives the same one from the hour (and, for the moon,
+// the day, since its place follows its phase).
+export function lightKey(hour, N, day = 0) {
   const kph = N <= 512 ? 240 : 30;
   const isSun = sunDir(hour)[1] > -0.035;
   const q = Math.round(hour * kph);
-  return { key: (isSun ? 's' : night === 'p1' ? 'm' : `m${day}:`) + q, keyHour: q / kph, isSun, day, night };
+  return { key: (isSun ? 's' : `m${day}:`) + q, keyHour: q / kph, isSun, day };
 }
 
 // The arrays shadows are kept in: V, the shadow volume's height over each
@@ -178,12 +178,12 @@ export class Light {
   }
 
   // Called once per frame with the frame's hour and clock (and, with shared
-  // shadows, the frame's { buf, settled }), its day, its night rule and its
-  // weather (phase 2b: how much cloud casts shadows, how far it has drifted).
-  update(hour, t, shadow, day = 0, night = 'p1', weather = null) {
+  // shadows, the frame's { buf, settled }), its day (the moon's phase) and
+  // its weather (phase 2b: how much cloud casts shadows, how far it has drifted).
+  update(hour, t, shadow, day = 0, weather = null) {
     this.wp = weatherParams(weather);
-    const sun = sunDir(hour), moon = moonFor(hour, day, night);
-    this.day = day; this.night = night;
+    const sun = sunDir(hour), moon = moonDirOn(hour, day);
+    this.day = day;
     // the light that shades the ground: the sun while it is near or above
     // the horizon, else the moon
     this.isSun = sun[1] > -0.035;
@@ -206,7 +206,7 @@ export class Light {
     }
     // cast shadows: recomputed when the light moves by a step (15 s of game
     // time, 2 minutes on a big map)
-    const k = lightKey(hour, this.N, day, night), key = k.key;
+    const k = lightKey(hour, this.N, day), key = k.key;
     if (key !== this.key) {
       const first = this.key === null;
       this.key = key; this.keyHour = k.keyHour;
@@ -228,15 +228,15 @@ export class Light {
   get pending() { return this.shared ? !this.sharedSettled : this.job !== null; }
 
   // One whole sweep, at once, for the light at `keyHour` (the shadow worker).
-  sweepNow(keyHour, isSun, day = 0, night = 'p1') {
-    this.keyHour = keyHour; this.isSun = isSun; this.day = day; this.night = night; this.job = null;
+  sweepNow(keyHour, isSun, day = 0) {
+    this.keyHour = keyHour; this.isSun = isSun; this.day = day; this.job = null;
     const t0 = performance.now();
     this.startSweep(); this.runSweep(Infinity);
     return performance.now() - t0;
   }
 
   startSweep() {
-    const Lq = this.isSun ? sunDir(this.keyHour) : moonFor(this.keyHour, this.day, this.night);
+    const Lq = this.isSun ? sunDir(this.keyHour) : moonDirOn(this.keyHour, this.day);
     const eq = Math.max(0.035, Lq[1]);
     const hh = Math.hypot(Lq[0], Lq[2]) || 1;
     const lx = Lq[0] / hh, lz = Lq[2] / hh, tanE = eq / Math.sqrt(1 - eq * eq);

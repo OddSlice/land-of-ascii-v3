@@ -30,11 +30,6 @@ export function serve(root = ROOT, { isolated = true } = {}) {
   });
 }
 
-// "cloud=B,meadow=1" -> { cloud: 'B', meadow: '1' }
-export function parseLook(s) {
-  return s ? Object.fromEntries(String(s).split(',').filter(Boolean).map((kv) => kv.split('='))) : null;
-}
-
 export function args(argv = process.argv.slice(2)) {
   const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -55,7 +50,7 @@ export function args(argv = process.argv.slice(2)) {
 // `quiet` (the default): the menu, the hint and the start card (phase 2b) are
 // suppressed from the first frame, so no picture or measurement changes
 // because of them; builds without them ignore it.
-export async function openLab(browser, base, { built = false, threads, density, stress = false, scene, seed, look = null, width = 1440, height = 900, dpr = 2, extra = null, quiet = true, context = {} } = {}) {
+export async function openLab(browser, base, { built = false, threads, density, stress = false, scene, seed, width = 1440, height = 900, dpr = 2, extra = null, quiet = true, context = {} } = {}) {
   scene = scene || (stress ? 'stress' : 'lab');
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr, ...context });
   if (quiet) await ctx.addInitScript(() => { self.LAND_QUIET = true; });
@@ -71,8 +66,6 @@ export async function openLab(browser, base, { built = false, threads, density, 
   if (scene === 'yard') q.set('yard', '1');
   if (scene === 'world' && seed !== undefined) q.set('seed', String(seed));
   if (extra) for (const [k, v] of Object.entries(extra)) q.set(k, String(v));
-  // the look candidates (a build without them ignores these)
-  if (look) for (const [k, v] of Object.entries(look)) q.set(k, String(v));
   const url = `${base}/${built ? 'play.html' : ''}${q.toString() ? `?${q}` : ''}`;
   await page.goto(url);
   await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: scene === 'lab' ? 30000 : 180000 });

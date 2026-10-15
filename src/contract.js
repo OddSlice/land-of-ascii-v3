@@ -145,9 +145,6 @@ export const CELL_STRIDE = 8;
 //   aspect,                   width / height of the picture in pixels
 //   hour,                     time of day, 0..24
 //   t,                        animation clock in seconds (clouds, flame)
-//   look: { tree, cloud, meadow, shallows, air, night }   the look candidates
-//                             and rules in use (LOOK.choices); missing keys
-//                             take the defaults
 //   day,                      (phase 2a) whole days since day 0, which the
 //                             moon's phase follows; missing means day 0
 //   weather: { mix, wet, drift }   (phase 2b) how much of each kind of

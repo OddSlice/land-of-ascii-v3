@@ -12,15 +12,6 @@
   #view { display: block; image-rendering: pixelated; cursor: crosshair; }
   #hud { position: fixed; left: 10px; top: 8px; font: 11px/1.5 Menlo, Consolas, monospace; color: #dcd7cb;
     white-space: pre; pointer-events: none; text-shadow: 0 1px 0 #000, 0 0 4px #000; }
-  #ref { position: relative; height: 100%; background: #111215; flex: none; }
-  #ref img { display: block; height: 100%; image-rendering: auto; }
-  #ref .label { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px; font: 11px Menlo, monospace;
-    color: #dcd7cb; background: rgba(0, 0, 0, .55); }
-  #ref .note { display: none; padding: 24px 18px; width: 260px; font: 12px/1.5 Menlo, monospace; color: #b9b4a8; }
-  #ref.missing img, #ref.missing .label { display: none; }
-  #ref.missing .note { display: block; }
-  #look { position: fixed; right: 10px; top: 8px; padding: 6px 9px; font: 11px/1.6 Menlo, Consolas, monospace; color: #dcd7cb;
-    white-space: pre; pointer-events: none; background: rgba(10, 11, 14, .62); }
   #progress { position: fixed; left: 0; right: 0; top: 45%; display: none; text-align: center;
     font: 12px/1.5 Menlo, Consolas, monospace; color: #dcd7cb; white-space: pre; }
   #error { position: fixed; inset: 0; display: none; z-index: 10; padding: 28px; background: #3a1010; color: #ffd9cf;
@@ -413,15 +404,9 @@
 <body>
 <div id="stage">
   <div id="pic"><canvas id="view"></canvas></div>
-  <div id="ref" style="display:none">
-    <img alt="reference frame">
-    <div class="label"></div>
-    <div class="note">The reference frames are other people's footage, kept private in a local copy (reference/thumbs/, made by tools/refs.mjs). They are not part of the published page.</div>
-  </div>
 </div>
 <div id="hud"></div>
 <div id="progress"></div>
-<div id="look" style="display:none"></div>
 <div id="hint" aria-hidden="true"><kbd>Esc</kbd>menu and controls</div>
 <div id="say" role="status" aria-live="polite"><div class="who"></div><div class="line"></div></div>
 <div id="mapover" hidden></div>

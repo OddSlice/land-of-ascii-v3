@@ -13,35 +13,13 @@
 // - muted: nothing fully saturated, nothing pure black, every channel clamped;
 // - lit and shadowed grass differ mainly in brightness.
 //
-// Colours are sRGB hex. Three keyframes (day, dusk, night) are blended by the
-// height of the sun, so time can run between them.
-
-// A look rule in use: the frame's choice, else its default (LOOK.choices).
-export function ruleOf(look, name) { return look && look[name] !== undefined ? look[name] : LOOK.choices[name].default; }
+// Colours are sRGB hex. Five keyframes (day, dawn, dusk, and night under a
+// bright and a dark moon) are blended by the height of the sun and the moon's
+// light, so time can run between them.
 
 export const LOOK = {
   // Camera: vertical field of view in degrees. The eye is 1.7 m up (world/layout.js).
   fovY: 60,
-
-  // The look candidates (phase 0c), chosen live in the look panel (L), by URL
-  // (?cloud=A&meadow=0&shallows=warm) or with lab.setLook(). Each has
-  // its options with a short name for the panel, the default, and the key
-  // that cycles it. Every candidate varies only with world position or an
-  // object's own identity, never with the screen or the clock.
-  // Locked in phase 1: the defaults are the settled look (clouds B, meadow
-  // 2, blue shallows); the other options stay for comparison. (The conifers
-  // had a choice too, until after phase 3a: only the tidy tiers are kept.)
-  choices: {
-    cloud:    { label: 'clouds',   key: '8', default: 'B', options: { A: 'cumulus', B: 'banks' } },
-    meadow:   { label: 'meadow',   key: '9', default: 2,   options: { 0: 'none', 1: 'soft patches', 2: 'strong patches' } },
-    shallows: { label: 'shallows', key: '0', default: 'blue', options: { warm: 'warm bed', blue: 'even blue' } },
-    // Phase 2a's rules, each with phase 1's beside it for comparison:
-    // `air`, aerial perspective and the far-land rules (air, below; `far`;
-    // the backdrop beyond the north and east edges); `night`, the moon's
-    // phases, moonlight and starlight, and dawn (`moonKeys`).
-    air:      { label: 'distance', key: '5', default: 'aerial', options: { p1: 'phase 1 haze', aerial: 'aerial perspective, far land' } },
-    night:    { label: 'night',    key: '6', default: 'moon', options: { p1: 'phase 1 night', moon: 'moon phases, dawn' } },
-  },
 
   // Hours the 1, 2, 3, 4 keys jump to (dawn: the sun as low as at dusk).
   hours: { day: 14.0, dusk: 17.85, night: 23.0, dawn: 6.15, noon: 12.2 },
@@ -72,12 +50,13 @@ export const LOOK = {
   // is fixed to the land, so this does not crawl as you walk.
   toneRung: 0.45,
 
-  // Haze (phase 1, air 'p1'): the share of the horizon colour mixed in at
-  // distance d is 1 - exp(-d / dist), times `max`.
+  // Haze (phase 1): the plain haze by distance, where aerial perspective
+  // (below) does not apply, as on the overhead map: the share of the horizon
+  // colour mixed in at distance d is 1 - exp(-d / dist), times `max`.
   // Glyph contrast fades with the same haze, times `glyphFade`.
   haze: { glyphFade: 0.9 },
 
-  // Aerial perspective (phase 2a, air 'aerial'). Air is thickest low down and
+  // Aerial perspective (phase 2a). Air is thickest low down and
   // thins with height: at height y its density is exp(-(y - base) / height)
   // (metres; `base` is the generated world's sea level), plus a thin share
   // (`uniform`) that is the same at every height, so far land still recedes.
@@ -89,7 +68,7 @@ export const LOOK = {
   // apart out to the view distance while their colours cool.
   air: { base: 20, height: 220, uniform: 0.05 },
 
-  // Far land (phase 2a, air 'aerial'). Past `fade[0]` metres the large forms
+  // Far land (phase 2a). Past `fade[0]` metres the large forms
   // gain light-and-shade contrast (`form`, at full strength from `fade[1]`),
   // as fine ground detail fades; rock shows strata and gullies as broad
   // bands (`bands`: how far they move its tone); snow and rock end at a clear
@@ -257,11 +236,9 @@ export const LOOK = {
   water: {
     ior: 1.33,                       // bends the ray toward the bed
     fresnel: { r0: 0.1, power: 4, max: 0.9 },    // Schlick, with a stylised floor and cap
-    absorb: 1.1,                     // metres of water that take the bed most of the way to deep water
     warm: 0.2,                       // how far the bed is tinted toward the shallow colour
-    tint: 0.4,                       // the least share of deep-water colour, even in the shallows
     torchSurface: 0.5,               // torchlight on the surface itself
-    blueDepth: 0.5,                  // shallows 'blue': metres of water over which the bed still shows
+    blueDepth: 0.5,                  // metres of water over which the bed still shows
     // the sun or moon caught by ripples: a broken path, narrow across, long
     // toward the viewer (degrees), sparkling at `rate` changes a second
     glitter: { width: 2.4, length: 20, density: 0.85, rate: 4 },
@@ -303,29 +280,27 @@ export const LOOK = {
     jag: 0.36, sectors: 9, darken: 1,
   },
 
-  // Clouds. A: rounded cumulus, sizes varied, undersides soft. B: banks and
-  // broken bands of stretched puffs with streaky, dissolving edges, flatter
-  // and longer at dusk (each keyframe's `cloudFlat` and `cloudStretch`).
+  // Clouds: banks and broken bands of stretched puffs with streaky,
+  // dissolving edges, flatter and longer at dusk (each keyframe's
+  // `cloudFlat` and `cloudStretch`).
   // `body`: the light's turn from the grey underside to the lit top (in the
   // up component of the surface); `under`: how much darker the flat
   // underside is at its rim and at its middle; `edge`: how many cells wide the
   // dissolving edge is; `streak`: how much the edge breaks into streaks.
   clouds: {
-    A: { body: [0.14, 0.66], under: [0.16, 0.16], edge: 9, streak: 0 },
-    B: { body: [0.05, 0.75], under: [0.1, 0.24], edge: 10, streak: 0.45 },
+    body: [0.05, 0.75], under: [0.1, 0.24], edge: 10, streak: 0.45,
     // (phase 2b) a dissolving edge is at least this many rows deep, even on a
     // flat or far puff; a puff too small for one fades as a whole instead of
     // scattering into single cells
     edgeMin: 2.5,
   },
 
-  // Meadow mottling, by strength (0 = none, as in phase 0b): soft patches
-  // several metres across (`patch`: how far they move the grass's tone;
-  // `hue`: how far tone moves its colour between each keyframe's
-  // `grassDry` and `grassLush`), and sparse dark tufts near the eye (`tufts`:
-  // the share of 1.2 m squares that hold one). Both fade out as a cell's
-  // footprint grows past them.
-  meadow: { patch: [0, 0.45, 0.85], hue: [0, 0.45, 0.8], tufts: [0, 0.2, 0.34] },
+  // Meadow mottling: soft patches several metres across (`patch`: how far
+  // they move the grass's tone; `hue`: how far tone moves its colour between
+  // each keyframe's `grassDry` and `grassLush`), and sparse dark tufts near
+  // the eye (`tufts`: the share of 1.2 m squares that hold one). Both fade
+  // out as a cell's footprint grows past them.
+  meadow: { patch: 0.85, hue: 0.8, tufts: 0.34 },
   // (phase 4b) a flower drift's heads up close: one in `share` of the
   // squares of a `lattice`-metre grid, `head` metres across, `bright` in
   // tone; drawn only while a head is several cells across
@@ -489,7 +464,8 @@ export const LOOK = {
 
   // Keyframes. Every material has `lit` (full sun) and `shade` (no direct
   // light) colours; the resolve step blends between them by the light that
-  // reaches the surface.
+  // reaches the surface. Day and dusk here; dawn and the nights below
+  // (moonKeys), with dusk's light retuned there.
   keys: {
     day: {
       sky:    { high: '#5266a4', horizon: '#6c7e9b', glow: '#9aa7bd', glowSize: 0.12 },
@@ -507,7 +483,7 @@ export const LOOK = {
       sand:   { lit: '#93805e', shade: '#4a4036' },
       rock:   { lit: '#8a7e6d', shade: '#383842' },
       snow:   { lit: '#d6cfc6', shade: '#737586' },
-      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', deep: '#2e3c4a', shallow: '#5f5c49', blue: '#44597a' },
+      water:  { lit: '#36474d', shade: '#2b3a40', sky: '#5f6f86', shallow: '#5f5c49', blue: '#44597a' },
       grassDry: '#859447', grassLush: '#4a6b3c',
       stone:  { lit: '#9a958d', shade: '#4d4b50' },
       masonry:{ lit: '#b8ae9c', shade: '#56524f' },
@@ -579,7 +555,7 @@ export const LOOK = {
       sand:   { lit: '#6e5c50', shade: '#30292a' },
       rock:   { lit: '#625560', shade: '#2f2a33' },
       snow:   { lit: '#a8949a', shade: '#4f4859' },
-      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', deep: '#211f2b', shallow: '#655248', blue: '#383852' },
+      water:  { lit: '#3f3f55', shade: '#2c2c3e', sky: '#6a5568', shallow: '#655248', blue: '#383852' },
       grassDry: '#4a4f38', grassLush: '#2e3a33',
       stone:  { lit: '#6e6064', shade: '#3a353c' },
       masonry:{ lit: '#857373', shade: '#40393f' },
@@ -634,81 +610,10 @@ export const LOOK = {
       window: { lit: '#eca45a', shade: '#1e1a1a' }, windowStrength: 0.8,
       weather: { cast: '#5d545c', mist: '#7c6e74', rain: '#93878c' },
     },
-    night: {
-      sky:    { high: '#161927', horizon: '#252438', glow: '#2c3046', glowSize: 0.10 },
-      cloud:  { lit: '#3b3b47', shade: '#1a1b23' },
-      cloudFlat: 0.85, cloudStretch: 1.12,
-      light:  { ambient: 0.22, direct: 0.42, cloudShadow: 0.15, castShadow: 0.70, far: 1 },
-      haze:   { colour: '#1e1f2c', dist: 330, max: 0.80 },
-      air:    { dist: 900, distC: 600, lum: 0.4, chroma: 0.62 },
-      torch:  { colour: '#ffc46a', strength: 0.55 },
-      stars:  1,
-      sun:    '#f4eedc',
-      moon:   '#c9ccd4',
-      grass:  { lit: '#212723', shade: '#131615' },
-      dirt:   { lit: '#25242a', shade: '#131317' },
-      sand:   { lit: '#27262a', shade: '#141417' },
-      rock:   { lit: '#252429', shade: '#131316' },
-      snow:   { lit: '#3c3f4c', shade: '#1d1f28' },
-      water:  { lit: '#1b2029', shade: '#11141b', sky: '#20263a', deep: '#0d0f14', shallow: '#28261f', blue: '#141924' },
-      grassDry: '#262b24', grassLush: '#1a221f',
-      stone:  { lit: '#29282e', shade: '#141418' },
-      masonry:{ lit: '#302e33', shade: '#16151a' },
-      shaft:  { lit: '#100f11', shade: '#0c0b0d' },
-      conifer:{ lit: '#17191c', shade: '#0e0f12' },
-      trunk:  { lit: '#1c1a1a', shade: '#0f0e0f' },
-      bush:   { lit: '#191c1c', shade: '#0f1011' },
-      wood:   { lit: '#221d1a', shade: '#110f0e' },
-      flame:  '#ffb468',
-      flameStrength: 1, flameFloor: 0.5,
-      bed:    { lit: '#24231f', shade: '#121210' },
-      floor:  { lit: '#1b1a1a', shade: '#0e0e0f' },
-      foam:   { lit: '#4a4e5a', shade: '#262830' },
-      timber: { lit: '#231e1a', shade: '#100e0c' },
-      plaster:{ lit: '#302d30', shade: '#171618' },
-      roof:   { lit: '#1d1c22', shade: '#0f0e0f' },
-      yard:   { lit: '#28272f', shade: '#141417' },
-      thatch: { lit: '#272422', shade: '#141312' },
-      plaster2:{ lit: '#312b28', shade: '#171514' },
-      plaster3:{ lit: '#2f282a', shade: '#161415' },
-      timber2:{ lit: '#1c1816', shade: '#0d0b0a' },
-      timber3:{ lit: '#261f17', shade: '#120e0b' },
-      crop:   { lit: '#232620', shade: '#141613' },
-      stubble:{ lit: '#2c2826', shade: '#161515' },
-      fallow: { lit: '#211e22', shade: '#111012' },
-      skin:   { lit: '#2f2524', shade: '#171212' },
-      skin2:  { lit: '#261c1b', shade: '#120e0d' },
-      hair:   { lit: '#120f0e', shade: '#090706' },
-      linen:  { lit: '#322e31', shade: '#181719' },
-      russet: { lit: '#2c1c17', shade: '#150c0b' },
-      ochre:  { lit: '#312c23', shade: '#191712' },
-      moss:   { lit: '#1b1e18', shade: '#0d0f0c' },
-      slate:  { lit: '#191c27', shade: '#0c0e13' },
-      umber:  { lit: '#221d1a', shade: '#0f0e0c' },
-      charcoal: { lit: '#14151b', shade: '#090a0c' },
-      leather: { lit: '#1d1714', shade: '#0d0b09' },
-      iron:   { lit: '#1d1d25', shade: '#0e0e12' },
-      pasture:  { lit: '#242728', shade: '#151617' },
-      flowera:  { lit: '#262925', shade: '#151617' },
-      flowerb:  { lit: '#222432', shade: '#141416' },
-      flowerc:  { lit: '#272b32', shade: '#151717' },
-      reed:     { lit: '#242822', shade: '#101411' },
-      bark:     { lit: '#212021', shade: '#110f10' },
-      wool:     { lit: '#353134', shade: '#191819' },
-      hide:     { lit: '#241b18', shade: '#110c0c' },
-      fawn:     { lit: '#2b2624', shade: '#151311' },
-      gull:     { lit: '#36353f', shade: '#19191f' },
-      crow:     { lit: '#111219', shade: '#07090b' },
-      duck:     { lit: '#27231d', shade: '#11100c' },
-      duckhead: { lit: '#101515', shade: '#070908' },
-      hare:     { lit: '#2b2725', shade: '#131210' },
-      window: { lit: '#eeaa5e', shade: '#121112' }, windowStrength: 1,
-      weather: { cast: '#1c1d25', mist: '#2a2c35', rain: '#3c404a' },
-    },
   },
 
-  // The keyframes of the night rule 'moon' (phase 2a), in place of phase
-  // 1's dusk and night: dawn (the sun low in the east, its own colours, cooler
+  // The other keyframes (phase 2a; phase 1 had its own dusk and one night):
+  // dawn (the sun low in the east, its own colours, cooler
   // above and rosier at the horizon than dusk, with a pale morning mist),
   // dusk (phase 1's, with the low sun raking across the meadow: less ambient
   // light, more direct), and night in two: under a bright moon (`moonlit`,
@@ -737,7 +642,7 @@ export const LOOK = {
       sand:   { lit: '#a48c6c', shade: '#463c36' },
       rock:   { lit: '#9a8a7a', shade: '#3a3a48' },
       snow:   { lit: '#f0dcd0', shade: '#6f7088' },
-      water:  { lit: '#3e4a58', shade: '#2c3644', sky: '#8e8ca2', deep: '#2a3444', shallow: '#625a4c', blue: '#4c5a7c' },
+      water:  { lit: '#3e4a58', shade: '#2c3644', sky: '#8e8ca2', shallow: '#625a4c', blue: '#4c5a7c' },
       grassDry: '#8e9450', grassLush: '#4e6a40',
       stone:  { lit: '#a49a90', shade: '#4a4850' },
       masonry:{ lit: '#bcae9e', shade: '#524e52' },
@@ -809,7 +714,7 @@ export const LOOK = {
       sand:   { lit: '#43444a', shade: '#1c1d22' },
       rock:   { lit: '#44464f', shade: '#1a1b21' },
       snow:   { lit: '#7d8498', shade: '#2e3240' },
-      water:  { lit: '#222a38', shade: '#151a24', sky: '#2c3550', deep: '#10141c', shallow: '#2c2c28', blue: '#18202e' },
+      water:  { lit: '#222a38', shade: '#151a24', sky: '#2c3550', shallow: '#2c2c28', blue: '#18202e' },
       grassDry: '#3f4b44', grassLush: '#2c3a38',
       stone:  { lit: '#45464e', shade: '#1c1c22' },
       masonry:{ lit: '#52535b', shade: '#1f1f25' },
@@ -880,7 +785,7 @@ export const LOOK = {
       sand:   { lit: '#292a30', shade: '#191a1f' },
       rock:   { lit: '#24262c', shade: '#15161b' },
       snow:   { lit: '#3e4352', shade: '#22252f' },
-      water:  { lit: '#161b25', shade: '#10141b', sky: '#1a1f30', deep: '#0c0f15', shallow: '#1e1e1c', blue: '#121722' },
+      water:  { lit: '#161b25', shade: '#10141b', sky: '#1a1f30', shallow: '#1e1e1c', blue: '#121722' },
       grassDry: '#222a26', grassLush: '#19221f',
       stone:  { lit: '#25262c', shade: '#15161a' },
       masonry:{ lit: '#2b2b31', shade: '#16171b' },

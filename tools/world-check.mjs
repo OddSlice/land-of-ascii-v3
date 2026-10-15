@@ -218,10 +218,9 @@ function sky(w, seed) {
   const N = w.N, NN = w.NN, G = w.terrain.ground, frame = makeFrame(seed, N), P = {};
   const be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE);
-  const look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const render = (x, z, yawDeg) => {
     const cam = { x, z, y: groundAt(w.terrain, x, z) + SCALE.eye, yaw: yawDeg * Math.PI / 180, pitch: 0 };
-    const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 12.5, look };
+    const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 12.5 };
     for (let i = 0; i < 400; i++) { be.render(f, 0, cols, hits); if (be.settled) break; }
     let n = 0;
     for (let c = 0; c < cols * rows; c++) if (hits[c * HIT_STRIDE] <= MAT.STAR) n++;
@@ -257,7 +256,6 @@ function farRead(w, gw) {
   const N = w.N, NN = w.NN, kind = gw.kindMap, level = gw.levelMap, lake = gw.sites.lake;
   const be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE), cells = new Uint8Array(cols * rows * CELL_STRIDE);
-  const look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   // (phase 3a) and from the spawn turned toward the fort, aimed a little
   // over its yard, which must read: its stone, timber, plaster, roofs and
   // windows against the cells round them
@@ -270,10 +268,10 @@ function farRead(w, gw) {
   const out = [];
   for (const sp of spots) {
     const cam = { x: sp.x, z: sp.z, y: groundAt(w.terrain, sp.x, sp.z) + SCALE.eye, yaw: sp.yaw * Math.PI / 180, pitch: sp.pitch * Math.PI / 180 };
-    const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 12.5, day: 0, look };
+    const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 12.5, day: 0 };
     for (let i = 0; i < 400; i++) { be.render(f, 0, cols, hits); if (be.settled) break; }
     const rec = hits.slice();
-    resolveStripe(makePalette(f.hour, 0, 'moon'), hits, cells, cols, rows, 0, f);
+    resolveStripe(makePalette(f.hour, 0), hits, cells, cols, rows, 0, f);
     // each cell's ray (the contract's own), to find where it lands
     const ty = Math.tan(f.fovY / 2), tx = ty * f.aspect, cp = Math.cos(cam.pitch), spp = Math.sin(cam.pitch), cy0 = Math.cos(cam.yaw), sy0 = Math.sin(cam.yaw);
     const cls = new Int8Array(cols * rows).fill(-1);    // 0 lake, 1 river, 2 forest, 3 road, 4 the fort
@@ -341,7 +339,6 @@ function farRead(w, gw) {
 function villageRead(w) {
   const N = w.N, NN = w.NN, be = createCpuBackend(w);
   const cols = 360, rows = 112, hits = new Uint8Array(cols * rows * HIT_STRIDE), cells = new Uint8Array(cols * rows * CELL_STRIDE);
-  const look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const out = [];
   w.sites.villages.forEach((v, vi) => {
     const p = v.plan, c = p.centre, R = p.radius + 6;
@@ -351,10 +348,10 @@ function villageRead(w) {
       if (d > 1400) continue;
       const cam = { x: vp.x, z: vp.z, y: ey, yaw: Math.atan2(c.x - vp.x, c.z - vp.z), pitch: Math.atan2(c.y + 3 - ey, d) };
       const shot = (hour) => {
-        const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t: 12.5, day: 0, look };
+        const f = { seq: 1, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t: 12.5, day: 0 };
         for (let k = 0; k < 400; k++) { be.render(f, 0, cols, hits); if (be.settled) break; }
         const rec = hits.slice();
-        resolveStripe(makePalette(hour, 0, 'moon'), hits, cells, cols, rows, 0, f);
+        resolveStripe(makePalette(hour, 0), hits, cells, cols, rows, 0, f);
         const ty = Math.tan(f.fovY / 2), tx = ty * f.aspect, cp = Math.cos(cam.pitch), spp = Math.sin(cam.pitch), cy0 = Math.cos(cam.yaw), sy0 = Math.sin(cam.yaw);
         const inV = new Uint8Array(cols * rows);
         for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++) {

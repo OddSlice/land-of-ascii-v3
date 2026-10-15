@@ -1,16 +1,17 @@
 // The menu (phase 2b; laid out again after it): Escape opens it over the
 // world, which stays drawn behind it, dimmed, while the clock and movement
 // stand still. A rail on the left names the game, says where and when you
-// are (the seed, the time, the weather) and holds the four sections as tabs,
+// are (the seed, the time, the weather) and holds the five sections as tabs,
 // each with its icon: Controls (every key, the only place the full list
-// appears), Display (the choices kept for the next visit), World (the time,
-// the weather, the seed) and Advanced (the tools of earlier phases). One
+// appears, and the keys a player can change), Display (the choices kept for
+// the next visit), Sound, World (the time, the weather, the seed, your
+// progress) and Advanced (the fixed cameras, the other scenes, everyone in
+// the world, the benchmark). One
 // section shows at a time. Resume sits at the foot of the rail. Plain HTML
 // over the canvas; every control works by mouse and by keyboard alone (the
 // arrow keys move between the tabs), and Tab stays inside it while it is
 // open. It holds no game state of its own: it reads and sets it through
 // `game` (src/main.js).
-import { LOOK } from '../look.js';
 import { KINDS } from '../weather.js';
 import { icon } from './icons.js';
 
@@ -58,24 +59,17 @@ function keyGroups(scene) {
       ]],
       ['views', 'camera', [
         [['C'], 'the next fixed camera'],
-        [['Shift', 'L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
         [['H'], 'full statistics on or off'],
         [['Esc'], 'this menu'],
       ]],
     ];
   }
+  // the Look Lab, the stress scene and the building yard
   return [
     ['moving', 'move', [
       [['W', 'A', 'S', 'D'], 'walk'],
       [['Shift'], 'run, while held'],
-      [['Space'], world ? 'jump; rise, while flying' : 'jump'],
-      world && [['F'], 'fly on or off'],
-      world && [['E'], 'greet someone; say yes to a favour'],
-    ]],
-    world && ['wayfaring', 'book', [
-      [['J'], 'your journal'],
-      [['K'], 'sketch the view'],
-      [['L'], 'your lantern, once you have one'],
+      [['Space'], 'jump'],
     ]],
     ['looking', 'eye', [
       [['mouse'], 'look round (click the picture; Esc frees the mouse)'],
@@ -87,20 +81,16 @@ function keyGroups(scene) {
       [['T'], 'stop or start the clock'],
     ]],
     ['world', 'map', [
-      world ? [['R'], 'a new world from a new seed'] : [['R'], 'the reference frame beside the picture (the Look Lab)'],
-      world && [['M'], 'the map: # fort, o village, * viewpoint, + spawn, @ you'],
-      world && [['N'], 'sound on or off'],
       [['G'], 'glyphs on or off'],
       [['-', '+'], 'less or more detail'],
-      !world && [['X'], scene === 'stress' ? 'the Look Lab' : 'the stress scene'],
+      [['X'], scene === 'stress' ? 'the Look Lab' : 'the stress scene'],
     ]],
     ['views', 'camera', [
       [['C'], 'the next fixed camera'],
-      [world ? ['Shift', 'L'] : ['L'], 'the look panel; 5 6 8 9 0 cycle its choices'],
       [['H'], 'full statistics on or off'],
       [['Esc'], 'this menu'],
     ]],
-  ].filter(Boolean).map(([name, ic, rows]) => [name, ic, rows.filter(Boolean)]);
+  ];
 }
 
 const TABS = [
@@ -108,7 +98,7 @@ const TABS = [
   ['display', 'Display', 'monitor', 'How the picture is drawn. Kept in this browser for your next visit.'],
   ['sound', 'Sound', 'speaker', 'What you hear, made from the land as you go, and the music between. Kept in this browser for your next visit.'],
   ['world', 'World', 'landscape', 'The time, the weather and the seed.'],
-  ['advanced', 'Advanced', 'sliders', 'The comparison tools of earlier phases.'],
+  ['advanced', 'Advanced', 'sliders', 'The fixed cameras, the other scenes, everyone in the world, and a benchmark.'],
 ];
 const DETAIL = [
   ['coarse', 'about 15,000 large cells, the fastest'],
@@ -255,13 +245,9 @@ export class Menu {
     page('world', worldRows);
 
     // Advanced
-    const C = LOOK.choices;
     const workers = h('span', {});
     this.refresh.push(() => { workers.textContent = g.workersLine(); });
     page('advanced',
-      h('h3', { class: 'part' }, 'look candidates and comparisons (phases 0c and 2a)'),
-      Object.entries(C).map(([name, c]) => this.choice(`${c.label} (key ${c.key})`, Object.entries(c.options).map(([k, label]) => [k, label.startsWith(k) ? label : `${k}: ${label}`]),
-        () => String(g.look[name]), (v) => g.setLook(name, v), { words: false })),
       h('h3', { class: 'part' }, 'fixed cameras'),
       h('div', { class: 'opts' }, g.cameras.map((cam, i) => h('button', { type: 'button', onclick: () => { g.camera(i); this.update(); } }, `${i + 1} ${cam.name}`))),
       h('h3', { class: 'part' }, 'scenes'),

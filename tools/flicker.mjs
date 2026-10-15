@@ -2,14 +2,13 @@
 // the camera walks or turns with every clock frozen. A steady picture has
 // almost none: detail is fixed to the land, so it slides smoothly instead.
 //
-//   node tools/flicker.mjs                 the look set: each tree, cloud and meadow option on the
-//                                          views where it shows, beside the same run on a reference
-//                                          build (--ref DIR, e.g. a copy of phase 0b's sources)
+//   node tools/flicker.mjs [--set world]   a walk through the generated world (below); --ref DIR
+//                                          runs the same views on another build beside it
 //   node tools/flicker.mjs --set water     the phase 0b water set (shore walks, turns across the lake)
 //   node tools/flicker.mjs --set fort      (phase 3a) the fort beside the lab's wall and gate: walking
 //                                          the road to the gate, walking the wall walk, turning inside
-//   node tools/flicker.mjs --set world     a walk through the generated world (default seed, settled
-//                                          look): meadow, forest and along the lake, from its cameras,
+//   node tools/flicker.mjs --set world     a walk through the generated world (default seed): meadow,
+//                                          forest and along the lake, from its cameras,
 //                                          and (phase 2a) along the coast's foam line and swell
 //   node tools/flicker.mjs --skyline [--ref DIR]   (phase 2a; in Node, no browser) turning toward the
 //                                          range from the world's cameras, each blink sorted by what it
@@ -39,37 +38,18 @@
 //   --weather fair,overcast,wet,rain,mist  (phase 2b) each run under each weather held (wet: fair
 //                                          weather on wet ground); --time 6.6 for another hour
 //                                          (mist lies only round dawn); the default is fair
-//   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0] [--look cloud=B]
+//   node tools/flicker.mjs --at x,z,yaw,pitch [--stress] [--time day] [--step 0.075] [--dir 0] [--turn 0]
 //
 // step is metres a frame (0.075 m = 4.5 m/s at 60 fps), dir the walking
 // direction in degrees from the way the camera faces (90 = sideways), turn
 // degrees a frame (0.3 = 18 degrees a second). Views are given as positions,
 // not camera numbers, so any build can run them.
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab, parseLook, ROOT } from './lib/serve.mjs';
+import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const W = { step: 0.075, dir: 90, turn: 0 }, F = { step: 0.075, dir: 0, turn: 0 }, TURN = { step: 0, dir: 0, turn: 0.3 };
 const SETS = {
-  look: [
-    // trees, near to far, and in the water
-    { label: 'forest edge across the meadow, walking sideways', at: [276, 248, -97, 1], ...W },
-    { label: 'forest edge across the meadow, turning', at: [276, 248, -97, 1], ...TURN },
-    { label: 'inside the stand, walking out', at: [356, 320, 175, 3], ...F },
-    { label: 'inside the stand, turning', at: [356, 320, 175, 3], ...TURN },
-    { label: 'trees in the lake, walking along the shore', at: [356, 229.6, 2, -12], ...W },
-    { label: 'far treeline, walking sideways', at: [345, 60, 4, 1], ...W },
-    { label: 'stress forest, walking in', stress: true, cam: 0, ...F },
-    { label: 'stress forest, turning', stress: true, cam: 0, ...TURN },
-    // clouds, in views with no trees in them (trees would be counted too)
-    { axis: 'cloud', label: 'open sky, turning', at: [300, 120, 170, 25], ...TURN },
-    { axis: 'cloud', label: 'open sky, walking sideways', at: [300, 120, 170, 25], ...W },
-    { axis: 'cloud', label: 'stress sky over the lake, turning', stress: true, at: [818, 653.6, 8, 30], ...TURN },
-    // meadow, likewise
-    { axis: 'meadow', label: 'open meadow, walking', at: [300, 120, 160, -14], ...F },
-    { axis: 'meadow', label: 'open meadow, turning', at: [300, 120, 160, -14], ...TURN },
-    { axis: 'meadow', label: 'stress vista, turning', stress: true, cam: 2, ...TURN },
-  ],
   world: [
     // (cameras of the generated world, found from its data; `turn` here is
     // the camera turned that many degrees first)
@@ -111,7 +91,6 @@ SETS.fort = [
   { label: 'fort: walking the wall walk', scene: 'world', fort: 'walk', ...F },
   { label: 'fort: turning in the courtyard', scene: 'world', camName: 'the courtyard', ...TURN },
 ];
-const OPTIONS = { cloud: ['A', 'B'], meadow: [0, 1, 2] };
 const frames = Number(a.frames || 60);
 
 // ---- the far skyline (phase 2a), in Node --------------------------------------
@@ -125,6 +104,8 @@ async function skyline(root, seed) {
   const CT = await import(`${root}/src/contract.js`), OB = await import(`${root}/src/world/objects.js`);
   const g = G.generateWorld(seed); let r; while (!(r = g.next()).done);
   const w = PK.unpackWorld(PK.packWorld(r.value));
+  // (the look in use, for an older build given by --ref, which still reads
+  // its look candidates; this one has none and ignores it)
   const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
   const out = [];
   for (const ci of [0, 1]) {
@@ -138,8 +119,7 @@ async function skyline(root, seed) {
       const mats = new Uint8Array(n);
       for (let k = 0; k < n; k++) mats[k] = hits[k * CT.HIT_STRIDE] <= CT.MAT.STAR ? 1 : 0;
       const cells = new Uint8Array(n * 8);
-      if (LK.LOOK.moonKeys) RS.resolveStripe(RS.makePalette(14, 0, 'moon'), hits, cells, cols, rows, 0, f);
-      else RS.resolveStripe(RS.makePalette(14), hits, cells, cols, rows, 0, look);
+      RS.resolveStripe(RS.makePalette(14, 0), hits, cells, cols, rows, 0, f);
       fr.push({ cells, mats });
     }
     let sg = 0, sc = 0, ag = 0, ac = 0;
@@ -178,7 +158,7 @@ async function buildings(seed) {
   const w = PK.unpackWorld(PK.packWorld(r.value)), f = w.sites.fort;
   const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW,
     CT.MAT.THATCH, CT.MAT.PLASTER2, CT.MAT.PLASTER3, CT.MAT.TIMBER2, CT.MAT.TIMBER3]);
-  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
+  const cols = 360, rows = 112, n = cols * rows;
   const o = f.gate.out, deg = (x) => x * 180 / Math.PI;
   // the wall walk: the camera's spot, along its wall
   const wc = w.cameras.find((c) => c.name === 'the wall walk over the valley');
@@ -231,13 +211,13 @@ async function buildings(seed) {
       // (`stand`: on whatever is underfoot, a bridge's deck say)
       const y = run.y ?? (run.stand ? pl.supportAt(x, z, OB.groundAt(run.world.terrain, x, z) + 3) : OB.groundAt(run.world.terrain, x, z)) + 1.7;
       const cam = { x, z, y, yaw: (run.yaw + run.turn * i) * Math.PI / 180, pitch: run.pitch * Math.PI / 180 };
-      const fq = { seq: i, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: 14, t: 0, day: 0, look };
+      const fq = { seq: i, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour: 14, t: 0, day: 0 };
       const hits = new Uint8Array(n * CT.HIT_STRIDE);
       for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
       const mats = new Uint8Array(n), mat = new Uint8Array(n);
       for (let k = 0; k < n; k++) { mat[k] = hits[k * CT.HIT_STRIDE]; mats[k] = BLD.has(mat[k]) ? 1 : 0; }
       const cells = new Uint8Array(n * 8);
-      RS.resolveStripe(RS.makePalette(14, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+      RS.resolveStripe(RS.makePalette(14, 0), hits, cells, cols, rows, 0, fq);
       fr.push({ cells, mats, mat });
     }
     let bc = 0, gf = 0, cf = 0, agf = 0, acf = 0;
@@ -283,7 +263,7 @@ async function peopleSet(seed) {
   const P = PP.buildPeople(w), np = P.persons.length, FS = FG.FS;
   const BLD = new Set([CT.MAT.STONE, CT.MAT.MASONRY, CT.MAT.TIMBER, CT.MAT.PLASTER, CT.MAT.ROOF, CT.MAT.WINDOW]);
   const PPL = new Set([CT.MAT.SKIN, CT.MAT.SKIN2, CT.MAT.HAIR, CT.MAT.LINEN, CT.MAT.RUSSET, CT.MAT.OCHRE, CT.MAT.MOSS, CT.MAT.SLATE, CT.MAT.UMBER, CT.MAT.CHARCOAL, CT.MAT.LEATHER, CT.MAT.IRON]);
-  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
+  const cols = 360, rows = 112, n = cols * rows;
   const pl = P.p, deg = (x) => x * 180 / Math.PI;
   // (`only`: 'still' keeps those standing, sitting, working or asleep, and
   // 'walking' only those walking; the rest are left out)
@@ -338,12 +318,12 @@ async function peopleSet(seed) {
   if (wc) RUNS.push({ label: 'the wall walk at 23:00, from the courtyard, turning', x: wc.x, z: wc.z, y: wc.y, yaw: wc.yaw, pitch: wc.pitch, hour: 23.0, step: 0, dir: 0, turn: 0.15 });
   const out = [];
   const render = (be, cam, hour, t, s) => {
-    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, look, people: s.st, lit: s.lit };
+    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, people: s.st, lit: s.lit };
     const hits = new Uint8Array(n * CT.HIT_STRIDE);
     for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
     const mat = new Uint8Array(n); for (let k = 0; k < n; k++) mat[k] = hits[k * CT.HIT_STRIDE];
     const cells = new Uint8Array(n * 8);
-    RS.resolveStripe(RS.makePalette(hour, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+    RS.resolveStripe(RS.makePalette(hour, 0), hits, cells, cols, rows, 0, fq);
     return { cells, mat };
   };
   const byMat = {};
@@ -409,7 +389,7 @@ async function animalsSet(seed) {
   const M = CT.MAT;
   const ANI = new Set([M.WOOL, M.HIDE, M.FAWN, M.GULL, M.CROW, M.DUCK, M.DUCKHEAD, M.HARE, M.CHARCOAL, M.LINEN, M.RUSSET, M.UMBER, M.OCHRE, M.SLATE]);
   const WILD = new Set([M.ROCK, M.BARK, M.WOOD, M.REED, M.FLOWERA, M.FLOWERB, M.FLOWERC, M.PASTURE]);
-  const cols = 360, rows = 112, n = cols * rows, look = { cloud: 'B', meadow: 2, shallows: 'blue' };
+  const cols = 360, rows = 112, n = cols * rows;
   const pl = P.p, deg = (x) => x * 180 / Math.PI;
   const stAt = (day, hour, cam) => {
     const st = new Float32Array(N0 * AK.AS), ids = new Int32Array(N0);
@@ -479,14 +459,14 @@ async function animalsSet(seed) {
     RUNS.push({ label: 'small birds crossing the sky (camera still, clock running)', x: cx, z: cz, y: cy, yaw: deg(Math.atan2(-30, -30)), pitch: deg(Math.atan2(fly.y - cy, 42)), hour: fly.hour - 1 / 3600, step: 0, dir: 0, turn: 0, movingOnly: true });
   }
   const render = (be, cam, hour, t, s) => {
-    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, look, animals: s.st, marks: marksOf(s, cam) };
+    const fq = { seq: 0, cam, cols, rows, fovY: LOOK.fovY * Math.PI / 180, aspect: cols / (2 * rows), hour, t, day: 0, animals: s.st, marks: marksOf(s, cam) };
     const hits = new Uint8Array(n * CT.HIT_STRIDE);
     for (let k = 0; k < 400; k++) { be.render(fq, 0, cols, hits); if (be.settled) break; }
     // (the ground detail's materials are counted only within 120 m: past
     // that the rock is the mountains')
     const mat = new Uint8Array(n); for (let k = 0; k < n; k++) { const o = k * CT.HIT_STRIDE, m = hits[o], d = (hits[o + 6] | (hits[o + 7] << 8)) / 10; mat[k] = WILD.has(m) && d > 120 ? 255 : m; }
     const cells = new Uint8Array(n * 8);
-    RS.resolveStripe(RS.makePalette(hour, 0, 'moon'), hits, cells, cols, rows, 0, fq);
+    RS.resolveStripe(RS.makePalette(hour, 0), hits, cells, cols, rows, 0, fq);
     return { cells, mat, hits: process.env.DUMP ? hits : null };
   };
   let dumped = 0;
@@ -589,15 +569,10 @@ if (a.skyline) {
 let runs;
 if (a.at) {
   const at = a.at.split(',').map(Number);
-  runs = [{ label: 'custom', at, stress: !!a.stress, scene: a.scene, time: a.time, step: Number(a.step ?? 0.075), dir: Number(a.dir || 0), turn: Number(a.turn || 0), look: parseLook(a.look), y: a.y !== undefined ? Number(a.y) : undefined }];
+  runs = [{ label: 'custom', at, stress: !!a.stress, scene: a.scene, time: a.time, step: Number(a.step ?? 0.075), dir: Number(a.dir || 0), turn: Number(a.turn || 0), y: a.y !== undefined ? Number(a.y) : undefined }];
 } else {
   const only = a.only ? String(a.only).split(',') : null;
-  const set = SETS[a.set || 'look'].filter((r) => !only || only.some((w) => r.label.includes(w)));
-  runs = [];
-  for (const r of set) {
-    if (!r.axis) { runs.push({ ...r }); continue; }
-    for (const o of OPTIONS[r.axis]) runs.push({ ...r, look: { [r.axis]: o }, option: `${r.axis} ${o}` });
-  }
+  runs = SETS[a.set || 'world'].filter((r) => !only || only.some((w) => r.label.includes(w))).map((r) => ({ ...r }));
 }
 // (phase 2b) each run under each weather asked for, at the hour asked for
 const WEATHERS = { wet: { mix: { fair: 1 }, wet: 1 } };
@@ -619,9 +594,6 @@ async function measure(browser, root, list) {
       for (const run of mine) {
         const r = await lab.page.evaluate(async ({ run, frames }) => {
           const L = window.lab;
-          // (the look set compares options against the phase 0b look; the
-          // world set runs the settled look)
-          if (L.setLook) { if (run.scene === 'world' || run.scene === 'yard') L.resetLook(); else L.setLook({ cloud: 'A', meadow: 0, shallows: 'warm', ...(run.look || {}) }); }
           let s0;
           if (run.camName !== undefined) run.cam = L.cameras.findIndex((c) => c.name === run.camName);
           if (run.fort === 'road') {
@@ -706,9 +678,9 @@ let results, ref = null;
 try {
   results = await measure(browser, a.root || ROOT, runs);
   if (a.ref) {
-    // the reference build: each view once (it has no look candidates)
+    // the reference build: each view once
     const seen = new Set();
-    const refRuns = runs.filter((r) => { if (seen.has(r.label)) return false; seen.add(r.label); return true; }).map((r) => ({ ...r, look: null, option: null }));
+    const refRuns = runs.filter((r) => { if (seen.has(r.label)) return false; seen.add(r.label); return true; }).map((r) => ({ ...r, option: null }));
     console.log(`\nreference build: ${a.ref}`);
     ref = await measure(browser, a.ref, refRuns);
   }
@@ -716,12 +688,12 @@ try {
   await browser.close();
 }
 const f3 = (x) => `${x.toFixed(3)}%`;
-if (!a.at && (a.set || 'look') === 'look') {
-  console.log('\n| view and motion | option | blinking cells | glyph blinks | colour blinks (>6 levels) | reference build: blinking / glyph / colour |');
-  console.log('|---|---|---|---|---|---|');
+if (!a.at && ref) {
+  console.log('\n| view and motion | blinking cells | glyph blinks | colour blinks (>6 levels) | reference build: blinking / glyph / colour |');
+  console.log('|---|---|---|---|---|');
   for (const r of results) {
-    const rr = ref && ref.find((x) => x.label === r.label);
-    console.log(`| ${r.label} | ${r.option} | ${f3(r.blinkPct)} | ${f3(r.glyphPct)} | ${f3(r.colourPct)} | ${rr ? `${f3(rr.blinkPct)} / ${f3(rr.glyphPct)} / ${f3(rr.colourPct)}` : '–'} |`);
+    const rr = ref.find((x) => x.label === r.label);
+    console.log(`| ${r.label} | ${f3(r.blinkPct)} | ${f3(r.glyphPct)} | ${f3(r.colourPct)} | ${rr ? `${f3(rr.blinkPct)} / ${f3(rr.glyphPct)} / ${f3(rr.colourPct)}` : '–'} |`);
   }
 } else if (!a.at) {
   console.log(`\n| run${a.weather ? ' | weather' : ''} | blinking cells per frame | glyph blinks | colour blinks (>6 levels) | cells changing at all | glyph flips | colour flips (>6 levels) |`);

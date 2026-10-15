@@ -13,7 +13,7 @@ import { LOOK } from './look.js';
 import { MAT, MAT_NAMES, MAT_COUNT, MAT_NONE, MAT_SHELTER, MAT_FAINT, HIT_STRIDE, REC, CELL_STRIDE } from './contract.js';
 import { FAMILY, SHADE_STEPS, RAIN_GLYPHS, BIRD_GLYPHS } from './glyphs.js';
 import { weatherParams } from './weather.js';
-import { sunDir, moonDir, moonDirOn, moonLit } from './world/sky.js';
+import { sunDir, moonDirOn, moonLit } from './world/sky.js';
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
@@ -42,8 +42,7 @@ function unflatten(shape, flat) {
   };
   return walk(shape);
 }
-const KEYS = ['day', 'dusk', 'night'].map((k) => flatten(LOOK.keys[k]));
-// the night rule 'moon' (phase 2a): day, dawn, its dusk, and night under a bright and a dark moon
+// the keyframes (phase 2a): day, dawn, dusk, and night under a bright and a dark moon
 const MKEYS = [LOOK.keys.day, LOOK.moonKeys.dawn, LOOK.moonKeys.dusk, LOOK.moonKeys.moonlit, LOOK.moonKeys.starlit].map(flatten);
 
 // How much of each keyframe applies at an hour, from the sun's height.
@@ -54,9 +53,9 @@ export function keyWeights(hour) {
   return [day, Math.max(0, 1 - day - night), night];
 }
 
-// The same under the night rule 'moon': twilight is dawn in the morning and
-// dusk in the evening; night is moonlit by how much of the moon is lit and
-// how high it is, else starlit.
+// How much each of the five keyframes applies (day, dawn, dusk, moonlit,
+// starlit): twilight is dawn in the morning and dusk in the evening; night
+// is moonlit by how much of the moon is lit and how high it is, else starlit.
 export function moonWeights(hour, day) {
   const [d, tw, n] = keyWeights(hour);
   const moon = moonDirOn(hour, day);
@@ -88,39 +87,28 @@ function weatherKey(k, P) {
   }
 }
 
-// The palette for an hour, a day (the moon's phase), a night rule and the
-// frame's weather (src/weather.js; none is fair).
-export function makePalette(hour, day = 0, night = 'p1', weather = null) {
+// The palette for an hour, a day (the moon's phase) and the frame's weather
+// (src/weather.js; none is fair).
+export function makePalette(hour, day = 0, weather = null) {
   const P = weatherParams(weather);
-  const ck = (night === 'p1' ? `${hour}` : `${hour}|${day}`) + (P.fair ? '' : `|${P.mixKey}`);
+  const ck = `${hour}|${day}` + (P.fair ? '' : `|${P.mixKey}`);
   if (ck === cacheKey) return cachePal;
-  let k, dirFade, illum = 1, L, nightShare;
+  let dirFade, L;
   const sun = sunDir(hour);
   // (under cloud the moon's light does not get through: its night is starlit)
   const disc = P.fair ? 1 : discOf(P.sun);
-  if (night === 'p1') {
-    const w = keyWeights(hour);
-    nightShare = w[2];
-    const flat = KEYS[0].map((_, i) => KEYS[0][i] * w[0] + KEYS[1][i] * w[1] + KEYS[2][i] * w[2]);
-    k = unflatten(LOOK.keys.day, flat);
-    // the light that shades the ground fades out as it reaches the horizon
-    const moon = moonDir(hour);
-    L = sun[1] > -0.035 ? sun : moon;
-    dirFade = smooth(-0.035, 0.06, L[1]);
-  } else {
-    const w = moonWeights(hour, day);
-    if (!P.fair) { const m = w[3] * (1 - disc); w[3] -= m; w[4] += m; }
-    nightShare = w[3] + w[4];
-    const flat = MKEYS[0].map((_, i) => MKEYS[0][i] * w[0] + MKEYS[1][i] * w[1] + MKEYS[2][i] * w[2] + MKEYS[3][i] * w[3] + MKEYS[4][i] * w[4]);
-    k = unflatten(LOOK.keys.day, flat);
-    const moon = moonDirOn(hour, day);
-    illum = moonLit(hour, day);
-    // sunlight fades out as the sun sets; moonlight fades in only as the
-    // twilight deepens (and as the moon rises), so the change from one to
-    // the other never flashes
-    if (sun[1] > -0.035) { L = sun; dirFade = smooth(-0.035, 0.06, sun[1]); }
-    else { L = moon; dirFade = smooth(-0.035, -0.15, sun[1]) * smooth(-0.035, 0.06, moon[1]); }
-  }
+  const w = moonWeights(hour, day);
+  if (!P.fair) { const m = w[3] * (1 - disc); w[3] -= m; w[4] += m; }
+  const nightShare = w[3] + w[4];
+  const flat = MKEYS[0].map((_, i) => MKEYS[0][i] * w[0] + MKEYS[1][i] * w[1] + MKEYS[2][i] * w[2] + MKEYS[3][i] * w[3] + MKEYS[4][i] * w[4]);
+  const k = unflatten(LOOK.keys.day, flat);
+  const moon = moonDirOn(hour, day);
+  const illum = moonLit(hour, day);
+  // sunlight fades out as the sun sets; moonlight fades in only as the
+  // twilight deepens (and as the moon rises), so the change from one to
+  // the other never flashes
+  if (sun[1] > -0.035) { L = sun; dirFade = smooth(-0.035, 0.06, sun[1]); }
+  else { L = moon; dirFade = smooth(-0.035, -0.15, sun[1]) * smooth(-0.035, 0.06, moon[1]); }
   if (!P.fair) weatherKey(k, P);
   const lit = new Float32Array(MAT_COUNT * 3), shade = new Float32Array(MAT_COUNT * 3);
   for (let m = 0; m < MAT_COUNT; m++) {
@@ -136,7 +124,7 @@ export function makePalette(hour, day = 0, night = 'p1', weather = null) {
   // the mist's strength: it thins as the sun climbs
   const elDeg = Math.asin(Math.max(-1, Math.min(1, sun[1]))) * 180 / Math.PI;
   cachePal = {
-    k, lit, shade, dirFade, night, illum,
+    k, lit, shade, dirFade, illum,
     // the air's two shares by tau, as tables (aerial perspective)
     airT: airTables(k),
     // the flat ground's share of direct light (the far rule's pivot)
@@ -309,8 +297,9 @@ for (const m of [MAT.PASTURE, MAT.FLOWERA, MAT.FLOWERB, MAT.FLOWERC, MAT.BARK]) 
 WETM[MAT.REED] = 0.5;
 for (const m of [MAT.WOOL, MAT.HIDE, MAT.FAWN, MAT.GULL, MAT.CROW, MAT.DUCK, MAT.DUCKHEAD, MAT.HARE]) WETM[m] = 0.6;
 let wetDark = 0, wetSheen = 0;
-// the rules of the stripe being resolved: air (aerial perspective and the
-// far-land rules) and the air a record's ray passed through (-1: phase 1's haze)
+// whether the stripe being resolved is a view (aerial perspective and the
+// far-land rules) or the overhead map (a plain haze, by distance); a record's
+// `tau` is the air its ray passed through (-1: the plain haze)
 let airOn = false;
 
 // The colour of one record of a HitBuffer (any material). Fills `rec` with
@@ -318,7 +307,6 @@ let airOn = false;
 // record's edge is returned as its coverage in `rec.cover` with the sky
 // behind it in `rec.sky*`, so each caller can draw the edge its own way.
 const rec = { r: 0, g: 0, b: 0, bright: 0, h: 0, cover: 1, skyR: 0, skyG: 0, skyB: 0 };
-// the look candidates of the stripe being resolved (set by resolveStripe)
 // (phase 4b) the flower drifts' blooms: each a share of its drift's lit colour
 const FLOWERS = LOOK.flowers;
 const BLOOM = FLOWERS.bloom.map((c, i) => {
@@ -327,7 +315,8 @@ const BLOOM = FLOWERS.bloom.map((c, i) => {
   const a = v(c), b = v(d);
   return a.map((x, q) => x / Math.max(1, b[q]));
 });
-let grassHue = 0, blueShallows = false;
+// (the meadow's tone turns its colour drier or lusher in a view, not on the map)
+let grassHue = 0;
 // `mu`: for a direct view, the sine of the ray's elevation (wet ground
 // mirrors the sky at low angles); 2 for any other record. `y`: the height of
 // what was hit, where known (far lit ground high up keeps its colour).
@@ -372,7 +361,7 @@ function recordColour(pal, hits, o, tau = -1, mu = 2, y = NaN, amb = 1) {
   } else if (m === MAT.SUN || m === MAT.MOON || m === MAT.FLAME) {
     const c = m === MAT.SUN ? k.sun : m === MAT.MOON ? k.moon : k.flame;
     // (under the night rule 'moon' the moon is as bright as its lit share)
-    const f = m === MAT.FLAME ? 0.75 + 0.25 * light : m === MAT.MOON && pal.night !== 'p1' ? light : 1;
+    const f = m === MAT.FLAME ? 0.75 + 0.25 * light : m === MAT.MOON ? light : 1;
     r = c[0] * f; g = c[1] * f; b = c[2] * f;
     // (behind the weather's cloud the sun and moon fade into the sky round them)
     if (pal.disc < 1 && m !== MAT.FLAME) { const s = k.sky.glow, d = pal.disc; r = s[0] + (r - s[0]) * d; g = s[1] + (g - s[1]) * d; b = s[2] + (b - s[2]) * d; }
@@ -491,17 +480,16 @@ function waterColour(pal, hits, o, ey = 0, mu = 0) {
   if (hits[o + 2 * REC] !== MAT_NONE) {
     recordColour(pal, hits, o + 2 * REC, airOn ? 0 : -1);
     const path = (hits[o + 2 * REC + 6] | (hits[o + 2 * REC + 7] << 8)) / 10;
-    // warm: the bed shows through the shallows, tinted toward the deep
-    // colour with depth; blue: an even blue, the bed only in the last half metre
-    const a = blueShallows ? smooth(0, W.blueDepth, path) : Math.max(W.tint, 1 - Math.exp(-path / W.absorb));
+    // an even blue, the bed showing only in the last half metre
+    const a = smooth(0, W.blueDepth, path);
     const sh = 1 - pal.castK * (hits[o + 2] / 255) * 0.5;
-    const deep = blueShallows ? k.water.blue : k.water.deep, shal = k.water.shallow;
+    const deep = k.water.blue, shal = k.water.shallow;
     // shallow water warms the bed a little, deeper water takes it to the deep colour
     br = (rec.r + (shal[0] - rec.r) * W.warm) * sh; bg = (rec.g + (shal[1] - rec.g) * W.warm) * sh; bb = (rec.b + (shal[2] - rec.b) * W.warm) * sh;
     br += (deep[0] - br) * a; bg += (deep[1] - bg) * a; bb += (deep[2] - bb) * a;
     bBright = rec.bright * (1 - a);
   } else {
-    const deep = blueShallows ? k.water.blue : k.water.deep;
+    const deep = k.water.blue;
     br = deep[0]; bg = deep[1]; bb = deep[2]; bBright = 0.2;
   }
   let r = br + (mr - br) * F, g = bg + (mg - bg) * F, b = bb + (mb - bb) * F;
@@ -665,14 +653,13 @@ const hash01 = (i, k, n) => {
 
 // Resolve a stripe. `hits` and `cells` cover columns c0..c0+sw-1, all rows.
 // `frame` is the frame description (src/contract.js); a call without one
-// (the overhead map passes the look alone) resolves with phase 1's haze.
+// (the overhead map) resolves with a plain haze by distance.
 // `env`: what the world gives resolve besides the frame (phase 2b: the mist's
 // floor, `env.mist`); without it there is no mist.
 export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null) {
   const viewed = !!(frame && frame.cam);
-  const look = viewed ? frame.look : frame;
   const dither = LOOK.dither, glyphFade = LOOK.haze.glyphFade;
-  airOn = viewed && (look && look.air ? look.air : LOOK.choices.air.default) === 'aerial';
+  airOn = viewed;
   // the weather (phase 2b): thicker or thinner air, wet ground, mist, rain
   // (from the frame: the palette is shared by frames whose ground may be
   // wetter or drier)
@@ -701,8 +688,7 @@ export function resolveStripe(pal, hits, cells, sw, rows, c0, frame, env = null)
   const mc = pal.mistC, rc = pal.rainC;
   const [ifr, ifg, ifb] = pal.inkFloor;
   const flameK = pal.k.flameStrength, flameP = LOOK.flameFade, flameF = pal.k.flameFloor;
-  grassHue = look ? LOOK.meadow.hue[look.meadow] || 0 : 0;
-  blueShallows = !!(look && look.shallows === 'blue');
+  grassHue = viewed ? LOOK.meadow.hue : 0;
   let nf = 0;
   for (let cy = 0; cy < rows; cy++) {
     const yb = (1 - 2 * (cy + 0.5) / rows) * ty, bRow = cp - yb * sp, up = yb * cp + sp;

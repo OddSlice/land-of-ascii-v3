@@ -26,7 +26,7 @@ const grab = async (browser, root, scene) => {
     const r = await lab.page.evaluate(async ({ i, t }) => {
       const L = window.lab;
       if (L.people) L.people.set(true);
-      L.resetLook(); L.setWeather('fair');
+      L.setWeather('fair');
       L.camera(i); L.freeze(t, 0);
       await L.whenIdle();
       const st = L.state();

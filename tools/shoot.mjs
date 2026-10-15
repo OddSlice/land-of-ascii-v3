@@ -6,7 +6,7 @@
 //   node tools/shoot.mjs --cams 0,3 --times night --no-sheets
 //   node tools/shoot.mjs --built         shoot the built play.html instead of src/
 //   options: --threads N, --density 1..4, --browser chromium|firefox|webkit, --out dir,
-//            --look cloud=B,meadow=2,shallows=blue (the look candidates), --stress (its three cameras),
+//            --stress (its three cameras),
 //            --cam x,z,yaw,pitch --time day --name test  (a free camera)
 //   node tools/shoot.mjs --world [--seed N] [--built]   (phase 2a) the generated
 //       world's views beside the reference's mountain and dusk frames, into
@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, dataURL, writeDataURL, workbench } from './lib/browser.mjs';
-import { serve, args, openLab, parseLook, ROOT } from './lib/serve.mjs';
+import { serve, args, openLab, ROOT } from './lib/serve.mjs';
 
 const a = args();
 const out = path.join(ROOT, a.out || 'shots');
@@ -81,7 +81,7 @@ if (a.world || a.fort) {
   process.exit(failed ? 1 : 0);
 }
 try {
-  const lab = await openLab(browser, url, { built: !!a.built, threads: a.threads, density: a.density, look: parseLook(a.look), stress: !!a.stress });
+  const lab = await openLab(browser, url, { built: !!a.built, threads: a.threads, density: a.density, stress: !!a.stress });
   const { page } = lab;
   await page.evaluate(() => window.lab.setHud(false));
   const cams = await page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, ref: c.ref, refLabel: c.refLabel, time: c.time })));

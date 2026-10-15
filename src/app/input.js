@@ -1,5 +1,3 @@
-import { LOOK } from '../look.js';
-
 // Keyboard and mouse. Mouse look uses pointer lock after a click; where the
 // lock is refused (the Claude app's browser pane, some embeds) dragging with
 // the mouse looks around instead, and the arrow keys always do. Escape goes to
@@ -44,7 +42,7 @@ export class Input {
       if (!code) return;
       if (e.repeat && !code.startsWith('Arrow') && !code.startsWith('Key')) return;
       this.keys[code] = true;
-      if (!e.repeat) this.press({ code, shiftKey: e.shiftKey });
+      if (!e.repeat) this.press({ code });
       if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
     });
     addEventListener('keyup', (e) => { const code = this.map(e.code); if (code) this.keys[code] = false; });
@@ -90,11 +88,11 @@ export class Input {
       case 'KeyT': a.toggleClock(); break;
       case 'KeyC': a.nextCamera(); break;
       case 'KeyG': a.toggleGlyphs(); break;
-      case 'KeyR': a.toggleRef(); break;
+      case 'KeyR': if (a.newWorld) a.newWorld(); break;
       case 'KeyH': a.toggleHud(); break;
       case 'KeyX': a.toggleScene(); break;
-      // (phase 5a) L: the lantern in the world (Shift L, or L elsewhere: the look panel)
-      case 'KeyL': if (e.shiftKey || !a.lantern || !a.lantern()) a.toggleLook(); break;
+      // (phase 5a) L: the lantern
+      case 'KeyL': if (a.lantern) a.lantern(); break;
       case 'KeyJ': if (a.journal) a.journal(); break;
       case 'KeyK': if (a.sketch) a.sketch(); break;
       case 'KeyF': if (a.toggleFly) a.toggleFly(); break;
@@ -103,11 +101,6 @@ export class Input {
       case 'KeyN': if (a.mute) a.mute(); break;
       case 'KeyE': if (a.greet) a.greet(); break;
       case 'Space': if (a.jump) a.jump(); break;
-      default: {
-        // the look panel's keys (LOOK.choices)
-        for (const [name, c] of Object.entries(LOOK.choices)) if (e.code === `Digit${c.key}`) a.cycleLook(name);
-        break;
-      }
       case 'Minus': case 'NumpadSubtract': a.density(-1); break;
       case 'Equal': case 'NumpadAdd': a.density(1); break;
     }
