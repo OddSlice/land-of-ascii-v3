@@ -116,19 +116,39 @@ export function toJSON(p, packed = null) {
     ...(p.at ? { at: p.at } : {}),
   });
 }
-// Back from JSON, checked; null if it is not a record of this kind.
+// A world's number: what the address can open (0 to 2^32 - 1).
+export const seedOK = (s) => Number.isInteger(s) && s >= 0 && s < 2 ** 32;
+// The most sketches a record keeps (the journal's limit).
+export const MAX_SKETCHES = 60;
+// A moment: [day, hour].
+const whenOK = (t) => Array.isArray(t) && t.length === 2 && Number.isFinite(t[0]) && t[0] >= 0 && Number.isFinite(t[1]) && t[1] >= 0 && t[1] <= 24;
+// (phase 6.2) An object of entries, keeping only those `ok` accepts, into a
+// fresh object (so no key can reach its prototype).
+function entries(x, ok) {
+  const out = {};
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return out;
+  for (const [k, v] of Object.entries(x)) if (k !== '__proto__' && k.length <= 40 && ok(k, v)) out[k] = v;
+  return out;
+}
+const favourOK = (k, r) => r && typeof r === 'object' && Number.isInteger(r.s) && r.s >= F.NEW && r.s <= F.DONE && whenOK(r.t) && (r.n === undefined || Number.isInteger(r.n));
+// Back from JSON, checked; null if it is not a record of this kind. An
+// entry that is not of its kind is left out, so one bad entry never stops
+// the rest (phase 6.2); `dropWorld` (below) then leaves out what names
+// nothing in this world.
 export function fromJSON(text, seed, N) {
   let o;
   try { o = JSON.parse(text); } catch { return null; }
-  if (!o || typeof o !== 'object' || o.v !== VERSION || (seed !== undefined && o.seed !== seed)) return null;
+  if (!o || typeof o !== 'object' || o.v !== VERSION || !seedOK(o.seed) || (seed !== undefined && o.seed !== seed)) return null;
   const p = freshProgress(o.seed, N);
   if (o.sn !== p.sn || o.wn !== p.wn) return null;
   try { p.seen = unpackBits(String(o.seen || ''), p.sn * p.sn); p.walked = unpackBits(String(o.walked || ''), p.wn * p.wn); } catch { return null; }
-  const obj = (x) => (x && typeof x === 'object' && !Array.isArray(x) ? x : {});
-  p.found = obj(o.found); p.met = obj(o.met); p.favours = obj(o.favours);
+  p.found = entries(o.found, (k, t) => whenOK(t));
+  p.met = entries(o.met, (k, t) => /^\d+$/.test(k) && whenOK(t));
+  p.favours = entries(o.favours, favourOK);
   p.lantern = !!o.lantern; p.lit = !!o.lit && p.lantern; p.first = !!o.first;
-  p.sketches = Array.isArray(o.sketches) ? o.sketches.filter((s) => s && Number.isInteger(s.id)) : [];
-  p.nextSketch = Number.isInteger(o.nextSketch) ? o.nextSketch : 1 + Math.max(0, ...p.sketches.map((s) => s.id));
+  const ids = new Set();
+  p.sketches = (Array.isArray(o.sketches) ? o.sketches : []).filter((s) => s && typeof s === 'object' && Number.isInteger(s.id) && s.id > 0 && !ids.has(s.id) && ids.add(s.id)).slice(0, MAX_SKETCHES);
+  p.nextSketch = Number.isInteger(o.nextSketch) && o.nextSketch > Math.max(0, ...ids) ? o.nextSketch : 1 + Math.max(0, ...p.sketches.map((s) => s.id));
   // (phase 6; older records have none)
   if (Array.isArray(o.at) && o.at.length === 3 && o.at.every(Number.isFinite) && o.at[0] >= 0 && o.at[1] >= 0 && o.at[0] <= N && o.at[1] <= N) p.at = o.at.slice();
   return p;
@@ -177,7 +197,9 @@ export async function readBackup(text, N) {
   try { o = JSON.parse(new TextDecoder().decode(await inflate(fromB64(body)))); } catch { return { error: 'the backup is damaged or cut short' }; }
   const p = o && o.progress ? fromJSON(JSON.stringify(o.progress), Number(m[1]), N) : null;
   if (!p) return { error: 'the backup is damaged or from another version' };
-  const sk = o.sketches && typeof o.sketches === 'object' ? o.sketches : {};
+  // (only the kept sketches' pictures, each as text)
+  const kept = new Set(p.sketches.map((s) => String(s.id)));
+  const sk = entries(o.sketches, (k, d) => kept.has(k) && typeof d === 'string');
   return { progress: p, sketches: sk };
 }
 
@@ -213,6 +235,17 @@ export class Store {
       if (!this.failed) { this.failed = true; this.note = 'The browser would not keep the last change (its storage is full or blocked), so it lasts until you leave.'; }
       return false;
     }
+  }
+  // (phase 6.2) A record this build cannot read (another version's, or
+  // damaged) is kept under a key of its own before anything is written
+  // over it, so it is never lost: one key per different record.
+  keepAside(text) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    const name = `unread.${(h >>> 0).toString(16).padStart(8, '0')}`;
+    if (this.get(name) === null) this.set(name, text);
+    if (this.ok && !this.failed) this.note = 'A walk saved here before could not be read, so it is kept aside, not written over.';
+    return name;
   }
   remove(name) {
     this.mem.delete(name);

@@ -16,7 +16,7 @@
 //   is left.
 // Off (the tools, which run with progress cleared): nothing is tracked or
 // drawn, and nothing changes from phase 4b.
-import { freshProgress, fromJSON, toJSON, Store, F, countBits, packSketch, unpackSketch, backupText, readBackup, bit, packBits } from '../game/progress.js';
+import { freshProgress, fromJSON, toJSON, Store, F, countBits, packSketch, unpackSketch, backupText, readBackup, bit, packBits, MAX_SKETCHES } from '../game/progress.js';
 import { placesOf, finds, compass, fill, cap } from '../game/places.js';
 import { buildFavours, favourWords, START_DAY, START_HOUR } from '../game/favours.js';
 import { Discovery, VIEW_REVEAL } from '../game/discovery.js';
@@ -27,7 +27,6 @@ import { WAITING, BACK, AND_ME, LATER, YES, LANTERN_GIFT, STANDING, HAILS, PICK_
 
 const SAVE_EVERY = 4000;          // ms: changes are written at most this often (sooner for the important ones)
 const PICK = 1.8;                 // m: how close a lost thing is picked up
-const MAX_SKETCHES = 60;
 
 const STRIDE = 1.3;
 
@@ -70,7 +69,8 @@ export class Wayfaring {
     this.store = new Store(this.seed, { off: !store });
     const saved = this.store.get('progress');
     const p = saved ? fromJSON(saved, this.seed, W.N) : null;
-    this.progress = p || freshProgress(this.seed, W.N);
+    if (saved && !p) this.store.keepAside(saved);
+    this.progress = p ? this.dropWorld(p) : freshProgress(this.seed, W.N);
     this.fresh = !p;
     // (the first meeting: a first session only)
     this.meetOn = meet && this.fresh && !!this.fav.meet && !this.progress.first;
@@ -386,12 +386,22 @@ export class Wayfaring {
       return { ok: true, seed: r.progress.seed, other: true };
     }
     this.store.clear(this.progress.sketches.map((s) => s.id));
-    this.progress = r.progress;
+    this.progress = this.dropWorld(r.progress);
     this.sketchCache.clear();
     for (const [id, d] of Object.entries(r.sketches)) this.store.set(`sketch.${id}`, d);
     this.store.set('progress', toJSON(this.progress));
     this.afterReset();
     return { ok: true, seed: this.seed };
+  }
+  // (phase 6.2) Leave out what a record names that is not in this world: a
+  // person, a place or a favour (from an edited backup, say). Another
+  // world's record is checked when that world is opened.
+  dropWorld(p) {
+    const n = this.people.P.persons.length, places = new Set(this.places.list.map((pl) => pl.id)), favs = new Set(this.fav.list.map((f) => f.id));
+    for (const id of Object.keys(p.met)) if (!(Number(id) < n)) delete p.met[id];
+    for (const id of Object.keys(p.found)) if (!places.has(id)) delete p.found[id];
+    for (const id of Object.keys(p.favours)) if (!favs.has(id)) delete p.favours[id];
+    return p;
   }
   clear() {
     this.store.clear(this.progress.sketches.map((s) => s.id));

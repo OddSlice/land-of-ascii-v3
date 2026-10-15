@@ -119,7 +119,7 @@ export function labParts(app) {
       if (!app.way || !app.way.on) return false;
       const p = progressFrom(typeof json === 'string' ? json : JSON.stringify(json), app.SEED, app.world.N);
       if (!p) return false;
-      app.way.progress = p; app.way.afterReset();
+      app.way.progress = app.way.dropWorld(p); app.way.afterReset();
       return true;
     },
     clear() { if (app.way && app.way.on) app.way.clear(); },
