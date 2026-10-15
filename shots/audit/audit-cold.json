@@ -1,0 +1,14 @@
+[
+ {
+  "area": "cold",
+  "what": "a cold load of the live site (unthrottled)",
+  "ok": true,
+  "note": "front page loaded in 0.41 s; play.html parsed 0.58 s, the title up 4.88 s, first frame 5.26 s (the world built in 3.43 s)"
+ },
+ {
+  "area": "cold",
+  "what": "a cold load of the live site (slow 4G)",
+  "ok": true,
+  "note": "front page loaded in 0.40 s; play.html parsed 2.18 s, the title up 6.47 s, first frame 6.84 s (the world built in 3.44 s)"
+ }
+]

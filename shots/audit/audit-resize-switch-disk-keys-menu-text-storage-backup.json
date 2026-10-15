@@ -1,0 +1,374 @@
+[
+ {
+  "area": "resize",
+  "what": "resized eight times while walking (shared): frames keep coming, the grid follows",
+  "ok": true,
+  "note": "1477x877:369x109 837x577:209x72 1957x1057:391x105 412x789:103x98 1061x617:265x77 2597x1417:371x101 677x337:169x42 1317x777:329x97"
+ },
+ {
+  "area": "resize",
+  "what": "resized eight times while walking (fallback): frames keep coming, the grid follows",
+  "ok": true,
+  "note": "1477x877:369x109 837x577:209x72 1957x1057:391x105 412x789:103x98 1061x617:265x77 2597x1417:371x101 677x337:169x42 1317x777:329x97"
+ },
+ {
+  "area": "switch",
+  "what": "the detail level switched seven times while walking, then − and + pressed quickly: frames keep coming",
+  "ok": true,
+  "note": "0:182x57 3:426x133 1:256x80 2:320x100 3:426x133 0:182x57 2:320x100"
+ },
+ {
+  "area": "switch",
+  "what": "opened with 0 workers: it walks and draws",
+  "ok": true,
+  "note": "0 threads, shared false, moved 8.1 m"
+ },
+ {
+  "area": "switch",
+  "what": "opened with 1 worker: it walks and draws",
+  "ok": true,
+  "note": "1 threads, shared true, moved 6.7 m"
+ },
+ {
+  "area": "switch",
+  "what": "opened with 2 workers: it walks and draws",
+  "ok": true,
+  "note": "2 threads, shared true, moved 5.5 m"
+ },
+ {
+  "area": "switch",
+  "what": "opened with 8 workers: it walks and draws",
+  "ok": true,
+  "note": "8 threads, shared true, moved 5.5 m"
+ },
+ {
+  "area": "disk",
+  "what": "play.html opened from the disk in chromium: the title, Play, walking",
+  "ok": true,
+  "note": "4 workers, shared false, 320x100"
+ },
+ {
+  "area": "disk",
+  "what": "play.html opened from the disk in firefox: the title, Play, walking",
+  "ok": true,
+  "note": "4 workers, shared false, 320x100"
+ },
+ {
+  "area": "disk",
+  "what": "play.html opened from the disk in webkit: the title, Play, walking",
+  "ok": true,
+  "note": "4 workers, shared false, 320x100"
+ },
+ {
+  "area": "keys",
+  "what": "the first walk's hint names the moved keys",
+  "ok": true,
+  "note": "IYOPwalk · click the picture to look round · Qgreet · Escmenu"
+ },
+ {
+  "area": "keys",
+  "what": "forward: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "KeyI 1.87 m, KeyW 0.00 m"
+ },
+ {
+  "area": "keys",
+  "what": "left: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "KeyY 1.80 m, KeyA 0.00 m"
+ },
+ {
+  "area": "keys",
+  "what": "back: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "KeyO 1.80 m, KeyS 0.00 m"
+ },
+ {
+  "area": "keys",
+  "what": "right: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "KeyP 1.80 m, KeyD 0.00 m"
+ },
+ {
+  "area": "keys",
+  "what": "run: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "walk 2.25, ShiftRight 3.99, ShiftLeft 2.25 m"
+ },
+ {
+  "area": "keys",
+  "what": "jump: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "B rose 0.72 m, Space 0.00 m"
+ },
+ {
+  "area": "keys",
+  "what": "fly: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "Z true, F false"
+ },
+ {
+  "area": "keys",
+  "what": "map: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "; true, M false"
+ },
+ {
+  "area": "keys",
+  "what": "greet: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "Q true, E false"
+ },
+ {
+  "area": "keys",
+  "what": "journal: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "V true, J false"
+ },
+ {
+  "area": "keys",
+  "what": "sketch: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "Comma 1, K 0"
+ },
+ {
+  "area": "keys",
+  "what": "lantern: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": ". lit true, L lit false"
+ },
+ {
+  "area": "keys",
+  "what": "mute: its moved key does it, its default key does nothing",
+  "ok": true,
+  "note": "/ \"NSound off.\", N \"JThe journal notes Dunholme.\""
+ },
+ {
+  "area": "keys",
+  "what": "Controls shows each moved key",
+  "ok": true,
+  "note": "I Y O P right Shift B Q Z V , . ; /"
+ },
+ {
+  "area": "keys",
+  "what": "no page error",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "menu",
+  "what": "every control of every section pressed by the keyboard alone (125 pressed, 48 that leave the page or take a key skipped)",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: title",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: menu controls",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: menu display",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: menu sound",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: menu world",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: menu advanced",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: journal places",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: journal people",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: journal favours",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: journal sketches",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: exchange",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: signpost",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "the largest text at 1024 x 640: map",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "text",
+  "what": "no page error",
+  "ok": true,
+  "note": ""
+ },
+ {
+  "area": "storage",
+  "what": "the front page with every storage call failing: Play shows, no error",
+  "ok": true,
+  "note": "Play"
+ },
+ {
+  "area": "storage",
+  "what": "the game with every storage call failing: the title, Play, walking, a setting, a key, a sketch, the journal",
+  "ok": true,
+  "note": "title: Play a new walk in this land; key: \"walk forward: U.\"; journal open, \"This browser is not keeping anything for this page, so what you do here lasts until you leave.\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with cut short: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "refused: the backup is damaged or cut short; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with a character changed: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "refused: the backup is damaged or cut short; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with another head: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "refused: that is not a backup from this game; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with empty: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "refused: that is not a backup from this game; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with a record of another version: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "refused: the backup is damaged or from another version; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with found: a place with null: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with found: a place not in this world: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with met: someone not in this world: the game goes on (journal, map, walking, reload)",
+  "ok": false,
+  "note": "restored; after a reload \"\"; page.evaluate: TypeError: Cannot read properties of undefined (reading 'village')\n    at http://127.0.0.1:57542/play.html?seed=3:434:31624\n    at Array.map (<anonymous>)\n    at ec.journal (http://127."
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with met: someone with null: the game goes on (journal, map, walking, reload)",
+  "ok": false,
+  "note": "restored; after a reload \"Continue a stranger\"; TypeError: Cannot read properties of null (reading '0') | TypeError: Cannot read properties of null (reading '0') | Uncaught TypeError: Cannot read properties of null (reading '0') (http://127.0.0.1:57542/play.html?seed=3:434)"
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with met: someone with a number: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with favours: one with null: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with favours: one in a state that does not exist: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with favours: one with a word for its state: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with sketches: one with no picture: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with sketches: 200 of them: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with at: far off the land: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with seen: not a grid: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with seed: another, huge: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored for seed 99999999999; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with a __proto__ key: the game goes on (journal, map, walking, reload)",
+  "ok": true,
+  "note": "restored; after a reload \"Continue a stranger\""
+ }
+]

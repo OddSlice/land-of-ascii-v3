@@ -1,0 +1,671 @@
+{
+ "git": {
+  "commits": 129,
+  "first": "2026-10-09T23:52:49+03:00",
+  "last": "2026-10-14T23:58:20+03:00",
+  "days": 5
+ },
+ "code": {
+  "sourceFiles": 128,
+  "sourceLines": 27015,
+  "byArea": {
+   "page, menus and input": {
+    "files": 38,
+    "lines": 6391
+   },
+   "renderer": {
+    "files": 23,
+    "lines": 5663
+   },
+   "front page": {
+    "files": 2,
+    "lines": 229
+   },
+   "wayfaring": {
+    "files": 7,
+    "lines": 1464
+   },
+   "look data": {
+    "files": 2,
+    "lines": 853
+   },
+   "sound and music": {
+    "files": 5,
+    "lines": 1266
+   },
+   "animals": {
+    "files": 6,
+    "lines": 1265
+   },
+   "world, kit and scenes": {
+    "files": 17,
+    "lines": 3550
+   },
+   "world generator": {
+    "files": 17,
+    "lines": 4489
+   },
+   "people": {
+    "files": 11,
+    "lines": 1845
+   }
+  },
+  "tools": 33,
+  "toolLibs": 10,
+  "toolLines": 7048,
+  "glyphs": 28,
+  "materials": 61,
+  "paletteHexColours": 617,
+  "soundKinds": 32,
+  "soundKindNames": [
+   "wind",
+   "rain",
+   "lake",
+   "river",
+   "sea",
+   "song",
+   "chorus",
+   "gull",
+   "crow",
+   "finch",
+   "sheep",
+   "cattle",
+   "hens",
+   "duck",
+   "dog",
+   "deer",
+   "step meadow",
+   "step road",
+   "step sand",
+   "step stone",
+   "step timber",
+   "step water",
+   "step snow",
+   "step splash",
+   "step creak",
+   "step land",
+   "step echo",
+   "torch",
+   "hearth",
+   "well",
+   "bell",
+   "latch"
+  ],
+  "musicTracks": 3,
+  "greetingLines": 137,
+  "favourLines": 192
+ },
+ "size": {
+  "playHtmlBytes": 1038168,
+  "page": {
+   "total": 664108,
+   "g": {
+    "look data": 20557,
+    "renderer": 110169,
+    "world, kit and scenes": 88251,
+    "people": 53557,
+    "page, menus and input": 164286,
+    "wayfaring": 46474,
+    "animals": 35258,
+    "world generator": 108014,
+    "sound and music": 37412
+   }
+  },
+  "worker": {
+   "total": 336471,
+   "g": {
+    "world, kit and scenes": 82390,
+    "renderer": 106659,
+    "look data": 20520,
+    "people": 5840,
+    "animals": 6057,
+    "world generator": 107703,
+    "page, menus and input": 7301
+   }
+  },
+  "htmlAndCss": 37463,
+  "front": 37377
+ },
+ "when": "2026-10-15T10:07:57.036Z",
+ "world": {
+  "seed3": {
+   "seed": 3,
+   "trees": 11824,
+   "bushes": 503,
+   "copses": 32,
+   "boulders": 310,
+   "outcrops": 16,
+   "logs": 243,
+   "stumps": 383,
+   "reedBeds": 43,
+   "people": 58,
+   "roles": {
+    "fisher": 2,
+    "householder": 15,
+    "farmer": 16,
+    "keeper": 3,
+    "shepherd": 4,
+    "wellkeeper": 2,
+    "carter": 3,
+    "minder": 1,
+    "guard": 9,
+    "traveller": 3
+   },
+   "animals": {
+    "sheep": 62,
+    "cattle": 8,
+    "hens": 19,
+    "dogs": 3,
+    "deer": 27,
+    "hares": 12,
+    "ducks": 14,
+    "gulls": 13,
+    "crows": 9,
+    "small birds": 86,
+    "large birds": 2
+   },
+   "animalsTotal": 255,
+   "villages": 3,
+   "villageHouses": 41,
+   "barns": 6,
+   "chapels": 3,
+   "marketShelters": 1,
+   "jetties": 1,
+   "fortTowers": 6,
+   "fortKeep": 1,
+   "fortHouses": 2,
+   "buildings": 59,
+   "bridges": 2,
+   "roadsKm": 2.3164843201791054,
+   "viewpoints": 4,
+   "lakes": 6,
+   "rivers": 3,
+   "places": 16,
+   "favours": 15,
+   "torches": 47
+  },
+  "stages3": {
+   "shaping the land": 587,
+   "running the rain": 98,
+   "carving rivers": 73,
+   "growing forests": 273,
+   "choosing sites": 231,
+   "finding roads": 211,
+   "planting trees": 441,
+   "laying the ground": 1636,
+   "finishing": 246,
+   "total": 3796
+  },
+  "sweep": {
+   "seeds": 60,
+   "stats": {
+    "trees": {
+     "mean": 11849.5,
+     "min": 11717,
+     "max": 11972
+    },
+    "bushes": {
+     "mean": 536.15,
+     "min": 321,
+     "max": 868
+    },
+    "copses": {
+     "mean": 29.466666666666665,
+     "min": 17,
+     "max": 32
+    },
+    "boulders": {
+     "mean": 300.5833333333333,
+     "min": 254,
+     "max": 361
+    },
+    "outcrops": {
+     "mean": 24.366666666666667,
+     "min": 11,
+     "max": 45
+    },
+    "logs": {
+     "mean": 251.03333333333333,
+     "min": 195,
+     "max": 302
+    },
+    "stumps": {
+     "mean": 383.75,
+     "min": 304,
+     "max": 485
+    },
+    "reedBeds": {
+     "mean": 48.15,
+     "min": 12,
+     "max": 92
+    },
+    "people": {
+     "mean": 59.9,
+     "min": 44,
+     "max": 73
+    },
+    "animalsTotal": {
+     "mean": 239.33333333333334,
+     "min": 184,
+     "max": 276
+    },
+    "villages": {
+     "mean": 3,
+     "min": 3,
+     "max": 3
+    },
+    "villageHouses": {
+     "mean": 42.06666666666667,
+     "min": 26,
+     "max": 57
+    },
+    "barns": {
+     "mean": 4.316666666666666,
+     "min": 3,
+     "max": 6
+    },
+    "chapels": {
+     "mean": 3,
+     "min": 3,
+     "max": 3
+    },
+    "marketShelters": {
+     "mean": 1,
+     "min": 1,
+     "max": 1
+    },
+    "jetties": {
+     "mean": 0.95,
+     "min": 0,
+     "max": 1
+    },
+    "fortTowers": {
+     "mean": 4.966666666666667,
+     "min": 4,
+     "max": 6
+    },
+    "fortKeep": {
+     "mean": 1,
+     "min": 1,
+     "max": 1
+    },
+    "fortHouses": {
+     "mean": 1.4166666666666667,
+     "min": 0,
+     "max": 2
+    },
+    "buildings": {
+     "mean": 56.766666666666666,
+     "min": 38,
+     "max": 72
+    },
+    "bridges": {
+     "mean": 1.2833333333333334,
+     "min": 0,
+     "max": 3
+    },
+    "roadsKm": {
+     "mean": 2.340789217149758,
+     "min": 1.8503705365546017,
+     "max": 3.26773941977731
+    },
+    "viewpoints": {
+     "mean": 4,
+     "min": 4,
+     "max": 4
+    },
+    "lakes": {
+     "mean": 5.333333333333333,
+     "min": 2,
+     "max": 12
+    },
+    "rivers": {
+     "mean": 2.0833333333333335,
+     "min": 1,
+     "max": 3
+    },
+    "places": {
+     "mean": 14.366666666666667,
+     "min": 12,
+     "max": 16
+    },
+    "favours": {
+     "mean": 12.483333333333333,
+     "min": 10,
+     "max": 16
+    },
+    "torches": {
+     "mean": 42.75,
+     "min": 35,
+     "max": 50
+    },
+    "role householder": {
+     "mean": 18.183333333333334,
+     "min": 6,
+     "max": 36
+    },
+    "role farmer": {
+     "mean": 13.566666666666666,
+     "min": 0,
+     "max": 20
+    },
+    "role shepherd": {
+     "mean": 4.883333333333334,
+     "min": 3,
+     "max": 6
+    },
+    "role keeper": {
+     "mean": 3,
+     "min": 3,
+     "max": 3
+    },
+    "role wellkeeper": {
+     "mean": 2,
+     "min": 2,
+     "max": 2
+    },
+    "role carter": {
+     "mean": 3,
+     "min": 3,
+     "max": 3
+    },
+    "role minder": {
+     "mean": 1,
+     "min": 1,
+     "max": 1
+    },
+    "role fisher": {
+     "mean": 1.9,
+     "min": 0,
+     "max": 2
+    },
+    "role guard": {
+     "mean": 9,
+     "min": 9,
+     "max": 9
+    },
+    "role traveller": {
+     "mean": 3.3666666666666667,
+     "min": 3,
+     "max": 4
+    },
+    "animal sheep": {
+     "mean": 68.21666666666667,
+     "min": 38,
+     "max": 104
+    },
+    "animal cattle": {
+     "mean": 6.483333333333333,
+     "min": 0,
+     "max": 12
+    },
+    "animal hens": {
+     "mean": 16.433333333333334,
+     "min": 12,
+     "max": 21
+    },
+    "animal dogs": {
+     "mean": 3,
+     "min": 3,
+     "max": 3
+    },
+    "animal deer": {
+     "mean": 23.583333333333332,
+     "min": 6,
+     "max": 35
+    },
+    "animal hares": {
+     "mean": 12,
+     "min": 12,
+     "max": 12
+    },
+    "animal ducks": {
+     "mean": 14.966666666666667,
+     "min": 12,
+     "max": 18
+    },
+    "animal gulls": {
+     "mean": 16.033333333333335,
+     "min": 12,
+     "max": 21
+    },
+    "animal crows": {
+     "mean": 9,
+     "min": 9,
+     "max": 9
+    },
+    "animal small birds": {
+     "mean": 67.61666666666666,
+     "min": 49,
+     "max": 83
+    },
+    "animal large birds": {
+     "mean": 2,
+     "min": 2,
+     "max": 2
+    }
+   },
+   "buildMeanMs": 4076
+  }
+ },
+ "screen": [
+  {
+   "window": "1440 x 900 at 1",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 205,
+   "rows": 64,
+   "cells": 13120
+  },
+  {
+   "window": "1440 x 900 at 1",
+   "level": "medium",
+   "target": 25000,
+   "cols": 288,
+   "rows": 90,
+   "cells": 25920
+  },
+  {
+   "window": "1440 x 900 at 1",
+   "level": "fine",
+   "target": 40000,
+   "cols": 360,
+   "rows": 112,
+   "cells": 40320
+  },
+  {
+   "window": "1440 x 900 at 1",
+   "level": "finest",
+   "target": 60000,
+   "cols": 480,
+   "rows": 150,
+   "cells": 72000
+  },
+  {
+   "window": "1440 x 900 at 2",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 220,
+   "rows": 69,
+   "cells": 15180
+  },
+  {
+   "window": "1440 x 900 at 2",
+   "level": "medium",
+   "target": 25000,
+   "cols": 288,
+   "rows": 90,
+   "cells": 25920
+  },
+  {
+   "window": "1440 x 900 at 2",
+   "level": "fine",
+   "target": 40000,
+   "cols": 360,
+   "rows": 112,
+   "cells": 40320
+  },
+  {
+   "window": "1440 x 900 at 2",
+   "level": "finest",
+   "target": 60000,
+   "cols": 410,
+   "rows": 128,
+   "cells": 52480
+  },
+  {
+   "window": "1280 x 720 at 1",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 182,
+   "rows": 51,
+   "cells": 9282
+  },
+  {
+   "window": "1280 x 720 at 1",
+   "level": "medium",
+   "target": 25000,
+   "cols": 256,
+   "rows": 72,
+   "cells": 18432
+  },
+  {
+   "window": "1280 x 720 at 1",
+   "level": "fine",
+   "target": 40000,
+   "cols": 320,
+   "rows": 90,
+   "cells": 28800
+  },
+  {
+   "window": "1280 x 720 at 1",
+   "level": "finest",
+   "target": 60000,
+   "cols": 426,
+   "rows": 120,
+   "cells": 51120
+  },
+  {
+   "window": "1920 x 1080 at 1",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 240,
+   "rows": 67,
+   "cells": 16080
+  },
+  {
+   "window": "1920 x 1080 at 1",
+   "level": "medium",
+   "target": 25000,
+   "cols": 320,
+   "rows": 90,
+   "cells": 28800
+  },
+  {
+   "window": "1920 x 1080 at 1",
+   "level": "fine",
+   "target": 40000,
+   "cols": 384,
+   "rows": 108,
+   "cells": 41472
+  },
+  {
+   "window": "1920 x 1080 at 1",
+   "level": "finest",
+   "target": 60000,
+   "cols": 480,
+   "rows": 135,
+   "cells": 64800
+  },
+  {
+   "window": "2560 x 1440 at 2",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 232,
+   "rows": 65,
+   "cells": 15080
+  },
+  {
+   "window": "2560 x 1440 at 2",
+   "level": "medium",
+   "target": 25000,
+   "cols": 300,
+   "rows": 84,
+   "cells": 25200
+  },
+  {
+   "window": "2560 x 1440 at 2",
+   "level": "fine",
+   "target": 40000,
+   "cols": 365,
+   "rows": 102,
+   "cells": 37230
+  },
+  {
+   "window": "2560 x 1440 at 2",
+   "level": "finest",
+   "target": 60000,
+   "cols": 464,
+   "rows": 130,
+   "cells": 60320
+  },
+  {
+   "window": "3840 x 2160 at 1.5",
+   "level": "coarse",
+   "target": 15000,
+   "cols": 228,
+   "rows": 63,
+   "cells": 14364
+  },
+  {
+   "window": "3840 x 2160 at 1.5",
+   "level": "medium",
+   "target": 25000,
+   "cols": 303,
+   "rows": 84,
+   "cells": 25452
+  },
+  {
+   "window": "3840 x 2160 at 1.5",
+   "level": "fine",
+   "target": 40000,
+   "cols": 384,
+   "rows": 108,
+   "cells": 41472
+  },
+  {
+   "window": "3840 x 2160 at 1.5",
+   "level": "finest",
+   "target": 60000,
+   "cols": 480,
+   "rows": 135,
+   "cells": 64800
+  }
+ ],
+ "rays": [
+  {
+   "camera": "main lake shore",
+   "cells": 40320,
+   "direct": 40320,
+   "mirrored": 11734,
+   "intoWater": 10654,
+   "total": 62708
+  },
+  {
+   "camera": "spawn view",
+   "cells": 40320,
+   "direct": 40320,
+   "mirrored": 2360,
+   "intoWater": 2111,
+   "total": 44791
+  },
+  {
+   "camera": "inside a forest stand",
+   "cells": 40320,
+   "direct": 40320,
+   "mirrored": 0,
+   "intoWater": 280,
+   "total": 40600
+  }
+ ]
+}
