@@ -248,7 +248,7 @@ export function wetFine(H, N, coarse, lakeInfo, rivers, accAt, seed) {
   });
   // the nearest river point to every node within reach of a channel
   for (let p = 0; p < pts.length; p++) {
-    const [x, z, w, bed, hw, lk] = pts[p];
+    const [x, z, w, , hw, lk] = pts[p];
     if (lk >= 0) continue;
     const R = hw + 1.5 + Math.min(30, Math.max(0, (bil(pre, N, x, z) - w) / 0.55));
     const x0 = Math.max(0, Math.floor(x - R)), x1 = Math.min(N, Math.ceil(x + R));

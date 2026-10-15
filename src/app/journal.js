@@ -109,7 +109,7 @@ export class Journal {
     this.pane = h('div', { class: 'pane' });
     this.panel = h('div', { class: 'panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'jr-title' }, rail, this.pane, h('div', { class: 'foot' }, this.closeBtn));
     this.sections = {};
-    for (const [id, title] of PAGES) this.sections[id] = h('section', { role: 'tabpanel', id: `jr-panel-${id}`, 'aria-labelledby': `jr-tab-${id}`, hidden: true });
+    for (const [id] of PAGES) this.sections[id] = h('section', { role: 'tabpanel', id: `jr-panel-${id}`, 'aria-labelledby': `jr-tab-${id}`, hidden: true });
     this.pane.append(...Object.values(this.sections));
     // the viewer, over everything
     this.canvas = h('canvas', { class: 'sheet', role: 'img' });

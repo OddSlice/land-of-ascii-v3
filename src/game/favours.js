@@ -28,7 +28,6 @@ import { compass, fill, cap } from './places.js';
 
 export const START_DAY = LOOK.moon.startDay, START_HOUR = LOOK.hours.day;
 const WALK = 4.5;                              // the player's walking speed (m/s)
-export const WALK_MIN = 4 * 60 * WALK, WALK_MAX = 12 * 60 * WALK;   // a favour's walk, metres
 // the walks aimed for (a little inside the limits, so a reader who
 // looks about a little still keeps within them)
 const CARRY_LEN = [1250, 2900], RETURN_LEN = [640, 1450], FIND_LEN = [1200, 2850];
@@ -341,7 +340,6 @@ export function buildFavours(world, P, places) {
     }
     return null;
   };
-  const townOf = (i) => (P.persons[i].role === 'guard' ? 'fort' : P.persons[i].village);
   // Is a town plainly the one its direction names from (x, z)? (no other
   // village lies nearer within 45 degrees of that direction: a reader of
   // "Corwen lies west of here" goes to the first village west, and the fort

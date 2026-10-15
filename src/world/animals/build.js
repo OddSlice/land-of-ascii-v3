@@ -12,7 +12,7 @@
 //   crows to the fort's battlements and the village roofs (from the kit's
 //   shapes), small birds to the copses, a pair of large birds to the high
 //   ground.
-import { KIND, SPEC } from './kinds.js';
+import { KIND } from './kinds.js';
 import { MAT } from '../../contract.js';
 import { hash2 } from '../noise.js';
 import { groundAt } from '../objects.js';
@@ -166,7 +166,7 @@ export function buildAnimals(world, P) {
     const cands = [];
     const g = C.duckGrid;
     for (let gz = 2; gz * g < N - 2; gz++) for (let gx = 2; gx * g < N - 2; gx++) {
-      const x = (gx + r(gx, gz, 41)) * g, z = (gz + r(gx, gz, 42)) * g, j = Math.round(z) * NN + Math.round(x);
+      const x = (gx + r(gx, gz, 41)) * g, z = (gz + r(gx, gz, 42)) * g;
       if (waterKind(x, z) !== WK.LAKE) continue;
       const depth = surf(x, z) - G(x, z);
       if (depth < 0.3) continue;

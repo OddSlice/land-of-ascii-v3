@@ -16,7 +16,6 @@ import { waterRays, swellSlope } from './water.js';
 import { bil2, bilU8 } from './sample.js';
 import { makePalette } from '../../resolve.js';
 
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((b) => (b + 0.5) / 16);
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const EDGE_MIN = LOOK.clouds.edgeMin;
 
@@ -99,7 +98,7 @@ export class SkyPass {
   // own lean (it faces the map, leaning back, turned by the line's peaks and
   // saddles), its gullies dark and its rock in broad strata.
   backdropShade(m, ci, slot, p, k, s, ey, dist, rowAngle) {
-    const bd = this.bd, K = bd.layers.length, q = p * K + k, Ly = bd.layers[k];
+    const bd = this.bd, K = bd.layers.length, q = p * K + k;
     const t = this.bT[q], u = this.bU[q], H = this.bH[q], y = ey + s * t;
     const FAR = LOOK.far, C = SCALE.backdrop;
     const g = smooth(0.6, 0.88, vnoise(u / 75, y / 320, SEED + 141 + k));

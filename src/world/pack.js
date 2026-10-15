@@ -5,7 +5,6 @@
 // worker gets its own copy. unpackWorld() turns the arrays back into the
 // world object the renderer and the page use: views onto the same memory,
 // nothing copied.
-import { TIER } from './objects.js';
 import { emptySpans } from './spans.js';
 import { KitBuilder, compileKit } from './kit.js';
 import { buildStructure } from './kit-pieces.js';

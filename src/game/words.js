@@ -28,7 +28,6 @@ export const LAKE_NAMES = ['Long Mere', 'Still Mere', 'Grey Mere', 'Heron Mere',
 
 // The eight directions, from north round by east.
 export const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
-export const SIDES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 
 // ---- the places the journal lists ------------------------------------------------
 // `title`: the name on the page; `where`: a line on where it lies, once it

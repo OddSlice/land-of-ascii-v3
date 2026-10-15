@@ -189,13 +189,6 @@ function footOf(world) {
   return best;
 }
 
-// Which of `list`'s places a walker at (x, z) with the eye at height `eye`
-// finds now: within its distance and with a clear sight of one of its points.
-export function findsFrom(world, list, done, x, z, eye) {
-  const out = [];
-  for (const pl of list) if (!done[pl.id] && finds(world, pl, x, z, eye)) out.push(pl.id);
-  return out;
-}
 // Is one place found from here?
 export function finds(world, pl, x, z, eye) {
   for (const p of pl.at) {

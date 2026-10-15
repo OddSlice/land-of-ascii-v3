@@ -25,7 +25,6 @@ const C = SCALE.animals;
 const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 // how alert at `d` metres from a walker: half at the kind's alert distance
 const alertOf = (spec, d) => smooth(spec.alert * 1.15, spec.alert * 0.85, d);
-const wrap = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
 
 // A point at distance s along a route: [x, z, y, yaw].
 function along(R, s, out) {
@@ -148,7 +147,7 @@ export function animalsAt(A, day, hour, near, out, ids, groups = null, weather =
       case 'dog': dog(A, g, day, hour, minutes, put); break;
       case 'deer': {
         // the group's way through the day
-        let s, R, pose = APOSE.GRAZE, cx, cz, cy, yaw = 0, moving = false;
+        let pose = APOSE.GRAZE, cx, cz, yaw = 0, moving = false;
         const tt = [5.0, 5.4, 8.1, 8.5, 17.9, 18.3, 21.2, 21.6];
         const W = g.ways;
         const leg = (R2, t0, t1) => { const f = (hour - t0) / (t1 - t0); along(R2, R2.len * f, tmp); moving = true; return tmp; };

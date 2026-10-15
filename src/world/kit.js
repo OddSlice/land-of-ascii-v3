@@ -221,18 +221,6 @@ export function compileKit(b) {
   return kit;
 }
 
-// The description, as plain data, for a world's packed form; the kit is
-// compiled again from it in each thread.
-export function kitData(b) {
-  if (b.settle) b.settle();
-  return { prims: b.prims, holes: b.holes, rooms: b.rooms, torches: b.torches, yards: b.yards, cleared: b.cleared };
-}
-export function kitFromData(d) {
-  const b = new KitBuilder();
-  b.prims = d.prims; b.holes = d.holes; b.rooms = d.rooms; b.torches = d.torches; b.yards = d.yards; b.cleared = d.cleared || [];
-  return compileKit(b);
-}
-
 // How far a shape reaches from its centre, horizontally.
 export function reachOf(prims, q) {
   const t = prims[q + P.TYPE], hx = prims[q + P.HX], hz = prims[q + P.HZ];
@@ -498,8 +486,6 @@ function yardBounds(yards) {
   return b;
 }
 
-export function inYard(kit, x, z) { for (const p of kit.yards) if (inPoly(p, x, z)) return true; return false; }
-export function inCleared(kit, x, z) { for (const p of kit.cleared) if (inPoly(p, x, z)) return true; return false; }
 
 // How much of the sky's soft light reaches a point inside room r: through
 // each opening, by its area over the square of the distance, as far as the

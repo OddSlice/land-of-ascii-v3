@@ -89,7 +89,6 @@ export function buildBackdrop(seed, N, edge) {
       // (sharper peaks over broad saddles)
       const shape = Math.pow(Math.max(0, Math.min(1, 0.72 * r + 0.28 * det + 0.12 * fbm(u / 900, k * 5.3, (seed | 0) + 971, 2))), 1.4);
       let hh = L.low + (L.high - L.low) * shape;
-      const along = P[3] === 1 && P[2] === 0 ? x : P[2] === 1 && P[3] === 0 ? z : N;
       const mf = smoothstep(C.mount[0], C.mount[1], eS[i]);
       hh *= mf;
       // the first ridgeline: where it stands above the map's own edge (which

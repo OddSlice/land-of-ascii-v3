@@ -185,7 +185,7 @@ export function barn(b, p) {
 // front gable end (local +u), and a bellcote over that gable or a short
 // tower in front of it.
 export function chapel(b, p) {
-  const S = K.chapel, F = frame(p.at[0], p.at[1], p.angle), hw = p.w, hd = p.d, wt = S.wallT, floor = p.floor, seed = p.seed || 1201;
+  const S = K.chapel, F = frame(p.at[0], p.at[1], p.angle), hw = p.w, hd = p.d, floor = p.floor, seed = p.seed || 1201;
   footing(b, F, hw, hd, floor, p.low, seed);
   if (p.tower) { const [tx, tz] = F.at(hw + S.tower - 0.05, 0); footing(b, frame(tx, tz, F.a), S.tower, S.tower, floor, p.low, seed + 9); }
   const holes = [];

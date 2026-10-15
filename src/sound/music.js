@@ -62,7 +62,6 @@ function rng(seed) {
   return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
 }
 const pick = (r, a) => a[Math.floor(r() * a.length) % a.length];
-const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 
 // ---- writing a piece ---------------------------------------------------------------------
 

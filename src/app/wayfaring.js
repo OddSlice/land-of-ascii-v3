@@ -23,7 +23,7 @@ import { Discovery, VIEW_REVEAL } from '../game/discovery.js';
 import { FS, S, POSE } from '../world/people/figure.js';
 import { roomAt } from '../world/kit.js';
 import { mainKind } from '../weather.js';
-import { WAITING, BACK, AND_ME, LATER, YES, LANTERN_GIFT, STANDING, HAILS, PICK_UP, SKETCHED, SKETCHED_NOTABLE, NOTABLE_WALL, NOTABLE_HILL, NOTABLE_AT, PARTS_OF_DAY, FIRST, CHOICE, CARRY, FIND } from '../game/words.js';
+import { WAITING, BACK, AND_ME, LATER, YES, LANTERN_GIFT, STANDING, HAILS, PICK_UP, SKETCHED, SKETCHED_NOTABLE, NOTABLE_WALL, NOTABLE_HILL, NOTABLE_AT, PARTS_OF_DAY, FIRST, CHOICE } from '../game/words.js';
 
 const SAVE_EVERY = 4000;          // ms: changes are written at most this often (sooner for the important ones)
 const PICK = 1.8;                 // m: how close a lost thing is picked up
@@ -473,7 +473,7 @@ export class Wayfaring {
     };
   }
   askedWords(f) {
-    const s = f.slots, P = this.people.P, u = this.fav.usual.get(f.giver);
+    const s = f.slots, u = this.fav.usual.get(f.giver);
     const where = u ? `, ${u.where}` : f.first ? ' on the road where you first met' : '';
     return `${s.giver}${where} asked a favour of you. You said another time.`;
   }

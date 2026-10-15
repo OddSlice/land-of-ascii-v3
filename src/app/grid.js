@@ -15,8 +15,7 @@ export function cellWidth(preset, dpr, area = REF_W * REF_H) {
 }
 
 // The grid for a picture area of cssW x cssH CSS pixels in a window of
-// `area` CSS pixels squared (the picture can be narrower than the window: the
-// Look Lab's reference frame stands beside it).
+// `area` CSS pixels squared.
 export function layout(preset, cssW, cssH, dpr, area = cssW * cssH) {
   const cw = cellWidth(preset, dpr, area), ch = cw * 2;
   let cols = Math.max(8, Math.floor(Math.floor(cssW * dpr) / cw));

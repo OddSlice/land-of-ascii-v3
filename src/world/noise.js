@@ -8,10 +8,6 @@ export function hash2(x, y, seed) {
   return (h >>> 0) / 4294967296;
 }
 
-export function hash1(x, seed) {
-  return hash2(x, 0x5bd1e995, seed);
-}
-
 // Smooth value noise, -1..1.
 // (Phase 4a: the four corners' hashes share their parts, the same integers
 // hash2 would make, so the result is identical; Firefox ran it slowly.)
