@@ -24,7 +24,9 @@
 //             journal, a sketch
 //  backup     edited backups: cut short, a character changed, another
 //             head, and hand-made records with wrong kinds of value; each
-//             restored, then the journal, the title and a reload
+//             restored, then the journal, the title and a reload; what is
+//             not of its kind or not in this world left out (phase 6.2);
+//             and a stored record the game cannot read kept aside
 //
 //   node tools/audit.mjs [--only resize,keys] [--browser chromium] [--live URL] [--minutes 12]
 import fs from 'node:fs';
@@ -455,31 +457,33 @@ try {
       ['empty', ''],
       ['a record of another version', await raw({ v: 2 })],
       ['found: a place with null', await raw({ found: { fort: null } })],
-      ['found: a place not in this world', await raw({ found: { 'no-such-place': [0, 12] } })],
-      ['met: someone not in this world', await raw({ met: { 9999: [0, 12] } })],
-      ['met: someone with null', await raw({ met: { 3: null } })],
-      ['met: someone with a number', await raw({ met: { 3: 7 } })],
+      ['found: a place not in this world', await raw({ found: { 'no-such-place': [0, 12] } }), (r, p) => p && !Object.keys(p.found).length],
+      ['met: someone not in this world', await raw({ met: { 9999: [0, 12], 3: [0, 12] } }), (r, p) => p && Object.keys(p.met).join() === '3'],
+      ['met: someone with null', await raw({ met: { 3: null, 4: [0, 12] } }), (r, p) => p && Object.keys(p.met).join() === '4'],
+      ['met: someone with a number', await raw({ met: { 3: 7 } }), (r, p) => p && !Object.keys(p.met).length],
       ['favours: one with null', await raw({ favours: { 0: null } })],
-      ['favours: one in a state that does not exist', await raw({ favours: { 0: { s: 9, t: [0, 12], n: 1 } } })],
+      ['favours: one in a state that does not exist', await raw({ favours: { f0: { s: 9, t: [0, 12], n: 1 } } }), (r, p) => p && !Object.keys(p.favours).length],
       ['favours: one with a word for its state', await raw({ favours: { 0: { s: 'done' } } })],
       ['sketches: one with no picture', await raw({ sketches: [{ id: 1 }], nextSketch: 2 })],
-      ['sketches: 200 of them', await raw({ sketches: Array.from({ length: 200 }, (_, i) => ({ id: i + 1, place: 'x', day: 0, hour: 12, weather: 'fair', cols: 10, rows: 5 })) })],
+      ['sketches: 200 of them', await raw({ sketches: Array.from({ length: 200 }, (_, i) => ({ id: i + 1, place: 'x', day: 0, hour: 12, weather: 'fair', cols: 10, rows: 5 })) }), (r, p) => p && p.sketches.length === 60],
       ['at: far off the land', await raw({ at: [1e9, 5, 0] })],
       ['seen: not a grid', await raw({ seen: '!!!!' })],
-      ['seed: another, huge', await raw({ seed: 99999999999 })],
-      ['a __proto__ key', await raw({ found: JSON.parse('{"__proto__": {"polluted": 1}}') })],
+      ['seed: another, huge', await raw({ seed: 99999999999 }), (r) => r && !r.ok],
+      ['a __proto__ key', await raw({ found: JSON.parse('{"__proto__": {"polluted": 1}}') }), (r, p) => p && !Object.keys(p.found).length],
     ];
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    for (const [what, text] of cases) {
+    for (const [what, text, expect] of cases) {
       const page = await ctx.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(String(e)));
       await page.goto(`${url}/play.html?seed=${seed}`);
       await ready(page);
       await page.evaluate(async () => { await window.lab.whenIdle(); window.lab.titlePlay(); });
-      let r = null, after = '';
+      let r = null, after = '', kept = true;
       try {
         r = await within(page.evaluate((t) => window.lab.progress.restore(t), text), 20000, 'the restore');
+        // (what was kept of it)
+        if (expect) kept = !!expect(r, await page.evaluate(() => window.lab.progress.get()));
         // the journal's pages, the map, a while walking, then a reload and Continue
         await within(page.evaluate(async () => { const L = window.lab; for (const t of ['places', 'people', 'favours', 'sketches']) { L.progress.journal.close(); L.progress.journal.open(t); await new Promise((q) => setTimeout(q, 60)); } L.progress.journal.close(); L.setMap(true); await new Promise((q) => setTimeout(q, 300)); L.setMap(false); }), 20000, 'the journal and the map');
         await page.evaluate(() => { const L = window.lab, p = L.people.list()[3]; if (p) L.setCamera({ x: p.x + 2, z: p.z + 2, yaw: 0 }); });
@@ -492,13 +496,30 @@ try {
         await wait(600);
       } catch (e) { errors.push(String(e.message).slice(0, 200)); }
       const stop = await page.evaluate(() => (window.lab ? window.lab.errors.slice() : ['no game'])).catch(() => ['page gone']);
-      const ok = !errors.length && !stop.length;
-      check('backup', `restored a backup with ${what}: the game goes on (journal, map, walking, reload)`, ok,
+      const ok = !errors.length && !stop.length && kept;
+      check('backup', `restored a backup with ${what}: the game goes on (journal, map, walking, reload)${expect ? ', and what is wrong is left out' : ''}`, ok,
         `${r ? (r.ok ? `restored${r.other ? ` for seed ${r.seed}` : ''}` : `refused: ${r.error}`) : 'no answer'}; after a reload "${after.replace(/\s+/g, ' ').slice(0, 50)}"${[...errors, ...stop].length ? `; ${[...errors, ...stop].join(' | ').slice(0, 300)}` : ''}`);
       // (clean up for the next case)
       await page.evaluate(() => { try { localStorage.clear(); } catch { /* */ } });
       await page.close();
     }
+    // (phase 6.2) a stored record this build cannot read (another version's)
+    // is kept aside before the first save writes a fresh one
+    const page = await ctx.newPage();
+    // (written from the front page, which keeps nothing itself)
+    await page.goto(`${url}/index.html`);
+    const unread = JSON.stringify({ ...JSON.parse(toJSON(base)), v: 2, found: { fort: [1, 9] } });
+    await page.evaluate((t) => localStorage.setItem('land-of-ascii-v3.progress.3', t), unread);
+    await page.goto(`${url}/play.html?seed=${seed}`);
+    await ready(page);
+    const st = await page.evaluate(async () => {
+      const L = window.lab; await L.whenIdle(); L.titlePlay(); await new Promise((q) => setTimeout(q, 500)); L.progress.save();
+      const keys = Object.keys(localStorage).filter((k) => k.includes('.unread.'));
+      return { keys, aside: keys.map((k) => localStorage.getItem(k)), now: localStorage.getItem('land-of-ascii-v3.progress.3'), note: L.progress.note() };
+    });
+    check('backup', 'a stored record this version cannot read is kept aside, not written over', st.keys.length === 1 && st.aside[0] === unread && st.now !== unread && /kept aside/.test(st.note),
+      `${st.keys.join(', ') || 'nothing kept'}; the menu says: "${st.note}"`);
+    await page.evaluate(() => localStorage.clear());
     await ctx.close();
   }
 } finally {

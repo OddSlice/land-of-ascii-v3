@@ -21,13 +21,13 @@
   "area": "switch",
   "what": "opened with 0 workers: it walks and draws",
   "ok": true,
-  "note": "0 threads, shared false, moved 8.1 m"
+  "note": "0 threads, shared false, moved 8.2 m"
  },
  {
   "area": "switch",
   "what": "opened with 1 worker: it walks and draws",
   "ok": true,
-  "note": "1 threads, shared true, moved 6.7 m"
+  "note": "1 threads, shared true, moved 7.3 m"
  },
  {
   "area": "switch",
@@ -39,7 +39,7 @@
   "area": "switch",
   "what": "opened with 8 workers: it walks and draws",
   "ok": true,
-  "note": "8 threads, shared true, moved 5.5 m"
+  "note": "8 threads, shared true, moved 6.9 m"
  },
  {
   "area": "disk",
@@ -69,7 +69,7 @@
   "area": "keys",
   "what": "forward: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "KeyI 1.87 m, KeyW 0.00 m"
+  "note": "KeyI 1.80 m, KeyW 0.00 m"
  },
  {
   "area": "keys",
@@ -87,7 +87,7 @@
   "area": "keys",
   "what": "right: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "KeyP 1.80 m, KeyD 0.00 m"
+  "note": "KeyP 1.87 m, KeyD 0.00 m"
  },
  {
   "area": "keys",
@@ -99,7 +99,7 @@
   "area": "keys",
   "what": "jump: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "B rose 0.72 m, Space 0.00 m"
+  "note": "B rose 0.77 m, Space 0.00 m"
  },
  {
   "area": "keys",
@@ -291,49 +291,49 @@
   "area": "backup",
   "what": "restored a backup with found: a place with null: the game goes on (journal, map, walking, reload)",
   "ok": true,
-  "note": "restored; after a reload \"Continue a stranger\""
+  "note": "restored; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
-  "what": "restored a backup with found: a place not in this world: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with found: a place not in this world: the game goes on (journal, map, walking, reload), and what is wrong is left out",
+  "ok": true,
+  "note": "restored; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with met: someone not in this world: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
   "note": "restored; after a reload \"Continue a stranger\""
  },
  {
   "area": "backup",
-  "what": "restored a backup with met: someone not in this world: the game goes on (journal, map, walking, reload)",
-  "ok": false,
-  "note": "restored; after a reload \"\"; page.evaluate: TypeError: Cannot read properties of undefined (reading 'village')\n    at http://127.0.0.1:57542/play.html?seed=3:434:31624\n    at Array.map (<anonymous>)\n    at ec.journal (http://127."
- },
- {
-  "area": "backup",
-  "what": "restored a backup with met: someone with null: the game goes on (journal, map, walking, reload)",
-  "ok": false,
-  "note": "restored; after a reload \"Continue a stranger\"; TypeError: Cannot read properties of null (reading '0') | TypeError: Cannot read properties of null (reading '0') | Uncaught TypeError: Cannot read properties of null (reading '0') (http://127.0.0.1:57542/play.html?seed=3:434)"
- },
- {
-  "area": "backup",
-  "what": "restored a backup with met: someone with a number: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with met: someone with null: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
   "note": "restored; after a reload \"Continue a stranger\""
+ },
+ {
+  "area": "backup",
+  "what": "restored a backup with met: someone with a number: the game goes on (journal, map, walking, reload), and what is wrong is left out",
+  "ok": true,
+  "note": "restored; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
   "what": "restored a backup with favours: one with null: the game goes on (journal, map, walking, reload)",
   "ok": true,
-  "note": "restored; after a reload \"Continue a stranger\""
+  "note": "restored; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
-  "what": "restored a backup with favours: one in a state that does not exist: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with favours: one in a state that does not exist: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
-  "note": "restored; after a reload \"Continue a stranger\""
+  "note": "restored; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
   "what": "restored a backup with favours: one with a word for its state: the game goes on (journal, map, walking, reload)",
   "ok": true,
-  "note": "restored; after a reload \"Continue a stranger\""
+  "note": "restored; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
@@ -343,7 +343,7 @@
  },
  {
   "area": "backup",
-  "what": "restored a backup with sketches: 200 of them: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with sketches: 200 of them: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
   "note": "restored; after a reload \"Continue a stranger\""
  },
@@ -361,14 +361,20 @@
  },
  {
   "area": "backup",
-  "what": "restored a backup with seed: another, huge: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with seed: another, huge: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
-  "note": "restored for seed 99999999999; after a reload \"Play a new walk in this land\""
+  "note": "refused: the backup is damaged or from another version; after a reload \"Play a new walk in this land\""
  },
  {
   "area": "backup",
-  "what": "restored a backup with a __proto__ key: the game goes on (journal, map, walking, reload)",
+  "what": "restored a backup with a __proto__ key: the game goes on (journal, map, walking, reload), and what is wrong is left out",
   "ok": true,
-  "note": "restored; after a reload \"Continue a stranger\""
+  "note": "restored; after a reload \"Play a new walk in this land\""
+ },
+ {
+  "area": "backup",
+  "what": "a stored record this version cannot read is kept aside, not written over",
+  "ok": true,
+  "note": "land-of-ascii-v3.unread.afc509ac.3; the menu says: \"A walk saved here before could not be read, so it is kept aside, not written over.\""
  }
 ]

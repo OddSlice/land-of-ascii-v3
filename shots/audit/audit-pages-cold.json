@@ -1,0 +1,20 @@
+[
+ {
+  "area": "pages",
+  "what": "the GitHub Pages copy: no shared memory, at most four workers, it walks",
+  "ok": true,
+  "note": "version 0.6.1, isolated false, 4 workers, shared false"
+ },
+ {
+  "area": "cold",
+  "what": "a cold load of the live site (unthrottled)",
+  "ok": true,
+  "note": "front page loaded in 0.26 s; play.html parsed 0.11 s, the title up 4.49 s, first frame 4.85 s (the world built in 3.50 s)"
+ },
+ {
+  "area": "cold",
+  "what": "a cold load of the live site (slow 4G)",
+  "ok": true,
+  "note": "front page loaded in 0.36 s; play.html parsed 2.15 s, the title up 6.61 s, first frame 7.00 s (the world built in 3.57 s)"
+ }
+]
