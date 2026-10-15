@@ -334,3 +334,24 @@ export function layRoads(N, H, kind, level, roads) {
   }
   return { wRoad, dist: best };
 }
+
+// Can a road leave (x, z) by gentle slopes, to somewhere `far` metres away?
+export function leaves(G, x, z, far) {
+  const { h, pen, nn } = G;
+  const s0 = Math.round(z / CG) * nn + Math.round(x / CG);
+  const seen = new Uint8Array(nn * nn), q = [s0];
+  seen[s0] = 1;
+  for (let k = 0; k < q.length; k++) {
+    const c = q[k], ci = c % nn, ck = (c - ci) / nn;
+    if (Math.hypot(ci * CG - x, ck * CG - z) >= far) return true;
+    for (const [di, dk] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const i = ci + di, kk = ck + dk;
+      if (i < 0 || kk < 0 || i >= nn || kk >= nn) continue;
+      const m = kk * nn + i;
+      if (seen[m] || pen[m] === Infinity) continue;
+      if (Math.abs(h[m] - h[c]) / (CG * Math.hypot(di, dk)) > STEEP) continue;
+      seen[m] = 1; q.push(m);
+    }
+  }
+  return false;
+}

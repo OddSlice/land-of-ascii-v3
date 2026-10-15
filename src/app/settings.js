@@ -4,7 +4,6 @@
 // blocked site data), so every read and write is guarded and the game runs the
 // same without it.
 const KEY = 'land-of-ascii-v3.display';
-const SEEN = 'land-of-ascii-v3.seen';
 
 // (the statistics are on by default since after phase 2b: the frame rate, the
 // frame time, the cells, the time and the weather on one line; choices kept
@@ -55,10 +54,6 @@ export function hasDisplay() { return read(KEY) !== null; }
 export function saveDisplay(d) {
   write(KEY, JSON.stringify({ v: VERSION, density: d.density, glyphs: d.glyphs, hud: d.hud, sensitivity: d.sensitivity, invert: d.invert, text: d.text, motion: d.motion, cap: d.cap, auto: d.auto }));
 }
-
-// Whether the start card has been seen (it shows on the first visit only).
-export function seenCard() { return read(SEEN) === '1'; }
-export function markCardSeen() { write(SEEN, '1'); }
 
 // (phase 6) How many times the title screen has opened in this browser (its
 // welcome line changes each visit).
