@@ -9,7 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, workbench } from './lib/browser.mjs';
-import { serve, args, openLab, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab, view } from './lib/game.mjs';
 
 const a = args();
 const OLD = path.resolve(String(a.old));
@@ -23,15 +24,9 @@ const grab = async (browser, root, scene) => {
   const out = [];
   for (let i = 0; i < cams.length; i++) {
     if (only && !only.includes(i + 1)) continue;
-    const r = await lab.page.evaluate(async ({ i, t }) => {
-      const L = window.lab;
-      if (L.people) L.people.set(true);
-      L.setWeather('fair');
-      L.camera(i); L.freeze(t, 0);
-      await L.whenIdle();
-      const st = L.state();
-      return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
-    }, { i, t });
+    await lab.page.evaluate(() => { if (window.lab.people) window.lab.people.set(true); });
+    await view(lab.page, { camera: i, hour: t });
+    const r = await lab.page.evaluate(() => { const st = window.lab.state(); return { cols: st.cols, rows: st.rows, data: Array.from(window.lab.cells()) }; });
     const shot = await lab.page.locator('#view').screenshot();
     out.push({ i, name: cams[i], ...r, png: `data:image/png;base64,${shot.toString('base64')}` });
   }

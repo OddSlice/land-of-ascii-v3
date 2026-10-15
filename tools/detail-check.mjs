@@ -7,6 +7,7 @@
 //   node tools/detail-check.mjs [--rates 1,2,4,6]
 import { launch } from './lib/browser.mjs';
 import { serve, args } from './lib/serve.mjs';
+import { openVisitor } from './lib/game.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './lib/serve.mjs';
@@ -18,12 +19,8 @@ const browser = await launch('chromium');
 const out = [];
 try {
   for (const rate of rates) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
-    const page = await ctx.newPage();
-    const cdp = await ctx.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate });
-    await page.goto(`${url}/play.html?autodetail=1${a.threads ? `&threads=${a.threads}` : ""}`);
-    await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 300000 });
+    const { ctx, page } = await openVisitor(browser, url, { width: 1280, height: 720, query: `?autodetail=1${a.threads ? `&threads=${a.threads}` : ''}`, timeout: 300000,
+      before: async (pg, c) => { const cdp = await c.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate }); } });
     await page.waitForFunction(() => window.lab.autoDetail, null, { timeout: 120000 });
     const r = await page.evaluate(() => ({ ...window.lab.autoDetail, note: window.lab.titleState().note, kept: JSON.parse(localStorage.getItem('land-of-ascii-v3.display')) }));
     out.push({ rate, ...r });

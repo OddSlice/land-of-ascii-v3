@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
 import { serve, args, ROOT } from './lib/serve.mjs';
+import { openVisitor } from './lib/game.mjs';
 import { generateWorld, DEFAULT_SEED } from '../src/world/gen/world.js';
 import { packWorld, unpackWorld } from '../src/world/pack.js';
 
@@ -27,12 +28,8 @@ const { server, url } = await serve(a.root ? path.resolve(String(a.root)) : ROOT
 const browser = await launch('chromium');
 try {
   for (const [w, h] of sizes) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
-    const page = await ctx.newPage();
-    const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
-    await page.goto(`${url}/play.html?seed=${seed}`);
-    await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-    await page.evaluate(async () => { await window.lab.ready; await window.lab.whenIdle(); });
+    const { ctx, page, errors } = await openVisitor(browser, url, { width: w, height: h, query: `?seed=${seed}` });
+    await page.evaluate(async () => { await window.lab.whenIdle(); });
     await page.evaluate(() => window.lab.titlePlay()); await page.waitForTimeout(300);   // (phase 6: past the title screen)
     await page.evaluate(async () => { const L = window.lab; L.setHud(false); L.progress.enable({ store: false }); L.progress.clear(); L.freeze(11, 0, 0); L.setWeather('fair'); await L.whenIdle(); });
     const shot = async (state) => {

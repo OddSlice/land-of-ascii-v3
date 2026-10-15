@@ -37,7 +37,8 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab, view } from './lib/game.mjs';
 
 const a = args();
 const browsers = (a.browser || 'chromium,firefox,webkit').split(',');
@@ -100,12 +101,8 @@ try {
             if (only && !only.some((w) => camNames[cam].includes(w))) continue;
             // keep the window in front: macOS throttles a covered window's frames
             await page.bringToFront();
-            await page.evaluate(({ d, cam, weather, hour }) => {
-              const L = window.lab;
-              if (L.setWeather) L.setWeather(weather);
-              L.setDensity(d - 1); L.camera(cam); L.freeze(hour !== null ? hour : L.cameras[cam].time, 0);
-            }, { d, cam, weather: String(a.weather || 'fair'), hour: a.hour !== undefined ? Number(a.hour) : null });
-            await page.evaluate(() => window.lab.whenIdle());
+            await page.evaluate((d) => window.lab.setDensity(d - 1), d);
+            await view(page, { camera: cam, hour: a.hour !== undefined ? Number(a.hour) : 'own', weather: String(a.weather || 'fair') });
             await page.evaluate(() => window.lab.timings(60));            // warm up, and let the stripes settle
             const t = await page.evaluate((n) => window.lab.timings(n), frames);
             // (phase 5b) the sound's main-thread time, over the next 120 frames

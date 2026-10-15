@@ -188,6 +188,25 @@ export function labCore(app) {
       if (day !== undefined) app.state.day = day;
     },
     setDay(d) { app.state.day = d; },
+    // (phase 6.1) The one way every tool stands somewhere and holds the
+    // clock: a fixed camera (its index, or its name) or a place ({ x, z,
+    // y, yaw, pitch }, as setCamera), the weather held (fair unless given;
+    // null leaves it), and every clock frozen at `hour` (a number, a name
+    // such as 'dusk', or 'own': the camera's own hour), the animation
+    // clock at `t` and, if given, the day count at `day`. Resolves with the
+    // state once a frame made after it is on screen, cast shadows caught up.
+    async view({ camera, at, hour = 'own', weather = 'fair', t = 0, day } = {}) {
+      if (weather !== null) this.setWeather(weather);
+      let i = -1;
+      if (camera !== undefined) {
+        i = typeof camera === 'number' ? camera : app.CAMS.findIndex((c) => c.name === camera);
+        if (!app.CAMS[i]) throw new Error(`no camera ${camera}`);
+        this.camera(i);
+      } else if (at) this.setCamera(at);
+      this.freeze(hour === 'own' ? (i >= 0 ? app.CAMS[i].time : app.state.hour) : hour, t, day);
+      await this.whenIdle();
+      return this.state();
+    },
     unfreeze() { app.state.frozen = false; },
     setHour(h) { app.state.hour = typeof h === 'string' ? LOOK.hours[h] : h; },
     // (`rate`: game hours a real second, phase 2b; the menu's speeds)

@@ -12,7 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { launch } from './lib/browser.mjs';
-import { serve, openLab, args, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab } from './lib/game.mjs';
 import { GLYPHS } from '../src/glyphs.js';
 
 const a = args();
@@ -31,10 +32,11 @@ try {
       const out = [];
       for (const [name, hour, words] of shots) {
         const r = await lab.page.evaluate(async ({ name, hour }) => {
-          const L = window.lab, i = L.cameras.findIndex((c) => c.name === name);
-          if (i < 0) return null;
-          L.setHud(false); L.setWeather('fair'); L.camera(i); L.freeze(hour, 0);
-          for (let k = 0; k < 4; k++) await L.whenIdle();
+          const L = window.lab;
+          if (!L.cameras.some((c) => c.name === name)) return null;
+          L.setHud(false);
+          await L.view({ camera: name, hour });
+          for (let k = 0; k < 3; k++) await L.whenIdle();
           const s = L.state();
           return { cols: s.cols, rows: s.rows, cells: Array.from(L.cells()) };
         }, { name, hour });

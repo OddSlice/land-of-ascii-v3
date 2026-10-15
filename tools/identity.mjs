@@ -13,7 +13,8 @@
 //                                                     world gains the lake and the river at dawn,
 //                                                     where the mist lies; the default is fair
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab } from './lib/serve.mjs';
+import { serve, args } from './lib/serve.mjs';
+import { openLab, view } from './lib/game.mjs';
 
 const a = args();
 const counts = String(a.threads || '0,1,3,5,8').split(',').map(Number);
@@ -107,23 +108,18 @@ try {
     for (const weather of WEATHERS) {
       for (let i = 0; i < views.length; i++) {
         const v = views[i];
-        const h = await lab.page.evaluate(async ({ v, weather }) => {
-          const L = window.lab;
-          if (L.setWeather) L.setWeather(weather);
-          if (v.free) L.setCamera(v.free);
-          else if (v.site) {
-            const s = L.world.sites, c = L.cameras;
-            const coast = c.find((k) => k.name === 'the coast'), riv = c.find((k) => k.name === 'river valley');
-            if (v.site === 'coastUp') L.setCamera({ x: coast.x, z: coast.z, y: 80, yaw: coast.yaw, pitch: -8 });
-            if (v.site === 'edge') L.setCamera({ x: 1024, z: -150, y: 60, yaw: 10, pitch: -6 });
-            if (v.site === 'gate') L.setCamera({ x: s.fort.gate.x + 0.3, z: s.fort.front.z, yaw: s.fort.front.z < s.fort.gate.z ? 0 : 180, pitch: 18 });
-            if (v.site === 'river') L.setCamera({ x: riv.x, z: riv.z, yaw: riv.yaw + 70, pitch: -35 });
-            if (v.site === 'shoreL' || v.site === 'shoreR') L.setCamera({ x: coast.x, z: coast.z, yaw: coast.yaw + (v.site === 'shoreL' ? -90 : 90), pitch: -14 });
-          } else L.camera(v.cam);
-          L.freeze(v.t === 'own' ? L.cameras[v.cam].time : v.t, 12.5, v.day || 0);
-          await L.whenIdle();
-          return L.cellHash();
-        }, { v, weather });
+        // (a place found from the world's own records, for the views that are not a fixed camera)
+        const at = v.free || (v.site ? await lab.page.evaluate((site) => {
+          const L = window.lab, s = L.world.sites, c = L.cameras;
+          const coast = c.find((k) => k.name === 'the coast'), riv = c.find((k) => k.name === 'river valley');
+          if (site === 'coastUp') return { x: coast.x, z: coast.z, y: 80, yaw: coast.yaw, pitch: -8 };
+          if (site === 'edge') return { x: 1024, z: -150, y: 60, yaw: 10, pitch: -6 };
+          if (site === 'gate') return { x: s.fort.gate.x + 0.3, z: s.fort.front.z, yaw: s.fort.front.z < s.fort.gate.z ? 0 : 180, pitch: 18 };
+          if (site === 'river') return { x: riv.x, z: riv.z, yaw: riv.yaw + 70, pitch: -35 };
+          return { x: coast.x, z: coast.z, yaw: coast.yaw + (site === 'shoreL' ? -90 : 90), pitch: -14 };
+        }, v.site) : undefined);
+        await view(lab.page, { camera: at ? undefined : v.cam, at, hour: v.t, weather, t: 12.5, day: v.day || 0 });
+        const h = await lab.page.evaluate(() => window.lab.cellHash());
         await lab.check();
         (table[`${name} ${i}${WEATHERS.length > 1 || a.weather ? ` ${weather}` : ''}`] ||= {})[n] = h;
       }

@@ -14,6 +14,7 @@
 //   node tools/progress-check.mjs [--browser chromium] [--seed 3] [--built]
 import { launch } from './lib/browser.mjs';
 import { serve, args } from './lib/serve.mjs';
+import { openVisitor } from './lib/game.mjs';
 
 const a = args();
 const seed = Number(a.seed || 3), name = String(a.browser || 'chromium');
@@ -24,13 +25,7 @@ const check = (what, ok, note = '') => { rows.push({ what, ok, note }); console.
 
 // (phase 6: the title screen comes first; Play or Continue, unless `keep`)
 async function open(ctx, s = seed, keep = false, query = '') {
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto(`${url}/${a.built ? 'play.html' : ''}?seed=${s}${query}`);
-  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
-  await page.evaluate(() => window.lab.ready);
+  const { page, errors } = await openVisitor(browser, url, { ctx, built: !!a.built, query: `?seed=${s}${query}` });
   await page.evaluate(async () => { await window.lab.whenIdle(); });
   if (!keep) await page.evaluate(() => window.lab.titlePlay());
   return { page, errors };

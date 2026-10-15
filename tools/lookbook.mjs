@@ -19,7 +19,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { launch } from './lib/browser.mjs';
-import { serve, args, openLab, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab, view } from './lib/game.mjs';
 
 const a = args();
 if (!a.regress) { console.log('usage: node tools/lookbook.mjs --regress [--save] [--built] [--scenes lab,stress,world,yard]'); process.exit(1); }
@@ -44,17 +45,11 @@ async function regress() {
       const cams = await page.evaluate(() => window.lab.cameras.map((c) => c.name));
       for (let i = 0; i < cams.length; i++) {
         for (const t of times) {
-          const cells = await page.evaluate(async ({ i, t, weather, people }) => {
-            const L = window.lab;
-            // (phase 4a: people on, or off with --people off)
-            if (L.people) L.people.set(people);
-            // (phase 2b: the weather held at fair, the look before weather)
-            if (L.setWeather) L.setWeather(weather);
-            L.camera(i); L.freeze(t, 0);
-            await L.whenIdle();
-            const st = L.state();
-            return { cols: st.cols, rows: st.rows, data: Array.from(L.cells()) };
-          }, { i, t, weather, people: a.people !== 'off' });
+          // (phase 4a: people on, or off with --people off; phase 2b: the
+          // weather held at fair, the look before weather)
+          await page.evaluate((people) => { if (window.lab.people) window.lab.people.set(people); }, a.people !== 'off');
+          await view(page, { camera: i, hour: t, weather });
+          const cells = await page.evaluate(() => { const st = window.lab.state(); return { cols: st.cols, rows: st.rows, data: Array.from(window.lab.cells()) }; });
           await lab.check();
           frames.push({ name: `${scene} ${i + 1} ${cams[i]} (${t})`, cols: cells.cols, rows: cells.rows, data: Uint8Array.from(cells.data) });
         }

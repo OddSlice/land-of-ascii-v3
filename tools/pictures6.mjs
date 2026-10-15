@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
 import { serve, ROOT } from './lib/serve.mjs';
+import { openVisitor } from './lib/game.mjs';
 
 const OUT = path.join(ROOT, 'shots', 'phase6');
 fs.mkdirSync(OUT, { recursive: true });
@@ -24,10 +25,7 @@ try {
     await p.close();
   }
   // the title screen: Play, and the flyover's four spots
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
-  const page = await ctx.newPage();
-  await page.goto(`${url}/play.html`);
-  await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 180000 });
+  const { ctx, page } = await openVisitor(browser, url, { width: 1280, height: 720 });
   await page.waitForFunction(() => window.lab.titleState().shown);
   await page.waitForTimeout(800);
   await page.screenshot({ path: save('title-play.png') });

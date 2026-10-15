@@ -1,6 +1,7 @@
 // npm run dev: serves the repository with the modules straight from src/.
-// http://localhost:5190/ is the Look Lab (src/index.html); /play.html is
-// the last build.
+// http://localhost:5190/ is the game from the sources (src/index.html, with
+// any of play.html's options; ?lab=1 the Look Lab); /play.html is the last
+// build.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,4 +24,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', ...iso });
     res.end(data);
   });
-}).listen(PORT, () => console.log(`Look Lab: http://localhost:${PORT}/`));
+}).listen(PORT, () => console.log(`Land of Ascii, from the sources: http://localhost:${PORT}/`));

@@ -30,7 +30,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch } from './lib/browser.mjs';
-import { serve, openLab, args, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab, openVisitor, play } from './lib/game.mjs';
 import { backupText, freshProgress, toJSON } from '../src/game/progress.js';
 
 const a = args();
@@ -47,8 +48,9 @@ const { server, url } = await serve();
 const plain = await serve(undefined, { isolated: false });
 const browser = await launch(String(a.browser || 'chromium'));
 
-// a page as a visitor opens it (the title screen, progress and sound on);
-// `init`: a script to run before the page's own
+// any page as a visitor opens it (the front page, a file, a live site; the
+// game on this server opens with openVisitor); `init`: a script to run
+// before the page's own
 async function visit(u, { width = 1280, height = 800, init = null, ctx = null } = {}) {
   const c = ctx || await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   if (init) await c.addInitScript(init);
@@ -63,13 +65,6 @@ const ready = (page, ms = 180000) => page.waitForFunction(() => window.lab && wi
 const presented = (page) => page.evaluate(() => window.lab.state().presented);
 const stopped = (page) => page.evaluate(() => window.lab.errors.slice());
 // frames still coming: the count moves on over `ms`
-// Play, by the keyboard, once the title's panel is forward (a key while it
-// fades in only brings it forward)
-async function play(page) {
-  await page.waitForFunction(() => window.lab.titleState() && window.lab.titleState().shown, null, { timeout: 15000 });
-  await page.keyboard.press('Enter');
-  await wait(300);
-}
 async function alive(page, ms = 600) { const p0 = await presented(page); await wait(ms); return (await presented(page)) > p0; }
 
 try {
@@ -206,7 +201,9 @@ try {
   // ---- long ----------------------------------------------------------------------------
   if (want('long')) {
     const minutes = Number(a.minutes || 12), rate = 30 * 24 / (minutes * 60);
-    const lab = await openLab(browser, url, { built: true, scene: 'world', threads: 4, width: 1280, height: 800, dpr: 1 });
+    // (in a visible window: a headless one cannot measure its memory)
+    const lb = await launch('chromium', { headless: false, audio: true });
+    const lab = await openLab(lb, url, { built: true, scene: 'world', threads: 4, width: 1280, height: 800, dpr: 1 });
     const { page } = lab;
     await page.evaluate(() => { window.lab.progress.enable({ store: false }); window.lab.sound.enable(); });
     // beside the first village's green, its people and animals about
@@ -218,7 +215,7 @@ try {
     for (let k = 0; ; k++) {
       const el = (Date.now() - t0) / 1000;
       const s = await page.evaluate(async () => {
-        const L = window.lab, st = L.state(), m = await L.memory();
+        const L = window.lab, st = L.state(), m = await L.memory().catch(() => null);
         const tm = await L.timings(30);
         const w = tm.map((x) => x.worker).sort((p, q) => p - q);
         return { hour: st.hour, day: st.day, t: st.t, heap: performance.memory ? performance.memory.usedJSHeapSize : null, bytes: m ? m.bytes : null,
@@ -240,13 +237,13 @@ try {
     check('long', `${(gameH / 24).toFixed(1)} game days at ${rate.toFixed(2)} game hours a second (${(realS / 60).toFixed(1)} min), sound and progress on`, !err && last.day - start.day >= 29,
       `clock: ${gameH.toFixed(1)} game hours in ${realS.toFixed(0)} s, ${(gameH / realS).toFixed(3)} an s against ${rate.toFixed(3)} asked (frames pause the clock only when late); heap ${(first.heap / 1e6).toFixed(1)} → ${(mean((x) => x.heap) / 1e6).toFixed(1)} MB (last third's mean); page and workers ${(first.bytes / 1e6).toFixed(0)} → ${(mean((x) => x.bytes) / 1e6).toFixed(0)} MB; worker median ${first.worker.toFixed(2)} → ${mean((x) => x.worker).toFixed(2)} ms${err ? `; ${err}` : ''}`);
     await lab.ctx.close();
+    await lb.close();
   }
 
   // ---- keys ----------------------------------------------------------------------------
   if (want('keys')) {
     const moved = { forward: 'KeyI', left: 'KeyY', back: 'KeyO', right: 'KeyP', run: 'ShiftRight', jump: 'KeyB', greet: 'KeyQ', fly: 'KeyZ', journal: 'KeyV', sketch: 'Comma', lantern: 'Period', map: 'Semicolon', mute: 'Slash' };
-    const { ctx, page, errors } = await visit(`${url}/play.html`, { init: `try { localStorage.setItem('land-of-ascii-v3.keys', ${JSON.stringify(JSON.stringify(moved))}); localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true })); } catch (e) {}` });
-    await ready(page);
+    const { ctx, page, errors } = await openVisitor(browser, url, { missing: true, init: `try { localStorage.setItem('land-of-ascii-v3.keys', ${JSON.stringify(JSON.stringify(moved))}); localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true })); } catch (e) {}` });
     await page.evaluate(async () => { await window.lab.whenIdle(); });
     await play(page);
     const hint = await page.evaluate(() => document.getElementById('hint').innerText);
@@ -318,8 +315,7 @@ try {
 
   // ---- menu ----------------------------------------------------------------------------
   if (want('menu')) {
-    const { ctx, page, errors } = await visit(`${url}/play.html`, { width: 1440, height: 900, init: () => { try { localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true })); } catch (e) { /* */ } } });
-    await ready(page);
+    const { ctx, page, errors } = await openVisitor(browser, url, { width: 1440, height: 900, missing: true, init: () => { try { localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true })); } catch (e) { /* */ } } });
     await page.evaluate(async () => { await window.lab.whenIdle(); });
     await play(page);
     await page.keyboard.press('Escape'); await wait(500);
@@ -348,8 +344,7 @@ try {
 
   // ---- text ----------------------------------------------------------------------------
   if (want('text')) {
-    const { ctx, page, errors } = await visit(`${url}/play.html`, { width: 1024, height: 640, init: () => { try { localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true, text: 1.3 })); } catch (e) { /* */ } } });
-    await ready(page);
+    const { ctx, page, errors } = await openVisitor(browser, url, { width: 1024, height: 640, missing: true, init: () => { try { localStorage.setItem('land-of-ascii-v3.display', JSON.stringify({ v: 2, auto: true, text: 1.3 })); } catch (e) { /* */ } } });
     await page.evaluate(async () => { await window.lab.whenIdle(); });
     // anything wider than the window, cut off at its right or bottom, or scrolling sideways
     const over = () => page.evaluate(() => {

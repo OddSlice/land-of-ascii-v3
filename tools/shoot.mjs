@@ -17,7 +17,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, dataURL, writeDataURL, workbench } from './lib/browser.mjs';
-import { serve, args, openLab, ROOT } from './lib/serve.mjs';
+import { serve, args, ROOT } from './lib/serve.mjs';
+import { openLab, view } from './lib/game.mjs';
 
 const a = args();
 const out = path.join(ROOT, a.out || 'shots');
@@ -53,7 +54,7 @@ if (a.world || a.fort) {
     await page.evaluate(() => window.lab.setHud(false));
     const bench = await workbench(browser);
     for (const P of PAIRS_NOW) {
-      await page.evaluate(async ({ cam, hour }) => { window.lab.setWeather('fair'); window.lab.camera(cam); window.lab.freeze(hour, 0, 0); await window.lab.whenIdle(); }, P);
+      await view(page, { camera: P.cam, hour: P.hour, day: 0 });
       await lab.check();
       const own = `data:image/png;base64,${(await (await page.$('#view')).screenshot()).toString('base64')}`;
       const png = await bench.evaluate(async ({ ref, main, title, labels }) => {
@@ -87,7 +88,6 @@ try {
   const cams = await page.evaluate(() => window.lab.cameras.map((c) => ({ name: c.name, ref: c.ref, refLabel: c.refLabel, time: c.time })));
   const shots = [];
   const shoot = async (file) => {
-    await page.evaluate(() => window.lab.whenIdle());
     await lab.check();
     const el = await page.$('#view');
     await el.screenshot({ path: file });
@@ -96,14 +96,14 @@ try {
   if (a.cam) {
     const [x, z, yaw, pitch, y] = a.cam.split(',').map(Number);
     for (const t of times) {
-      await page.evaluate(({ x, z, yaw, pitch, y, t }) => { window.lab.setCamera({ x, z, yaw, pitch, y: isNaN(y) ? undefined : y }); window.lab.freeze(t, 0); }, { x, z, yaw, pitch, y, t });
+      await view(page, { at: { x, z, yaw, pitch, y: isNaN(y) ? undefined : y }, hour: t, weather: null });
       await shoot(path.join(out, `${a.name || 'free'}-${t}.png`));
     }
   } else {
     const list = a.cams ? String(a.cams).split(',').map(Number) : cams.map((_, i) => i);
     for (const i of list) {
       for (const t of times) {
-        await page.evaluate(({ i, t }) => { window.lab.camera(i); window.lab.freeze(t, 0); }, { i, t });
+        await view(page, { camera: i, hour: t, weather: null });
         await shoot(path.join(out, `${i + 1}-${slug(cams[i].name)}-${t}.png`));
       }
     }

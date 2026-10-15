@@ -11,7 +11,10 @@
 //  --size    the built single file, and what share of it each area is
 //            (esbuild's own account of the bytes each source adds)
 //  --git     commits, and days since the first commit
-// With none, all four. To shots/facts/facts.json and printed as tables.
+//  --screen  the cells on screen at each detail level, for a few windows
+//  --rays    the rays a frame casts, from the renderer itself, on the
+//            heaviest camera and the spawn's (Node, 360 x 112)
+// With none, all six. To shots/facts/facts.json and printed as tables.
 //
 //   node tools/facts.mjs [--world] [--code] [--size] [--git] [--sweep 60]
 import fs from 'node:fs';
@@ -20,7 +23,7 @@ import { execSync } from 'node:child_process';
 import { args, ROOT } from './lib/serve.mjs';
 
 const a = args();
-const all = !a.world && !a.code && !a.size && !a.git;
+const all = !a.world && !a.code && !a.size && !a.git && !a.screen && !a.rays;
 const out = {};
 const outFile = path.join(ROOT, 'shots', 'facts', 'facts.json');
 const kept = fs.existsSync(outFile) ? JSON.parse(fs.readFileSync(outFile, 'utf8')) : {};
@@ -133,13 +136,23 @@ async function codeFacts() {
   const { SOUND } = await import('../src/sound/palette.js');
   const { LINES } = await import('../src/world/people/lines.js');
   const W = await import('../src/game/words.js');
-  // spoken lines: the greetings, and every line of a favour's exchange in the words
-  const favourLines = ['CARRY', 'FIND', 'TELL'].reduce((s, k) => s + (W[k] ? JSON.stringify(W[k]).match(/"[^"]{12,}"/g).length : 0), 0);
+  // the kinds of sound: each bed and each event the palette makes (the
+  // footsteps once for each ground they sound on)
+  const S = SOUND;
+  const kinds = ['wind', 'rain', ...Object.keys(S.water), ...['song', 'chorus', 'gull', 'crow', 'finch'].filter((k) => S.birds[k]),
+    ...Object.keys(S.animals), ...['meadow', 'road', 'sand', 'stone', 'timber', 'water', 'snow', 'splash', 'creak', 'land', 'echo'].filter((k) => S.steps[k]).map((k) => `step ${k}`),
+    ...['torch', 'hearth'].filter((k) => S.fire[k]), 'well', 'bell', 'latch'];
+  // spoken lines: what someone can say, the greetings and every line of the
+  // favours' exchanges (their asks, thanks and answers, the hails, the
+  // first meeting's and the lantern's), counted as sentences in the words
+  const said = (v, key) => (typeof v === 'string' ? (['id', 'thing', 'short', 'shape', 'lost', 'kind', 'name'].includes(key) ? 0 : 1)
+    : Array.isArray(v) ? v.reduce((s2, x) => s2 + said(x, key), 0) : v && typeof v === 'object' ? Object.entries(v).reduce((s2, [k, x]) => s2 + said(x, k), 0) : 0);
+  const favourLines = ['CARRY', 'FIND', 'TELL', 'WAITING', 'BACK', 'AND_ME', 'LATER', 'YES', 'FIRST', 'LANTERN_GIFT', 'HAILS'].reduce((s2, k) => s2 + said(W[k], k), 0);
   out.code = {
     sourceFiles: src.length, sourceLines: total, byArea,
     tools: tools.length, toolLibs: toolLib.length, toolLines,
     glyphs: GLYPHS.length, materials: MAT_NAMES.length, paletteHexColours: hexes.size,
-    soundGroups: Object.keys(SOUND).filter((k) => SOUND[k] && typeof SOUND[k] === 'object').length,
+    soundKinds: kinds.length, soundKindNames: kinds,
     musicTracks: SOUND.music.tracks.length, greetingLines: Object.values(LINES).reduce((s2, x) => s2 + (Array.isArray(x) ? x.length : 0), 0), favourLines,
   };
   say(JSON.stringify(out.code, null, 1));
@@ -175,7 +188,44 @@ function gitFacts() {
   say(JSON.stringify(out.git));
 }
 
+// ---- the screen ----------------------------------------------------------------------------
+async function screenFacts() {
+  const { layout, TARGETS } = await import('../src/app/grid.js');
+  const names = ['coarse', 'medium', 'fine', 'finest'];
+  out.screen = [];
+  for (const [w, h, dpr] of [[1440, 900, 1], [1440, 900, 2], [1280, 720, 1], [1920, 1080, 1], [2560, 1440, 2], [3840, 2160, 1.5]]) {
+    for (let p = 0; p < TARGETS.length; p++) { const g = layout(p, w, h, dpr); out.screen.push({ window: `${w} x ${h} at ${dpr}`, level: names[p], target: TARGETS[p], cols: g.cols, rows: g.rows, cells: g.cells }); }
+  }
+  for (const r of out.screen) say(`${r.window}: ${r.level} ${r.cols} x ${r.rows} = ${r.cells} cells (aims at ${r.target})`);
+}
+
+// ---- the rays ---------------------------------------------------------------------------------
+async function rayFacts() {
+  const { generateWorld, DEFAULT_SEED } = await import('../src/world/gen/world.js');
+  const { packWorld, unpackWorld } = await import('../src/world/pack.js');
+  const { createCpuBackend } = await import('../src/scene/cpu/backend.js');
+  const { HIT_STRIDE, REC, MAT_NONE } = await import('../src/contract.js');
+  const { LOOK } = await import('../src/look.js');
+  const { groundAt } = await import('../src/world/objects.js');
+  const g = generateWorld(DEFAULT_SEED); let r; while (!(r = g.next()).done);
+  const w = unpackWorld(packWorld(r.value)), be = createCpuBackend(w);
+  const cols = 360, rows = 112, n = cols * rows, hits = new Uint8Array(n * HIT_STRIDE), DEG = Math.PI / 180;
+  out.rays = [];
+  for (const name of ['main lake shore', 'spawn view', 'inside a forest stand']) {
+    const c = w.cameras.find((q) => q.name === name);
+    const feet = c.y !== undefined ? c.y - 1.7 : Math.max(groundAt(w.terrain, c.x, c.z), groundAt({ ground: w.terrain.levels[0].H, N: w.terrain.N, NN: w.terrain.NN }, c.x, c.z));
+    const f = { seq: 1, cam: { x: c.x, y: feet + 1.7, z: c.z, yaw: c.yaw * DEG, pitch: c.pitch * DEG }, cols, rows, fovY: LOOK.fovY * DEG, aspect: cols / (2 * rows), hour: LOOK.hours.day, t: 0, day: 0 };
+    for (let k = 0; k < 400; k++) { be.render(f, 0, cols, hits); if (be.settled) break; }
+    let mirrored = 0, under = 0;
+    for (let i = 0; i < n; i++) { if (hits[i * HIT_STRIDE + REC] !== MAT_NONE) mirrored++; if (hits[i * HIT_STRIDE + 2 * REC] !== MAT_NONE) under++; }
+    out.rays.push({ camera: name, cells: n, direct: n, mirrored, intoWater: under, total: n + mirrored + under });
+    say(`${name}: ${n} direct rays, ${mirrored} mirrored in water, ${under} through water to the bed: ${n + mirrored + under} in all (360 x 112)`);
+  }
+}
+
 if (all || a.git) gitFacts();
+if (all || a.screen) await screenFacts();
+if (all || a.rays) await rayFacts();
 if (all || a.code) await codeFacts();
 if (all || a.size) await sizeFacts();
 if (all || a.world) await worldFacts();

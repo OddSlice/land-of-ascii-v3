@@ -7,6 +7,7 @@
 //   node tools/title-bench.mjs [--browsers chromium,firefox,webkit] [--threads 8]
 import { launch } from './lib/browser.mjs';
 import { serve, args } from './lib/serve.mjs';
+import { openVisitor } from './lib/game.mjs';
 
 const a = args();
 const browsers = String(a.browsers || 'chromium,firefox,webkit').split(','), threads = Number(a.threads || 8);
@@ -15,9 +16,7 @@ const q = (s, p) => s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))];
 try {
   for (const name of browsers) {
     const browser = await launch(name);
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-    await page.goto(`${url}/play.html?density=3&threads=${threads}`);
-    await page.waitForFunction(() => window.lab && window.lab.ready, null, { timeout: 300000 });
+    const { page } = await openVisitor(browser, url, { width: 1440, height: 900, dpr: 2, query: `?density=3&threads=${threads}`, timeout: 300000 });
     await page.waitForFunction(() => window.lab.titleState().shown, null, { timeout: 20000 });
     const spots = [];
     for (let k = 0; k < 4; k++) {
