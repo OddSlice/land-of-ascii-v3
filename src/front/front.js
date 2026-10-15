@@ -104,26 +104,39 @@ async function main() {
   addEventListener('resize', () => { clearTimeout(t); t = setTimeout(draw, 150); });
 }
 
-// The share image: the main picture across it, the name over its foot.
+// The share image (1200 x 630), in the front page's look: the title
+// screen's stone frame round the main picture, the name centred over its
+// foot, and the line under the name.
 function drawOg(hero, glyphs) {
   const c = $('#og');
   c.hidden = false;
   document.body.classList.add('og');
-  const W = 1200, H = 630, cw = W / hero.cols;
-  const pic = document.createElement('canvas');
-  drawCells(pic, hero.cells, hero.cols, hero.rows, cw, glyphs, 1);
+  const W = 1200, H = 630;
   c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.fillStyle = '#0d0e12'; g.fillRect(0, 0, W, H);
-  g.drawImage(pic, 0, 0);
-  const grad = g.createLinearGradient(0, H - 260, 0, H);
-  grad.addColorStop(0, 'rgba(13,14,18,0)'); grad.addColorStop(0.55, 'rgba(13,14,18,0.86)'); grad.addColorStop(1, 'rgba(13,14,18,0.96)');
-  g.fillStyle = grad; g.fillRect(0, H - 260, W, 260);
+  // the frame: cells 10 x 20 px; 3 columns of stone at the sides, 2 rows of
+  // stone and a timber rail at the top and the foot
+  const fr = document.createElement('canvas'), fcw = 10, rows = Math.ceil(H / (2 * fcw));
+  drawFrame(fr, W / fcw, rows, fcw, 1);
+  const top = -Math.floor((rows * 2 * fcw - H) / 2);
+  g.drawImage(fr, 0, top);
+  // the picture in the field, as wide as the field, its top shown
+  const fx = 3 * fcw, fy = top + 3 * 2 * fcw, fw = W - 2 * fx, fh = rows * 2 * fcw - 2 * 3 * 2 * fcw;
+  const pic = document.createElement('canvas');
+  drawCells(pic, hero.cells, hero.cols, hero.rows, fw / hero.cols, glyphs, 1);
+  g.save(); g.beginPath(); g.rect(fx, fy, fw, fh); g.clip();
+  g.drawImage(pic, fx, fy);
+  // the name and the line, centred over a dark foot
+  const grad = g.createLinearGradient(0, fy + fh - 250, 0, fy + fh);
+  grad.addColorStop(0, 'rgba(13,14,18,0)'); grad.addColorStop(0.5, 'rgba(13,14,18,0.82)'); grad.addColorStop(1, 'rgba(13,14,18,0.95)');
+  g.fillStyle = grad; g.fillRect(fx, fy + fh - 250, fw, 250);
   const name = document.createElement('canvas');
   drawLettering(name, ['LAND OF ASCII'], 6, { dpr: 1 });
-  g.drawImage(name, 48, H - 158);
-  g.font = `22px ${FONT_STACK}`; g.fillStyle = 'rgba(240,230,204,0.85)'; g.textBaseline = 'alphabetic';
-  g.fillText('A quiet walk through a land drawn in letters. It runs in your browser.', 50, H - 36);
+  g.drawImage(name, Math.round((W - name.width) / 2), fy + fh - 160);
+  g.font = `22px ${FONT_STACK}`; g.fillStyle = 'rgba(240,230,204,0.88)'; g.textBaseline = 'alphabetic'; g.textAlign = 'center';
+  g.fillText('A quiet walk through a land drawn in letters. It runs in your browser.', W / 2, fy + fh - 26);
+  g.restore();
   window.ogDone = true;
 }
 
