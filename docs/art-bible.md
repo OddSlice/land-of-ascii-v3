@@ -4,8 +4,8 @@ Written 10 Oct 2026 in phase 0c as a draft; settled in phase 1, when the look wa
 
 Three things hold it together:
 - **`src/look.js` is the only place** where colours, glyphs, ladders and strengths are set. Renderer code reads it and never hard-codes a colour.
-- **The tools hold it in place.** `tools/lookbook.mjs --regress` compares the twenty fixed cameras (the lab's nine, the stress scene's three, the generated world's eight) cell for cell with a saved set. `tools/flicker.mjs` turns blinking into a number. `tools/identity.mjs` proves the picture is the same whatever the number of workers.
-- **The settled choices** (section 9) were made by Martin, by eye, in the look panel (L), which stays for comparison.
+- **The tools hold it in place.** `tools/lookbook.mjs --regress` compares every scene's fixed cameras at day, dusk and night (276 frames: the Look Lab's, the stress scene's, the generated world's with its people's and animals' cameras, and the building yard's) cell for cell with a saved set. `tools/flicker.mjs` turns blinking into a number. `tools/identity.mjs` proves the picture is the same whatever the number of workers.
+- **The settled choices** (section 9) were made by Martin, by eye, in a look panel that showed the candidates side by side; since 0.6.1 only the settled look is left in the game.
 
 ---
 
@@ -84,56 +84,54 @@ Colours are named by their role. Keyframes are blended by the height of the sun,
 - day is full once the sun is above 16°;
 - night is full once it is 13° below the horizon.
 
-The table gives phase 1's three keyframes, which the night rule 'p1' still uses. Under the default night rule ('moon', phase 2a) twilight is dawn in the morning and dusk in the evening, and night is two keyframes blended by the moonlight: see section 5.
+The table gives the five keyframes in use (since phase 2a): day; dawn and dusk, which are twilight in the morning and the evening; and night, blended between a moonlit and a starlit keyframe by how much moonlight there is (section 5). It is made from `src/look/keys.js` itself (0.6.1). Phase 1 had three keyframes, day, dusk and one night; its night is gone, and its dusk is kept with its light retuned.
 
 The whole palette is muted and close in value, after the reference: lit and shadowed grass differ mainly in brightness.
 
-| Role | Day | Dusk | Night |
-|---|---|---|---|
-| Sky, high | `#5266a4` | `#4b3d5d` | `#161927` |
-| Sky, horizon | `#6c7e9b` | `#7a5a64` | `#252438` |
-| Sky, glow round the sun | `#9aa7bd` | `#c48a6e` | `#2c3046` |
-| Haze | `#72839e` | `#5e4d5c` | `#1e1f2c` |
-| Cloud, lit top | `#dfe1e8` | `#b48c78` | `#3b3b47` |
-| Cloud, underside | `#4c5070` | `#3a3049` | `#1a1b23` |
-| Grass, lit | `#6f8a3f` | `#3c4636` | `#212723` |
-| Grass, shade | `#2c3827` | `#20272a` | `#131615` |
-| Meadow patch, dry | `#859447` | `#4a4f38` | `#262b24` |
-| Meadow patch, lush | `#4a6b3c` | `#2e3a33` | `#1a221f` |
-| Forest floor, lit | `#4c4a33` | `#34312d` | `#1b1a1a` |
-| Forest floor, shade | `#22231b` | `#1b1a1b` | `#0e0e0f` |
-| Dirt road, lit | `#7f705a` | `#6a5650` | `#25242a` |
-| Sand, lit | `#93805e` | `#6e5c50` | `#27262a` |
-| Rock, lit | `#8a7e6d` | `#625560` | `#252429` |
-| Rock, shade | `#383842` | `#2f2a33` | `#131316` |
-| Snow, lit | `#d6cfc6` | `#a8949a` | `#3c3f4c` |
-| Wall stone, lit | `#9a958d` | `#6e6064` | `#29282e` |
-| Wall stone, shade | `#4d4b50` | `#3a353c` | `#141418` |
-| Conifer, lit | `#3b4c3a` | `#2c3430` | `#17191c` |
-| Conifer, shade | `#1e271f` | `#1a1f1e` | `#0e0f12` |
-| Trunk, lit | `#4c3e33` | `#352c2a` | `#1c1a1a` |
-| Trunk, shade | `#241e1a` | `#1d1919` | `#0f0e0f` |
-| Bush, lit | `#55703a` | `#36402e` | `#191c1c` |
-| Torch post, lit | `#6a5340` | `#4c3a32` | `#221d1a` |
-| Flame | `#f0dfba` | `#ffb060` | `#ffb468` |
-| Torchlight on surfaces | `#ffb060` | `#ff9f50` | `#ffc46a` |
-| Water, deep | `#2e3c4a` | `#211f2b` | `#0d0f14` |
-| Water, shallow tint | `#5f5c49` | `#655248` | `#28261f` |
-| Water, even blue (blue shallows) | `#44597a` | `#383852` | `#141924` |
-| Lake bed, lit | `#6b6148` | `#544a42` | `#24231f` |
-| Sun disc | `#f4eedc` | `#f0b07a` | `#f4eedc` |
-| Moon disc | `#c8ccd6` | `#b8b6c4` | `#c9ccd4` |
+| Role | Day | Dawn | Dusk | Night, moonlit | Night, starlit |
+|---|---|---|---|---|---|
+| Sky, high | `#5266a4` | `#4d5b8e` | `#4b3d5d` | `#182033` | `#121520` |
+| Sky, horizon | `#6c7e9b` | `#b6a0a4` | `#7a5a64` | `#2c3450` | `#1c1f2e` |
+| Sky, glow round the sun | `#9aa7bd` | `#ecc092` | `#c48a6e` | `#343c58` | `#20243a` |
+| Haze | `#72839e` | `#9a93a6` | `#4f4352` | `#283048` | `#181a26` |
+| Cloud, lit top | `#dfe1e8` | `#e2c0ae` | `#b48c78` | `#4a5064` | `#262832` |
+| Cloud, underside | `#4c5070` | `#4b4a68` | `#3a3049` | `#1e2230` | `#12131a` |
+| Grass, lit | `#6f8a3f` | `#7a8a48` | `#3c4636` | `#3b4a4a` | `#232c2b` |
+| Grass, shade | `#2c3827` | `#26302a` | `#20272a` | `#172022` | `#171e1f` |
+| Meadow patch, dry | `#859447` | `#8e9450` | `#4a4f38` | `#3f4b44` | `#222a26` |
+| Meadow patch, lush | `#4a6b3c` | `#4e6a40` | `#2e3a33` | `#2c3a38` | `#19221f` |
+| Forest floor, lit | `#4c4a33` | `#54503a` | `#34312d` | `#26262a` | `#18191b` |
+| Forest floor, shade | `#22231b` | `#22231c` | `#1b1a1b` | `#121214` | `#0f0f11` |
+| Dirt road, lit | `#7f705a` | `#8f7a62` | `#6a5650` | `#3b3d45` | `#26272e` |
+| Sand, lit | `#93805e` | `#a48c6c` | `#6e5c50` | `#43444a` | `#292a30` |
+| Rock, lit | `#8a7e6d` | `#9a8a7a` | `#625560` | `#44464f` | `#24262c` |
+| Rock, shade | `#383842` | `#3a3a48` | `#2f2a33` | `#1a1b21` | `#15161b` |
+| Snow, lit | `#d6cfc6` | `#f0dcd0` | `#a8949a` | `#7d8498` | `#3e4352` |
+| Wall stone, lit | `#9a958d` | `#a49a90` | `#6e6064` | `#45464e` | `#25262c` |
+| Wall stone, shade | `#4d4b50` | `#4a4850` | `#3a353c` | `#1c1c22` | `#15161a` |
+| Fort masonry, lit | `#b8ae9c` | `#bcae9e` | `#857373` | `#52535b` | `#2b2b31` |
+| Conifer, lit | `#3b4c3a` | `#3c4a38` | `#2c3430` | `#222a2c` | `#141a1c` |
+| Conifer, shade | `#1e271f` | `#1e2620` | `#1a1f1e` | `#10141a` | `#0d1013` |
+| Trunk, lit | `#4c3e33` | `#54443a` | `#352c2a` | `#2a2626` | `#191717` |
+| Trunk, shade | `#241e1a` | `#261f1c` | `#1d1919` | `#141212` | `#100e0f` |
+| Bush, lit | `#55703a` | `#5a703c` | `#36402e` | `#2a3434` | `#182020` |
+| Flame | `#f0dfba` | `#f0dfba` | `#ffb060` | `#ffb468` | `#ffb468` |
+| Torchlight on surfaces | `#ffb060` | `#ffb060` | `#ff9f50` | `#ffc46a` | `#ffc46a` |
+| Water, shallow tint | `#5f5c49` | `#625a4c` | `#655248` | `#2c2c28` | `#1e1e1c` |
+| Water, even blue | `#44597a` | `#4c5a7c` | `#383852` | `#18202e` | `#121722` |
+| Lake bed, lit | `#6b6148` | `#74684e` | `#544a42` | `#2e2f2c` | `#1f1f1d` |
+| Sun disc | `#f4eedc` | `#f6d4a0` | `#f0b07a` | `#f4eedc` | `#f4eedc` |
+| Moon disc | `#c8ccd6` | `#c8ccd6` | `#b8b6c4` | `#d9dce4` | `#c9ccd4` |
 
 **Light per keyframe:**
 
-| | Day | Dusk | Night |
-|---|---|---|---|
-| ambient, direct | 0.28, 0.80 | 0.30, 0.55 | 0.22, 0.42 |
-| cloud shadow, cast shadow | 0.78, 0.92 | 0.25, 0.80 | 0.15, 0.70 |
-| haze: distance (m), most | 700, 0.72 | 420, 0.85 | 330, 0.80 |
-| torchlight strength | 0.04 | 0.30 | 0.55 |
-| flame strength (section 6) | 0.6 | 0.85 | 1 |
-| stars | 0 | 0.15 | 1 |
+| | Day | Dawn | Dusk | Night, moonlit | Night, starlit |
+|---|---|---|---|---|---|
+| ambient, direct | 0.28, 0.8 | 0.24, 1.05 | 0.22, 0.95 | 0.26, 0.62 | 0.42, 0.1 |
+| cloud shadow, cast shadow | 0.78, 0.92 | 0.3, 0.85 | 0.25, 0.82 | 0.15, 0.55 | 0.1, 0.4 |
+| haze: distance (m), most | 700, 0.72 | 420, 0.85 | 420, 0.85 | 330, 0.8 | 330, 0.8 |
+| torchlight strength | 0.04 | 0.12 | 0.3 | 0.55 | 0.55 |
+| flame strength (section 6) | 0.6 | 0.65 | 0.85 | 1 | 1 |
 
 ---
 
@@ -163,19 +161,19 @@ Every colour is clamped after light, haze and ink:
 - Clouds keep phase 1's haze rule.
 - The settings are each keyframe's `air` and `LOOK.air`.
 
-Phase 1's haze stays behind the air rule 'p1', for comparison.
+Phase 1's haze by distance alone was kept beside it for comparison until 0.6.1; now only the overhead map uses a plain haze.
 
 **Dusk** is purple and orange:
 - the sky is purple, with an orange glow round the low sun;
 - the haze is thick, at 420 m;
 - cloud tops catch the warm light;
-- cloud banks (option B) flatten and stretch (`cloudFlat`, `cloudStretch`).
+- cloud banks flatten and stretch (`cloudFlat`, `cloudStretch`).
 
 ### Night and dawn (phase 2a; replaced phase 1's single night)
 
 **What it replaced, and why.** Phase 1 had one night keyframe with a moon always nearly full, its light so weak (direct 0.42 on near-black colours) that at 23:00 the land was a black screen, and its morning used dusk's colours. In the world, with no torches, there was nothing to walk by.
 
-**The rule now** (night 'moon', the default):
+**The rule now:**
 - **The moon has a phase** that follows the day count (a month of 29.53 days; day 0 a bright moon, about day 15 a dark one). Its place follows its phase: a new moon rides with the sun and is down all night; a full moon is opposite it and up all night. The disc is drawn as bright as its lit share, and not at all when new; its glitter on water is as strong.
 - **Night is two keyframes**, blended by how much moonlight there is (the lit share times how high the moon is):
   - **moonlit:** enough to walk by. Open ground, water and snow carry a cool, readable light (direct 0.62, ambient 0.26) and soft moon shadows (cast shadow 0.55), through the same shadow sweep and worker-shared arrays as sunlight;
@@ -186,7 +184,7 @@ Phase 1's haze stays behind the air rule 'p1', for comparison.
 - 900 fixed stars, projected so they never blink; torches make small warm pools (torchlight 0.55); cloud shadows fade out once the light is low. A star's cell keeps the sky's colour round it (phase 2b): before, it lost the glow round a low sun, so at dawn and dusk the hidden stars showed as blue specks.
 - The colours are `LOOK.moonKeys`; the moon's settings `LOOK.moon`.
 
-Phase 1's night stays behind the night rule 'p1', for comparison.
+Phase 1's night was kept beside it for comparison until 0.6.1, when it was removed.
 
 ### 5b. Far land (phase 2a; new)
 
@@ -526,8 +524,7 @@ Hens, dogs and small birds wear colours the people's cloth already has (russet, 
 - the gradient from horizon to high, with a glow round the sun;
 - sun and moon discs at least 1.2 cells;
 - 900 stars.
-- **Clouds A (cumulus):** clusters of spheres of varied sizes, cut flat underneath, bright tops and grey undersides that are lighter at the rim. Kept in the look panel for comparison only.
-- **Clouds B (banks), the settled look:** long broken bands of stretched puffs turned to the band's angle, with streaks along the edge; flatter and longer at dusk.
+- **Clouds (banks):** long broken bands of stretched puffs turned to the band's angle, with streaks along the edge; flatter and longer at dusk.
 - In the generated world the clouds are spread over its whole sky from the seed (about a kilometre apart, some places left clear), not only where the lab's valley looked.
 - A puff's dissolving edge in front of the same cloud's body is not a hole.
 
@@ -611,12 +608,12 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 13. **Never trust stills alone.** Flicker and crawl show only in motion: run the flicker tool and record walk videos.
 14. **Never benchmark with another copy of the game open** (the Claude app's browser pane included), or on a busy machine. WebKit is measured headless.
 15. **Never give the canvas a fractional CSS size** (WebKit drops to 3 fps), and never use the font's own shade blocks at small sizes.
-16. **Never decide the look late, or from concept art.** Compare candidates rendered by the real engine in the real world: that is what the look panel is for.
+16. **Never decide the look late, or from concept art.** Compare candidates rendered by the real engine in the real world, side by side, as phase 0c's look panel did; then keep only the one chosen.
 17. **Never let an object's cost scale with its whole screen box.** Cull exactly and work per plane, as the conifer pass does. The first build's market stalls cost 2 ms because they did not.
 18. **Never show frames at uneven delays, or move the camera by a wobbling clock.** A frame shows the camera as it was when it was asked for. If some frames reach the screen a refresh later than others, turning stalls and then jumps. So every frame is shown the same number of refreshes after it was asked for, at a steady rate, a late frame is dropped rather than shown late, and time moves in whole display refreshes (`src/app/pace.js`). `tools/smooth.mjs` measures it.
 19. **Never judge terrain from the overhead map.** Height noise that looks gentle on a map is usually far too steep at eye level. The generated world is judged by the sky test (`tools/world-check.mjs`: at eye level the median frame is at least 35% sky, and under one view in ten has less than 15%) and by standing in it.
 20. **Never simulate the weather** (phase 2b). Every part of it, the mix of kinds, the wetness of the ground and the clouds' drift, is worked out from the seed, the day and the hour, so a frozen clock repeats exactly and every thread draws the same picture.
-21. **Never let anything on screen but the picture into a tool's frames** (phase 2b). The tools run with the menu, the hint and the start card suppressed from the first frame (`tools/lib/serve.mjs`).
+21. **Never let anything on screen but the picture into a tool's frames** (phase 2b). The tools run with the menu, the hint and the title screen suppressed from the first frame (`tools/lib/serve.mjs`).
 
 **Buildings (phase 3a):**
 
@@ -638,23 +635,18 @@ From the first build's retrospective and from what went wrong in phases 0a and 0
 
 ## 9. Settled choices
 
-Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates. They are the defaults in `look.js` (`choices`); the look panel (L) and the URL (`?cloud=A&meadow=0&shallows=warm`) still show the others, for comparison, until a later phase removes them. (The conifers' choice was removed after phase 3a, 12 Oct 2026: only the tidy tiers are kept, at Martin's request.)
+Locked at the start of phase 1 (10 Oct 2026), from phase 0c's candidates, chosen by eye in the look panel. The conifers' choice went after phase 3a (12 Oct 2026, at Martin's request), and in 0.6.1 (15 Oct 2026) every other candidate and comparison rule was removed with the panel, its keys and its URL options; the settled look is the only one, and every cell of it is as it was.
 
-| Choice (key) | Settled | Why |
+| Choice | Settled | Why |
 |---|---|---|
-| Conifers (7, removed after phase 3a) | ~~B, rough and dark~~ **A, the tidy tiers** since after phase 3a (Martin's choice) | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. B costs about 3% more than A in a forest and blinks no more than phase 0b walking; turning inside a forest it crawls more than phase 0b did, which Martin accepted. |
-| Clouds (8) | **B, banks** | The reference's clouds are irregular banks and broken bands, flatter and longer at dusk. |
-| Meadow (9) | **2, strong patches** | The reference's meadow is mottled in large soft patches several metres across; strength 1 is barely visible at density 3. |
-| Shallows (0) | **blue, even blue** | The reference's near water is an even blue with no bed showing. |
+| Conifers | **the tidy tiers** (A), since after phase 3a (Martin's choice); the rough, dark B is gone | The reference's conifers are dark, rough and uneven: broken outlines, sky showing through, clumped needles. A is a clean version of the same tree and still looks drawn. |
+| Clouds | **banks** (B); the rounded cumulus (A) is gone | The reference's clouds are irregular banks and broken bands, flatter and longer at dusk. |
+| Meadow | **strong patches**; none and soft are gone | The reference's meadow is mottled in large soft patches several metres across; the soft patches were barely visible at density 3. |
+| Shallows | **even blue**; the warm bed is gone | The reference's near water is an even blue with no bed showing. |
 
 Also accepted from phase 0c: the forest-floor material, and narrower crowns in dense stands.
 
-**Phase 2a's rules** are the defaults too, with phase 1's kept beside them in the look panel and by URL for comparison:
-
-| Rule (key) | Default | Phase 1's, for comparison |
-|---|---|---|
-| Distance (5) | **aerial**: aerial perspective, the far-land rules and the backdrop (sections 5 and 5b) | `?air=p1`: haze by distance alone, no backdrop |
-| Night (6) | **moon**: the moon's phases, moonlight and starlight, dawn, the low sun raking (section 5) | `?night=p1`: one dark night, dusk's colours at dawn |
+**Phase 2a's rules** replaced phase 1's: aerial perspective, the far-land rules and the backdrop (sections 5 and 5b), and the moon's phases with moonlight, starlight and dawn (section 5). Phase 1's haze and night were kept beside them for comparison until 0.6.1.
 
 The reasons and measurements are in `docs/phase0c.md`. The regression set was saved again with these defaults in phase 1 (`docs/phase1.md`), and again in phase 2b after the five look fixes, with the weather held at fair (`docs/phase2b.md`).
 
@@ -749,7 +741,7 @@ S9. **Never let the music crowd the land.** Nothing is quick or bright, every tr
 ## 11. The front page and the title screen (phase 6)
 
 - **The name** is set in the game's own lettering (`src/app/lettering.js`): block letters five pixels wide and seven tall, each pixel two cells wide and one tall, each cell filled in the masonry's cream (lighter at the top, shaded toward the foot) with a glyph over it, and a shadow a cell down and to the right. The page carries the name as text too, for readers that cannot see it.
-- **The title screen's panel** is the kit's stone and timber drawn in glyphs (`drawFrame` in `src/app/title.js`): a border of dressed stone in courses, three cells wide and two rows deep, lit from above and the left, with its joints; a timber rail under the top and over the foot, pegged every eight cells; the field dark. Nothing else decorates it: no flames, no emblem, no logo. The world behind it is only ever the game's own picture.
+- **The title screen's panel** is the kit's stone and timber drawn in glyphs (`drawFrame` in `src/app/title.js`): a border of dressed stone in courses, three cells wide and two rows deep, lit from above and the left, with its joints; a timber rail under the top and over the foot, pegged every eight cells; the field dark. Nothing else decorates it: no flames, no emblem, no logo. The world behind it is only ever the game's own picture. On a window under 700 px tall the panel's padding tightens, so at the largest text it still fits with the foot (the version and the seed) clear of it (0.6.1).
 - **The choices** are the menu's: the first in the accent, the rest in the dark well with a quiet line under each; focus outlined in the accent; every one a pointer and a hover.
 - **The front page** is one screen on a laptop and scrolls on a phone: the name, the main picture (a frame the game drew), a few plain sentences, Play in the accent, the keys that matter, four sketches, the inspiration as the research records it, the source. The same colours and monospace as the menu; real contrast; nothing claimed the game does not do.
 - **Never** copy another game's logo, artwork, fonts or layout, and never put a flame, a crest or an ornament on the panel.

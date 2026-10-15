@@ -2,7 +2,7 @@
 
 The numbers the generated world is built to, and the reasons for them. They live in code in `src/world/scale.js`; change a number there and here together. Distances are metres, speeds metres a second, and slopes rise over run (so 12% is 0.12, and 45 degrees is 1.0).
 
-Measured figures come from the default world (seed 3), built by `src/world/gen/world.js`.
+Measured figures come from the default world (seed 3), built by `src/world/gen/world.js`. They were measured again for 0.6.1 (15 Oct 2026) and corrected where the world had moved on since the phase that first gave them. Figures that differ from seed to seed, with their range over sixty seeds, are in `docs/facts.md`.
 
 ## The map
 
@@ -54,8 +54,8 @@ The range goes on past the north and east edges as three receding ridgelines: ne
 |---|---|---|---|
 | One side (2,048 m) | 7.6 min | 4.3 min | 41 s |
 | Corner to corner (2,896 m) | 10.7 min | 6.0 min | 58 s |
-| Spawn to the fort, by road (seed 3, 711 m) | 2.6 min | 1.5 min | |
-| All the roads (seed 3, 2,240 m) | 8.3 min | 4.7 min | |
+| Spawn to the fort's gate, by the roads (seed 3, 1,368 m) | 5.1 min | 2.9 min | |
+| All the roads (seed 3, 2,316 m) | 8.6 min | 4.8 min | |
 
 ## The land
 
@@ -65,15 +65,15 @@ The range goes on past the north and east edges as three receding ridgelines: ne
 | The sky test | at eye level the median frame is at least 35% sky, and under one view in ten has less than 15% | How the terrain is judged (art bible, never-do 19): `tools/world-check.mjs`. |
 | Rivers | 3 to 14 m wide; 2 or 3, rising in the mountains | Seed 3: three rivers, 2.3, 1.8 and 1.3 km long, from 211, 154 and 194 m above the sea. |
 | Fords | water no deeper than 0.6 m where a road crosses | Below the knee; well short of chest depth. |
-| Lakes | filled hollows at least 1,500 m² and 0.7 m deep | Seed 3: a main lake of about 10 ha, 14 m above the sea, and four small ones. |
+| Lakes | filled hollows at least 1,500 m² and 0.7 m deep | Seed 3: a main lake of about 10 ha, 14 m above the sea, and five small ones. |
 
 ## Things on the land
 
 | | | |
 |---|---|---|
-| Trees | about 12,000 conifers, in stands on a jittered 5 m lattice, and (phase 2a) in copses | Seed 3 has 11,843 trees (417 of them in copses) and 503 bushes. |
-| Copses (phase 2a) | up to 32 small clumps of 5 to 30 conifers, 4.5 m apart, in the open lowland at least 140 m apart, clear of the stands, water, shore and range | Something to walk toward in the middle of the map. Seed 3 has 31 copses. |
-| Tree height | 11 to 24 m for most trees; a few emergent trees reach about 36 m | Seed 3 median 19.4 m. Mature spruce and fir height, so a stand edge stands well above the eye across a meadow. |
+| Trees | about 12,000 conifers, in stands on a jittered 5 m lattice, and (phase 2a) in copses | Seed 3 has 11,824 trees and 503 bushes. |
+| Copses (phase 2a) | up to 32 small clumps of 5 to 30 conifers, 4.5 m apart, in the open lowland at least 140 m apart, clear of the stands, water, shore and range | Something to walk toward in the middle of the map. Seed 3 has 32 copses. |
+| Tree height | 11 to 24 m for most trees; a few emergent trees reach about 36 m | Seed 3 median 19.3 m. Mature spruce and fir height, so a stand edge stands well above the eye across a meadow. |
 | Roads | dirt, 4 m wide, flattened across their width; steepest 12% | A cart track. The path search refuses 4 m steps steeper than 7.5% and loosens only where it must (9, 11, 14, then 20%). The laid road is graded to 9.6% and never cut or banked more than 1.5 m. `world-check.mjs` measures each road along its length over 4 m. |
 | The wall | 120 m long, 3 m thick, 6 m high, with merlons 1.5 m high and a gate 4 m wide | The 0A wall. Since phase 3a only in the lab; the generated world has the fort (below). |
 
@@ -151,7 +151,7 @@ A person's sizes are in `FIG` (`src/world/people/figure.js`), before each person
 | Walking | 1.15 to 1.45 m/s by person, a cycle of two steps every 1.3 m | Slower than you (4.5 m/s), so you overtake. |
 | The watch on the wall walk | 0.8 m/s, to and fro along its beat | |
 | Making way | closer than 0.75 m, one steps aside (up to four rounds in a crowd); a walker meeting you within 2.2 m steps round you or waits a metre short | |
-| Greeting | within about 2.3 m, in front of you and facing you; the line shows for about 5 s | |
+| Greeting | within 3 m on your level, from any side (0.5.5; until then about 2.3 m, in front of you and facing you); the line shows for about 5 s | Someone standing turns to you as you come within 4.5 m. |
 | Lights | a lantern or torch out of doors from 18.4 h to 6.1 h | |
 
 | Who | | |
