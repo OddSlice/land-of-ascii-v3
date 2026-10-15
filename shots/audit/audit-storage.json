@@ -1,0 +1,14 @@
+[
+ {
+  "area": "storage",
+  "what": "the front page with every storage call failing: its button shows, no error",
+  "ok": true,
+  "note": "Start exploring"
+ },
+ {
+  "area": "storage",
+  "what": "the game with every storage call failing: the title, Play, walking, a setting, a key, a sketch, the journal",
+  "ok": true,
+  "note": "title: Play a new walk in this land; key: \"walk forward: U.\"; journal open, \"This browser is not keeping anything for this page, so what you do here lasts until you leave.\""
+ }
+]

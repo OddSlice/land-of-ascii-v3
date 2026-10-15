@@ -21,7 +21,7 @@
   "area": "switch",
   "what": "opened with 0 workers: it walks and draws",
   "ok": true,
-  "note": "0 threads, shared false, moved 8.2 m"
+  "note": "0 threads, shared false, moved 8.4 m"
  },
  {
   "area": "switch",
@@ -33,13 +33,13 @@
   "area": "switch",
   "what": "opened with 2 workers: it walks and draws",
   "ok": true,
-  "note": "2 threads, shared true, moved 5.5 m"
+  "note": "2 threads, shared true, moved 6.8 m"
  },
  {
   "area": "switch",
   "what": "opened with 8 workers: it walks and draws",
   "ok": true,
-  "note": "8 threads, shared true, moved 6.9 m"
+  "note": "8 threads, shared true, moved 5.6 m"
  },
  {
   "area": "disk",
@@ -87,19 +87,19 @@
   "area": "keys",
   "what": "right: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "KeyP 1.87 m, KeyD 0.00 m"
+  "note": "KeyP 1.80 m, KeyD 0.00 m"
  },
  {
   "area": "keys",
   "what": "run: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "walk 2.25, ShiftRight 3.99, ShiftLeft 2.25 m"
+  "note": "walk 2.25, ShiftRight 4.13, ShiftLeft 2.25 m"
  },
  {
   "area": "keys",
   "what": "jump: its moved key does it, its default key does nothing",
   "ok": true,
-  "note": "B rose 0.77 m, Space 0.00 m"
+  "note": "B rose 0.72 m, Space 0.00 m"
  },
  {
   "area": "keys",
@@ -247,15 +247,15 @@
  },
  {
   "area": "storage",
-  "what": "the front page with every storage call failing: Play shows, no error",
+  "what": "the front page with every storage call failing: its button shows, no error",
   "ok": true,
-  "note": "Play"
+  "note": "Start exploring"
  },
  {
   "area": "storage",
   "what": "the game with every storage call failing: the title, Play, walking, a setting, a key, a sketch, the journal",
   "ok": true,
-  "note": "title: Play a new walk in this land; key: \"walk forward: U.\"; journal open, \"This browser is not keeping anything for this page, so what you do here lasts until you leave.\""
+  "note": "title: Play a new walk in this land; key: \"walk forward: U.\"; journal open, \"This browser is not keeping anything for this page, so your walk is lost when you leave.\""
  },
  {
   "area": "backup",
@@ -375,6 +375,6 @@
   "area": "backup",
   "what": "a stored record this version cannot read is kept aside, not written over",
   "ok": true,
-  "note": "land-of-ascii-v3.unread.afc509ac.3; the menu says: \"A walk saved here before could not be read, so it is kept aside, not written over.\""
+  "note": "land-of-ascii-v3.unread.afc509ac.3; the menu says: \"An earlier walk saved here couldn't be read. It's been kept aside, not written over.\""
  }
 ]
