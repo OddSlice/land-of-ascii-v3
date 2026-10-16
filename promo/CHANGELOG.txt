@@ -1,0 +1,2 @@
+Land of Ascii 0.6 brings a title screen to set out from, links that share your world or the exact spot you're standing on, keys you can change and larger text for easier reading.
+Since then the villagers' lines have been rewritten so they sound like real people, saved walks look after themselves if a backup is damaged, and link previews show the land in its stone frame.
