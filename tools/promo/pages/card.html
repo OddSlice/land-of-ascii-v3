@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>promo card</title>
+<link rel="stylesheet" href="/tools/promo/fonts/fonts.css">
+<style>
+  :root { --ink: #dcd7cb; --quiet: #a9a397; --head: #f0e6cc; --accent: #ffb060; --on-accent: #1d1409; --line: #383842; --bg: #0d0e12;
+    --mono: "Cascadia Mono", Menlo, Consolas, monospace; }
+  html, body { margin: 0; background: var(--bg); }
+  #card { position: relative; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--mono); }
+  #card canvas, #card img { position: absolute; display: block; image-rendering: pixelated; }
+  #card .text { position: absolute; white-space: nowrap; }
+  #card .tag { color: var(--head); text-shadow: 0 2px 0 #000, 0 0 12px rgba(0,0,0,.65); }
+  #card .foot { display: flex; align-items: center; gap: 0.9em; color: var(--head); letter-spacing: .12em; font-weight: 700; text-shadow: 0 2px 0 #000; }
+  #card .foot b { color: var(--on-accent); background: var(--accent); padding: .32em .7em .34em; border-radius: 5px; border: 1px solid #000; letter-spacing: .08em; text-shadow: none; }
+  #card .badge { color: var(--on-accent); background: var(--accent); font-weight: 700; letter-spacing: .14em; padding: .36em .8em .38em; border-radius: 5px; border: 1px solid #000; }
+  #card .panel { position: absolute; background: rgba(13,14,18,.86); border: 1px solid var(--line); border-radius: 6px; }
+  #card .list { position: absolute; margin: 0; padding: 0; list-style: none; color: var(--ink); }
+  #card .list li { white-space: nowrap; }
+  #card .list li::before { content: '+ '; color: var(--accent); }
+  #card .label { position: absolute; color: var(--head); font-weight: 600; letter-spacing: .06em; text-shadow: 0 1px 0 #000; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script type="module" src="/tools/promo/pages/card.js"></script>
+</body>
+</html>

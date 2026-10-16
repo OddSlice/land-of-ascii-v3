@@ -1,0 +1,87 @@
+LAND OF ASCII: the itch.io page, slot by slot
+============================================
+
+The sizes below come from community guides and itch.io moderators, not
+from itch.io's own documentation. Before uploading each file, check the
+size shown next to its slot on itch.io's upload screen. If one differs,
+ask for the file at that size: the scripts make any of them again in
+minutes.
+
+
+1. THE GAME
+   Upload: dist/land-of-ascii-0.6.5-itch.zip (index.html and play.html)
+   Kind of project: HTML. Tick "This file will be played in the browser".
+   Embed: 1280 x 720 or larger, with the fullscreen button on.
+   Embed options: tick "SharedArrayBuffer support" if it's offered. The
+   game then shares one copy of the world across its workers and runs
+   at its best; without it, it still runs, on four workers.
+
+
+2. THE PAGE'S IMAGES
+
+   cover-630x500.png
+     Slot: Cover image, on the game's edit page.
+     The one people see in lists and search. It's made to read at half
+     size (315 x 250), where itch.io often shows it.
+
+   cover-animated-630x500.gif   (optional)
+     Slot: the same Cover image slot, if you want it to move. itch.io
+     plays an animated cover when someone hovers over it. Its frames
+     match the still cover. 0.6 MB, a 5-second loop of the clouds and the
+     water at dawn.
+     Use either this or cover-630x500.png, not both.
+
+   banner-960x300.png
+     Slot: the banner, in the page's theme editor. It replaces the game's
+     title at the top of the page, so it carries the name. If the title
+     text still shows under the banner, look for the option there to hide it.
+
+   wide-cover-1920x823.png
+     Slot: the wide/featured cover (21:9), if your upload screen offers
+     one. itch.io uses it when it features a game on its front page.
+
+   background-tile-256.png
+     Slot: the background image in the theme editor, set to repeat. It is the
+     game's dark field with faint letters, and it repeats without a seam.
+
+   screenshots/1-meeting-on-the-road.png ... 6-a-sketch.png
+     Slot: Screenshots, on the game's edit page, in this order:
+       1  Rose Cobb meets you on the road with her favour
+       2  Elmswick at dusk, as the journal notes the village
+       3  the journal's Places page
+       4  the map after a day's walk
+       5  a signpost read on the road
+       6  a sketch, open in the journal
+     They show the game exactly as a player sees it, at 1920 x 1080, with
+     two Display settings a player can choose: text "two steps larger"
+     and statistics off.
+
+
+3. THE TRAILER
+   itch.io's trailer field only takes a YouTube or Vimeo link; it can't
+   take a video file. Upload promo/video/land-of-ascii-trailer.mp4 to
+   YouTube (Unlisted is fine) or Vimeo, then paste the link into the
+   trailer field on the game's edit page.
+
+
+4. THEME COLOURS (the theme editor), taken from the game itself
+
+   Background             #0d0e12   the game's dark (behind the tile)
+   Background 2 / column  #131419   the menu's side panel
+   Text                   #dcd7cb   the game's ink
+   Headings               #f0e6cc   the brighter ink of names and titles
+   Links                  #ffb060   the game's orange (the Play button)
+   Buttons                #ffb060   with button text #1d1409
+   Borders                #383842   the panels' edges
+
+   The stone and timber of the frame, if a field asks for an accent:
+   stone #b8ae9c (lit) and #56524f (shade); timber #795939 and #35271b.
+
+   Font: if itch.io's font list has a monospace font, pick it. The game
+   itself uses Cascadia Mono.
+
+
+5. WORDS FOR THE PAGE
+   One line:  A quiet walk through a land drawn in letters.
+   Then:      Meet the villagers, do them favours and sketch the views.
+   Recent updates (two sentences): promo/CHANGELOG.txt
