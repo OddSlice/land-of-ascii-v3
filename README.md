@@ -58,6 +58,18 @@ Every check runs from the command line, in Node or in Playwright's Chromium, Fir
 
 How these tools share their pages is in [docs/architecture.md](docs/architecture.md), and what each other tool in `tools/` does is in its first lines.
 
+## Promo
+
+The trailer, the hype images and the itch.io page set are in `promo/` (see `promo/README.txt`), made from the real game by the scripts in `tools/promo/`:
+
+```sh
+node tools/promo/trailer.mjs          # promo/video: the 30-second trailer, frame by frame, with the game's own sound
+node tools/promo/check-trailer.mjs    # its length, size, frame rate, loudness and the sound in every second
+node tools/promo/stills.mjs           # promo/images, promo/itch: hype images, covers, banner, tile, screenshots
+```
+
+They open the built game with every clock held and Math.random seeded, so a run gives the same pictures every time (the trailer's sound to within one 16-bit step), and use the game's own font from `tools/promo/fonts/` (Cascadia Mono, SIL Open Font License). `promo/` is kept off Vercel (`.vercelignore`).
+
 ## Read more
 
 | Document | What it covers |
