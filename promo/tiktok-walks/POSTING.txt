@@ -1,0 +1,46 @@
+LAND OF ASCII: five peaceful walks for TikTok
+============================================
+
+Five vertical videos, 1080 x 1920 (9:16), 30 seconds each, 60 frames a
+second. No captions, no end card: just the walk, inside the game's stone
+frame, fading in from the dark and out again. Each has the game's own
+sound (its music, the wind, the water, birds, footsteps), levelled to
+-14 LUFS. They were recorded fresh from the game as it is today.
+
+1. land-of-ascii-walk-lake-to-village.mp4
+   Along the shore of Dunholme's lake in the afternoon, the village
+   mirrored in the water, then up the road into the village.
+
+2. land-of-ascii-walk-fort-weather.mp4
+   The fort on its hill above the winding road, from dawn to night in 30
+   seconds: clear skies, cloud, rain, mist at dusk, then a clear night
+   with the gate's torches lit. (Sound: the wind, the rain and the music.)
+
+3. land-of-ascii-walk-flock.mp4
+   A slow walk in among the grazing flock on a morning with a little mist,
+   the shepherd beyond.
+
+4. land-of-ascii-walk-bridge.mp4
+   Down the fort road and over the stone bridge across the Fennwater, late
+   in the afternoon, on toward Dunholme with the sun low ahead.
+
+5. land-of-ascii-walk-night-village.mp4
+   The road into Elmswick under the stars, lantern in hand, the windows and
+   the lamps lit.
+
+
+BEFORE YOU POST
+  - Make sure https://oddslice.itch.io is in your TikTok bio: these videos
+    carry no words at all, so the caption has to say where to play.
+  - A caption idea for any of them:
+      A quiet walk in Land of Ascii, a world drawn entirely in letters.
+      Free in your browser, link in bio.
+  - Hashtags to choose from:
+      #cozygames #indiegame #asciiart #relaxing #ambience #gamedev
+      #indiedev #browsergame #pixelart #itchio
+
+
+To make them again after an update (from the repository's folder):
+  npm run build
+  node tools/promo/tiktok-walks.mjs                       all five (about 5 minutes each)
+  node tools/promo/tiktok-walks.mjs --only fort-weather   one of them

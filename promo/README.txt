@@ -31,6 +31,13 @@ tiktok/   (1080 x 1920, 9:16, for TikTok, Reels and Shorts; see tiktok/POSTING.t
   land-of-ascii-tiktok-favour.mp4   22 s  Rose's favour, the fort at sunset, Juliana's lantern
   POSTING.txt                       captions, cover frames, hashtags, before you post
 
+tiktok-walks/   (1080 x 1920, 30 s each, no words; see tiktok-walks/POSTING.txt)
+  land-of-ascii-walk-lake-to-village.mp4   along Dunholme's lake and into the village
+  land-of-ascii-walk-fort-weather.mp4      the fort from dawn to night through every weather
+  land-of-ascii-walk-flock.mp4             in among the grazing flock on a misty morning
+  land-of-ascii-walk-bridge.mp4            over the stone bridge across the Fennwater
+  land-of-ascii-walk-night-village.mp4     into Elmswick at night, lantern in hand
+
 itch/   (the itch.io page; see itch/UPLOAD-GUIDE.txt for which slot each goes in)
   cover-630x500.png               the cover (made to read at half size)
   cover-animated-630x500.gif      the same cover, moving (optional)
@@ -53,6 +60,7 @@ To make it all again after an update (from the repository's folder):
   node tools/promo/check-trailer.mjs    checks it: length, size, frame rate, sound each second
   node tools/promo/stills.mjs           the images, the itch.io set and the screenshots
   node tools/promo/tiktok.mjs           the three vertical videos
+  node tools/promo/tiktok-walks.mjs     the five peaceful walks
 Every run gives the same pictures, byte for byte: the game's clocks and
 its randomness are fixed while it is recorded. (The trailer's sound matches
 to within one 16-bit step, far below hearing.)
