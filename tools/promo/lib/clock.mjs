@@ -113,6 +113,10 @@ function install(cfg) {
     for (const fn of list) { try { fn(P.now); } catch (e) { console.error(e); } }
     await macrotask();
   };
+  // Two real display frames: after them the browser has drawn everything
+  // the last step changed (the game's canvas and the page over it), so a
+  // screenshot taken now shows this frame, not the one before.
+  P.settle = () => new Promise((r) => real.raf(() => real.raf(() => r())));
   // Finish the audio: render the rest, and give it back as 16-bit PCM WAV
   // in base64 pieces (the page hands them to Node one at a time).
   P.finishAudio = async () => {

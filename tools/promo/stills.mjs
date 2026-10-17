@@ -71,7 +71,7 @@ async function scene(s) {
   // a sketch waits on the game's own timers, which move only as frames do)
   if (s.press) { await page.keyboard.press(s.press); await st.step(s.pressSteps || 20); }
   if (s.after) { await st.eval(s.after); await st.step(s.afterSteps || 4); }
-  const png = await st.shot();
+  const png = await st.steadyShot();
   writePng(path.join(WORK, `${s.name}.png`), png);
   return `data:image/png;base64,${png.toString('base64')}`;
 }

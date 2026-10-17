@@ -42,6 +42,14 @@ export async function openStage({ width = 1920, height = 1080, dpr = 1, seed = 7
     url, page, ctx, cdp, errors, width, height,
     async step(n = 1) { for (let i = 0; i < n; i++) await page.evaluate(() => window.__promo.step()); },
     async shot(format = 'png') { const { data } = await cdp.send('Page.captureScreenshot', { format, ...(format === 'jpeg' ? { quality: 95 } : {}), captureBeyondViewport: false }); return Buffer.from(data, 'base64'); },
+    // (a frame captured once the browser has drawn it, and until two captures
+    // in a row agree: under load a capture can catch the frame before)
+    async steadyShot() {
+      await page.evaluate(() => window.__promo.settle());
+      let a = await st.shot();
+      for (let k = 0; k < 6; k++) { const b = await st.shot(); if (a.equals(b)) return a; a = b; st.retakes = (st.retakes || 0) + 1; }
+      return a;
+    },
     eval: (fn, arg) => page.evaluate(fn, arg),
     async close() { await browser.close(); server.close(); },
   };
