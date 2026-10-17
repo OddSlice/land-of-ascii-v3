@@ -67,6 +67,7 @@ node tools/promo/trailer.mjs          # promo/video: the 30-second trailer, fram
 node tools/promo/check-trailer.mjs    # its length, size, frame rate, loudness and the sound in every second
 node tools/promo/stills.mjs           # promo/images, promo/itch: hype images, covers, banner, tile, screenshots
 node tools/promo/tiktok.mjs           # promo/tiktok: three vertical 1080 x 1920 videos for TikTok, Reels and Shorts
+node tools/promo/tiktok-walks.mjs     # promo/tiktok-walks: five vertical 30-second walks, no words, the game's own sound
 node tools/promo/frame-walks.mjs      # dist/walks: the development walk recordings (shots/walks), framed, no words (large: kept out of git)
 ```
 
