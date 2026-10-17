@@ -67,6 +67,7 @@ node tools/promo/trailer.mjs          # promo/video: the 30-second trailer, fram
 node tools/promo/check-trailer.mjs    # its length, size, frame rate, loudness and the sound in every second
 node tools/promo/stills.mjs           # promo/images, promo/itch: hype images, covers, banner, tile, screenshots
 node tools/promo/tiktok.mjs           # promo/tiktok: three vertical 1080 x 1920 videos for TikTok, Reels and Shorts
+node tools/promo/frame-walks.mjs      # dist/walks: the development walk recordings (shots/walks), framed, no words (large: kept out of git)
 ```
 
 They open the built game with every clock held and Math.random seeded, so a run gives the same pictures every time (the trailer's sound to within one 16-bit step), and use the game's own font from `tools/promo/fonts/` (Cascadia Mono, SIL Open Font License). `promo/` is kept off Vercel (`.vercelignore`).
