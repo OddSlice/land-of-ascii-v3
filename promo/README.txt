@@ -25,6 +25,12 @@ images/   (1920 x 1080, for posts and devlogs)
   land-of-ascii-sketching.png     the journal open on six sketches
   land-of-ascii-the-land.png      dawn, midday, evening and night, in four views
 
+tiktok/   (1080 x 1920, 9:16, for TikTok, Reels and Shorts; see tiktok/POSTING.txt)
+  land-of-ascii-tiktok-letters.mp4  14 s  the land in huge letters, sharpening into the game
+  land-of-ascii-tiktok-day.mp4      15 s  a day in Elmswick as a timelapse, a clock on screen
+  land-of-ascii-tiktok-favour.mp4   22 s  Rose's favour, the fort at sunset, Juliana's lantern
+  POSTING.txt                       captions, cover frames, hashtags, before you post
+
 itch/   (the itch.io page; see itch/UPLOAD-GUIDE.txt for which slot each goes in)
   cover-630x500.png               the cover (made to read at half size)
   cover-animated-630x500.gif      the same cover, moving (optional)
@@ -46,6 +52,7 @@ To make it all again after an update (from the repository's folder):
   node tools/promo/trailer.mjs          the trailer (about 5 minutes)
   node tools/promo/check-trailer.mjs    checks it: length, size, frame rate, sound each second
   node tools/promo/stills.mjs           the images, the itch.io set and the screenshots
+  node tools/promo/tiktok.mjs           the three vertical videos
 Every run gives the same pictures, byte for byte: the game's clocks and
 its randomness are fixed while it is recorded. (The trailer's sound matches
 to within one 16-bit step, far below hearing.)

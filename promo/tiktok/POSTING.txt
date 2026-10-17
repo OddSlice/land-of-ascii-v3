@@ -1,0 +1,64 @@
+LAND OF ASCII on TikTok: three videos, ready to post
+==================================================
+
+All three are 1080 x 1920 (9:16), 60 frames a second, with the game's own
+music and sounds, levelled to -14 LUFS, a common loudness target for
+TikTok and Reels. They work as they are on Instagram Reels and YouTube
+Shorts too.
+
+Every caption and the end card keep to the middle and upper part of the
+picture, clear of TikTok's buttons on the right and its caption area at
+the bottom. The end card says PLAY FREE IN YOUR BROWSER, ODDSLICE.ITCH.IO
+and "link in bio".
+
+
+BEFORE YOU POST
+  - Put https://oddslice.itch.io in your TikTok bio. Links in captions
+    aren't clickable on TikTok, which is why the videos say "link in bio".
+  - The sound is the game's own, so TikTok will list it as "original
+    sound". If your app offers to rename it, call it "Land of Ascii", so
+    anyone who uses the sound is led back to the game.
+  - The text is burned into the videos. If you add TikTok's own captions
+    as well, keep them short so they don't cover the end card.
+
+
+1. land-of-ascii-tiktok-letters.mp4   (14 s)   the hook
+   Opens on the land in huge letters, which sharpen four times into the
+   real game. Then a village at midday and the fort at night.
+   On screen: "This whole world is drawn in letters." / "Everyone here
+   keeps a day of their own." / "No enemies. Just a quiet walk."
+   Cover frame: the first second (the big letters).
+   Suggested caption:
+     Every square on screen is a letter. Land of Ascii is a quiet walk
+     through a land drawn in text. Free in your browser, link in bio.
+
+2. land-of-ascii-tiktok-day.mp4   (15 s)   the timelapse
+   Elmswick from 05:00 to about 21:45, a clock on screen. Sunrise, the
+   midday light, the sunset and the lamps coming on.
+   On screen: "A whole day in a village made of letters."
+   Cover frame: around 8.5 s (the sunset, about 18:15).
+   Suggested caption:
+     A day in Elmswick, sped up. The sky, the clouds and the lamps are
+     all letters. Free to play in your browser, link in bio.
+
+3. land-of-ascii-tiktok-favour.mp4   (22 s)   the story
+   Rose Cobb meets you on the road and asks you to take a mended cloak to
+   the fort. You head there at sunset. At the gate, Juliana Rush thanks
+   you and gives you a lantern for the road.
+   On screen: "POV: a stranger stops you on the road." / "Carry it to the
+   fort before dark." / "A small kindness, and a lantern for the road."
+   Cover frame: around 5 s (Rose's request).
+   Suggested caption:
+     Rose asked me to take a mended cloak up to the fort before dark.
+     Land of Ascii, a quiet game drawn in letters. Link in bio.
+
+Hashtags to choose from:
+  #indiegame #asciiart #cozygames #gamedev #indiedev #browsergame
+  #pixelart #itchio #relaxinggames
+
+
+To make them again after an update (from the repository's folder):
+  npm run build
+  node tools/promo/tiktok.mjs                  all three (about 3 minutes each)
+  node tools/promo/tiktok.mjs --only day       one of them
+  node tools/promo/check-trailer.mjs promo/tiktok/land-of-ascii-tiktok-day.mp4 --seconds 15 --size 1080x1920
