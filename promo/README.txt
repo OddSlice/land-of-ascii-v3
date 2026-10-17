@@ -24,6 +24,7 @@ images/   (1920 x 1080, for posts and devlogs)
   land-of-ascii-villagers.png     villagers at Dunholme's well, one greeting you
   land-of-ascii-sketching.png     the journal open on six sketches
   land-of-ascii-the-land.png      dawn, midday, evening and night, in four views
+  land-of-ascii-banner-728x90.png a 728 x 90 web banner (the "leaderboard" ad size), also as .jpg
 
 tiktok/   (1080 x 1920, 9:16, for TikTok, Reels and Shorts; see tiktok/POSTING.txt)
   land-of-ascii-tiktok-letters.mp4  14 s  the land in huge letters, sharpening into the game
