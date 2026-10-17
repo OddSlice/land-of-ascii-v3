@@ -203,13 +203,13 @@ for (let f = 0; f < TOTAL; f++) {
   if (cutAt >= 0 && f - cutAt >= CUT) cutAt = -1;
 
   await st.step(1);
-  const png = await st.shot();
+  const png = await st.steadyShot();
   lastShot = png;
   if (PREVIEW) { if (f % PREVIEW === 0) writePng(path.join(WORK, 'preview', `f${String(f).padStart(4, '0')}.png`), png); }
   else await write(png);
   if (f % 120 === 0) console.log(`frame ${f} of ${TOTAL}, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 }
-console.log('errors', st.errors);
+console.log('errors', st.errors, st.retakes ? `${st.retakes} frame(s) captured again` : '');
 
 if (!PREVIEW) {
   ff.stdin.end();
