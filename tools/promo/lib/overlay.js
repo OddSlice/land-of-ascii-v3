@@ -58,7 +58,11 @@ const cursor = h('div', 'position:absolute;left:0;top:0;width:34px;height:34px;d
 const ring = h('div', 'position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border:3px solid #ffb060;border-radius:50%;display:none;');
 const end = h('div'); end.id = 'promo-end'; end.style.display = 'none';
 const clock = h('div'); clock.id = 'promo-clock'; clock.style.display = 'none';
-root.append(wipe, ring, cursor, cap, clock, end);
+// (the walks: a veil to fade the picture from and to the dark, and the title
+// screen's stone frame round the picture, over the veil so it stays put)
+const veil = h('div', 'position:absolute;inset:0;background:#0d0e12;opacity:0;');
+const border = h('canvas', `position:absolute;left:0;top:0;width:${W}px;height:${H}px;display:none;`);
+root.append(veil, border, wipe, ring, cursor, cap, clock, end);
 if (TALL) document.documentElement.classList.add('promo-tall');
 document.body.append(root);
 
@@ -140,6 +144,23 @@ export function drawCut(p) {
   }
 }
 
+// ---- the walks: the frame and the fade ----
+// The frame's cells are 6 CSS pixels wide (12 device pixels in a video at
+// two to one): three cells of stone at the sides, two rows and a timber rail
+// at the top and the foot, the middle cleared for the picture.
+export function setBorder(on, cw = 6) {
+  border.style.display = on ? '' : 'none';
+  if (!on) return;
+  const cols = Math.ceil(W / cw), rows = Math.ceil(H / (2 * cw));
+  drawFrame(border, cols, rows, cw, DPR);
+  border.style.width = `${cols * cw}px`; border.style.height = `${rows * 2 * cw}px`;
+  border.style.top = `${-Math.floor((rows * 2 * cw - H) / 2)}px`;
+  // (drawFrame leaves the context scaled to device pixels: back to plain ones to clear the middle)
+  const g = border.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(3 * cw * DPR, 3 * 2 * cw * DPR, (cols - 6) * cw * DPR, (rows - 6) * 2 * cw * DPR);
+}
+export function setVeil(a) { veil.style.opacity = String(Math.max(0, Math.min(1, a))); }
+
 // ---- the timelapse's clock ----
 export function setClock(text) {
   if (!text) { clock.style.display = 'none'; return; }
@@ -179,4 +200,4 @@ export function tidy(on, hint = false, note = false) {
   document.documentElement.classList.toggle('promo-nonote', !!note);
 }
 
-window.__ov = { setCursor, setCaption, setClock, setCut, drawCut, setEnd, tidy, ready: true, tall: TALL };
+window.__ov = { setCursor, setCaption, setClock, setCut, drawCut, setEnd, setBorder, setVeil, tidy, ready: true, tall: TALL };
