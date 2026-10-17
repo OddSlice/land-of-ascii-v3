@@ -257,6 +257,24 @@ if (want('wide')) {
     footer(Wd.w, f.y + f.h - 48, 24),
   ], path.join(ITCH, 'wide-cover-1920x823.png'));
 }
+if (want('leaderboard')) {
+  // The 728 x 90 web banner (the standard "leaderboard" size): a thin frame
+  // (cells 3 x 6 px), a strip of Still Mere at dawn behind it, the name on the
+  // left, and where to play on the right. (--lbY moves the strip; --lbA darkens its left)
+  const L = { w: 728, h: 90 }, cw = 3, f = field(L.w, L.h, cw);
+  const R = { w: 760, h: 420 }, at = { x: 380, y: Number(a.lbY || 268) };
+  const pic = await scene({ ...SCENES.lakeDawn, pitch: 0, name: 'leaderboard', ...R });
+  await render('leaderboard', L.w, L.h, [
+    { type: 'pic', src: pic, x: f.x + f.w / 2 - at.x, y: f.y + f.h / 2 - at.y, clip: f },
+    shade(f, f.y, f.y + f.h, `background:linear-gradient(90deg, rgba(13,14,18,${a.lbA || .6}) 0%, rgba(13,14,18,.25) 58%, rgba(13,14,18,.8) 100%)`),
+    frameOf(L.w, L.h, cw),
+    { type: 'title', lines: ['LAND OF ASCII'], cw: 3, x: f.x + 16, y: f.y + f.h / 2, vanchor: 'middle' },
+    { type: 'tag', text: 'PLAY FREE IN YOUR BROWSER', x: f.x + f.w - 14, y: f.y + 15, anchor: 'right', vanchor: 'middle', size: 10, weight: 700, css: 'letter-spacing:.12em;' },
+    { type: 'badge', text: URL_TEXT, x: f.x + f.w - 14, y: f.y + 37, anchor: 'right', vanchor: 'middle', size: 13 },
+  ], path.join(IMG, 'land-of-ascii-banner-728x90.png'));
+  // (and a JPG, which some ad slots ask for)
+  spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(IMG, 'land-of-ascii-banner-728x90.png'), '-q:v', '2', path.join(IMG, 'land-of-ascii-banner-728x90.jpg')]);
+}
 if (want('tile')) {
   // a background that repeats without a seam: the field of the title
   // screen's frame, the faintest letters on the game's dark
